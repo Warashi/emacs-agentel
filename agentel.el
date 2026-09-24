@@ -26,6 +26,7 @@
 (require 'agentel-commands)
 (require 'agentel-resume)
 (require 'agentel-config)
+(require 'agentel-usage)
 
 (defcustom agentel-command "claude-agent-acp"
   "Program that speaks ACP on stdio."
