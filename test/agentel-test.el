@@ -6,35 +6,6 @@
 (require 'agentel)
 (require 'agentel-test-helper)
 
-(defmacro agentel-test-with-started (var options &rest body)
-  "Start a session on the mock agent with OPTIONS, bind it to VAR, run BODY."
-  (declare (indent 2))
-  `(let* ((agentel-session--registry nil)
-          (command (agentel-test-mock-command))
-          (agentel-command (car command))
-          (agentel-command-args (cdr command))
-          (,var (apply #'agentel-start :cwd temporary-file-directory
-                       :display nil ,options)))
-     (unwind-protect
-         (progn
-           (agentel-test-wait-until
-            (lambda () (eq (agentel-session-state ,var) 'idle)))
-           (with-current-buffer (agentel-session-buffer ,var) ,@body))
-       (when (buffer-live-p (agentel-session-buffer ,var))
-         (kill-buffer (agentel-session-buffer ,var))))))
-
-(defun agentel-test-send (text)
-  "Type TEXT into the input area and send it."
-  (goto-char (point-max))
-  (insert text)
-  (agentel-chat-send))
-
-(defun agentel-test-wait-for-text (regexp)
-  "Wait until the current buffer matches REGEXP."
-  (agentel-test-wait-until
-   (lambda () (save-excursion (goto-char (point-min))
-                              (re-search-forward regexp nil t)))))
-
 (ert-deftest agentel-start-opens-a-session-buffer ()
   (agentel-test-with-started session nil
     (should (string-prefix-p "mock-" (agentel-session-id session)))
