@@ -98,26 +98,40 @@ the working directory.  The session has no id until
         (agentel-session-busy session) nil)
   (agentel-session-changed session))
 
+(defun agentel-session--changed-with-ancestors (session)
+  "Tell listeners that SESSION and the sessions above it changed."
+  (while session
+    (agentel-session-changed session)
+    (setq session (agentel-session-parent session))))
+
 (defun agentel-session-add-pending (session item)
   "Record that SESSION waits for the user to answer ITEM."
   (setf (agentel-session-pending session)
         (append (agentel-session-pending session) (list item)))
-  (agentel-session-changed session))
+  (agentel-session--changed-with-ancestors session))
 
 (defun agentel-session-remove-pending (session item)
   "Record that the user answered ITEM of SESSION."
   (setf (agentel-session-pending session)
         (delq item (agentel-session-pending session)))
-  (agentel-session-changed session))
+  (agentel-session--changed-with-ancestors session))
+
+(defun agentel-session-pending-items (session)
+  "Return what SESSION and its subagents wait for, oldest session first.
+Each element is (OWNER . ITEM) where OWNER is the waiting session."
+  (append (mapcar (lambda (item) (cons session item))
+                  (agentel-session-pending session))
+          (mapcan #'agentel-session-pending-items
+                  (agentel-session-children session))))
 
 (defun agentel-session-state (session)
   "Return the state of SESSION as a symbol.
 It is `starting' before the agent assigns an id, the end reason once
-ended, `waiting' while the user owes an answer, `running' during a
-turn, and `idle' otherwise."
+ended, `waiting' while the user owes an answer to it or to one of its
+subagents, `running' during a turn, and `idle' otherwise."
   (cond ((agentel-session-ended session))
         ((not (agentel-session-id session)) 'starting)
-        ((agentel-session-pending session) 'waiting)
+        ((agentel-session-pending-items session) 'waiting)
         ((agentel-session-busy session) 'running)
         (t 'idle)))
 

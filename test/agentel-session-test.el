@@ -106,6 +106,17 @@
       (should (equal (agentel-session-children parent) (list child)))
       (should (equal (agentel-session-roots) (list parent))))))
 
+(ert-deftest agentel-session-waits-while-a-subagent-waits ()
+  (agentel-session-test-with-registry
+    (let* ((parent (agentel-session-create))
+           (child (agentel-session-create :parent parent)))
+      (agentel-session-register parent "p")
+      (agentel-session-register child "c")
+      (agentel-session-add-pending child 'question)
+      (should (eq (agentel-session-state parent) 'waiting))
+      (should (equal (agentel-session-pending-items parent)
+                     (list (cons child 'question)))))))
+
 (ert-deftest agentel-session-name-is-one-line ()
   (agentel-session-test-with-registry
     (let ((session (agentel-session-create :cwd "/tmp/project/")))
