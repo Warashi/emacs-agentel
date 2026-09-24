@@ -21,6 +21,7 @@
 (require 'agentel-session)
 (require 'agentel-connection)
 (require 'agentel-chat)
+(require 'agentel-permission)
 
 (defcustom agentel-command "claude-agent-acp"
   "Program that speaks ACP on stdio."
