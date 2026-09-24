@@ -102,6 +102,7 @@ sent to the agent as a prompt.")
 
 (defvar-keymap agentel-chat-mode-map
   :doc "Keymap of `agentel-chat-mode'."
+  "TAB" #'completion-at-point
   "C-c C-c" #'agentel-chat-send
   "C-c C-k" #'agentel-chat-cancel
   "C-c C-a" #'agentel-chat-answer
