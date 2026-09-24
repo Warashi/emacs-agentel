@@ -1,20 +1,19 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    twist.url = "github:emacs-twist/twist.nix";
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-    }:
+    inputs:
     let
       systems = [
         "x86_64-linux"
         "aarch64-linux"
         "aarch64-darwin"
       ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f (import nixpkgs { inherit system; }));
+      forAllSystems =
+        f: inputs.nixpkgs.lib.genAttrs systems (system: f (import inputs.nixpkgs { inherit system; }));
     in
     {
       formatter = forAllSystems (pkgs: pkgs.nixfmt-tree);
