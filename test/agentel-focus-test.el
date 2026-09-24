@@ -211,8 +211,9 @@ STATE is a plist of the tool calls made and the questions open."
           (should (equal (list seed followed)
                          (list seed (agentel-focus-test-visible)))))))))
 
-(defun agentel-focus-test-chunk-time (turns tools)
-  "Return the seconds a chunk takes after TURNS turns and TOOLS tool calls."
+(defun agentel-focus-test-time (turns tools change)
+  "Return the seconds CHANGE takes after TURNS turns and TOOLS tool calls.
+CHANGE is called with the session; the fastest of a few runs counts."
   (agentel-focus-test-with-session
     (dotimes (i turns)
       (agentel-focus-test-prompt session (format "prompt %d" i))
@@ -224,13 +225,23 @@ STATE is a plist of the tool calls made and the questions open."
       (agentel-focus-test-tool (format "now%d" i) "Read x"))
     (agentel-focus-test-chunk "agent_message_chunk" "x")
     (garbage-collect)
-    (car (benchmark-run 100
-           (agentel-focus-test-chunk "agent_message_chunk" "more text ")))))
+    (apply #'min (mapcar (lambda (_)
+                           (car (benchmark-run 100 (funcall change session))))
+                         '(1 2 3)))))
+
+(defun agentel-focus-test-scales-flat-p (change)
+  "Return non-nil if CHANGE takes as long in a short session as in long ones."
+  (let ((short (agentel-focus-test-time 10 10 change)))
+    (and (< (agentel-focus-test-time 1000 10 change) (* 5 short))
+         (< (agentel-focus-test-time 10 3000 change) (* 5 short)))))
 
 (ert-deftest agentel-focus-follows-a-chunk-regardless-of-the-length ()
-  (let ((short (agentel-focus-test-chunk-time 10 10)))
-    (should (< (agentel-focus-test-chunk-time 1000 10) (* 5 short)))
-    (should (< (agentel-focus-test-chunk-time 10 3000) (* 5 short)))))
+  (should (agentel-focus-test-scales-flat-p
+           (lambda (_) (agentel-focus-test-chunk "agent_message_chunk" "more text ")))))
+
+(ert-deftest agentel-focus-follows-the-session-regardless-of-the-length ()
+  (should (agentel-focus-test-scales-flat-p
+           (lambda (session) (setf (agentel-session-data session 'usage) (random))))))
 
 (ert-deftest agentel-focus-can-be-turned-on-for-every-session-buffer ()
   (let ((agentel-session--registry nil)

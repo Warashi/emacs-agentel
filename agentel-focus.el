@@ -12,22 +12,19 @@
 ;; its rendering stay as they are, and turning the mode off shows
 ;; everything again.
 ;;
-;; A streamed chunk changes one entry, so only that entry is looked at
-;; again; the cost does not grow with the session.  Everything before
-;; the last prompt is covered by a single overlay, and the entries of
-;; the current turn are kept in a list.  An overlay of a hidden entry
-;; follows text inserted in front of it and not behind it, so it keeps
-;; covering its entry when the neighbours are rendered again.
+;; A streamed chunk changes one entry and a change of the session can
+;; only move the answer, the activity or the questions, so only those
+;; entries are looked at again; the cost does not grow with the session
+;; or the turn.  Everything before the last prompt is covered by a
+;; single overlay.  An overlay of a hidden entry follows text inserted
+;; in front of it and not behind it, so it keeps covering its entry when
+;; the neighbours are rendered again.
 
 ;;; Code:
 
-(require 'seq)
 (require 'subr-x)
 (require 'agentel-session)
 (require 'agentel-chat)
-
-(defvar-local agentel-focus--turn nil
-  "Entries of the current turn, newest first.")
 
 (defvar-local agentel-focus--overlays nil
   "Hash table from each entry of the current turn to its overlay.
@@ -39,13 +36,24 @@ The overlay is nil while the entry is shown.")
 (defvar-local agentel-focus--before nil
   "Overlay hiding the transcript before the current turn.")
 
+(defvar-local agentel-focus--last-message nil
+  "Newest agent message of the current turn.")
+
+(defvar-local agentel-focus--last-activity nil
+  "Newest tool call or subagent of the current turn.")
+
+(defvar-local agentel-focus--askers nil
+  "Entries of the current turn that may wait for an answer.")
+
 (defvar-local agentel-focus--latest nil
   "Entry shown as the answer or the current activity of the turn.")
 
-(defun agentel-focus--activity ()
-  "Return the entry types that show the state of the turn."
+(defun agentel-focus--current-latest ()
+  "Return the entry that shows the state of the turn."
   (let ((session agentel-chat--session))
-    (if (and session (agentel-session-busy session)) '(tool subagent) '(agent))))
+    (if (and session (agentel-session-busy session))
+        agentel-focus--last-activity
+      agentel-focus--last-message)))
 
 (defun agentel-focus--waits-p (entry)
   "Return non-nil if ENTRY shows something owing an answer."
@@ -85,13 +93,24 @@ MOVED means its text changed, so a hidden entry is covered again."
            (move-overlay overlay (agentel-chat-entry-start entry)
                          (agentel-focus--entry-end entry))))))
 
+(defun agentel-focus--add (entry)
+  "Record ENTRY as the newest of the current turn."
+  (puthash entry nil agentel-focus--overlays)
+  (pcase (agentel-chat-entry-type entry)
+    ('agent (setq agentel-focus--last-message entry))
+    ((or 'tool 'subagent) (setq agentel-focus--last-activity entry)))
+  (when (or (agentel-chat-entry-get entry 'item)
+            (agentel-chat-entry-get entry 'child))
+    (push entry agentel-focus--askers)))
+
 (defun agentel-focus--refresh ()
-  "Show or hide every entry of the current turn."
-  (let ((activity (agentel-focus--activity)))
-    (setq agentel-focus--latest
-          (seq-find (lambda (e) (memq (agentel-chat-entry-type e) activity))
-                    agentel-focus--turn)))
-  (dolist (entry agentel-focus--turn)
+  "Show or hide the entries that the state of the session can change."
+  (let ((previous agentel-focus--latest))
+    (setq agentel-focus--latest (agentel-focus--current-latest))
+    (unless (eq previous agentel-focus--latest)
+      (when previous (agentel-focus--fix previous))
+      (when agentel-focus--latest (agentel-focus--fix agentel-focus--latest))))
+  (dolist (entry agentel-focus--askers)
     (agentel-focus--fix entry)))
 
 (defun agentel-focus--clear ()
@@ -103,18 +122,18 @@ MOVED means its text changed, so a hidden entry is covered again."
     (delete-overlay agentel-focus--before))
   (setq agentel-focus--overlays (make-hash-table :test 'eq)
         agentel-focus--before nil
-        agentel-focus--turn nil
         agentel-focus--turn-start nil
+        agentel-focus--last-message nil
+        agentel-focus--last-activity nil
+        agentel-focus--askers nil
         agentel-focus--latest nil))
 
 (defun agentel-focus--start-turn (entries)
-  "Make ENTRIES, newest first, the current turn.
-The oldest of them is the last prompt, unless there is none."
+  "Make ENTRIES, oldest first, the current turn.
+The first of them is the last prompt, unless there is none."
   (agentel-focus--clear)
-  (setq agentel-focus--turn entries)
-  (dolist (entry entries)
-    (puthash entry nil agentel-focus--overlays))
-  (when-let* ((prompt (car (last entries)))
+  (mapc #'agentel-focus--add entries)
+  (when-let* ((prompt (car entries))
               ((eq (agentel-chat-entry-type prompt) 'user)))
     (setq agentel-focus--turn-start (agentel-chat-entry-start prompt))
     (when (> agentel-focus--turn-start (point-min))
@@ -122,10 +141,11 @@ The oldest of them is the last prompt, unless there is none."
       (setq agentel-focus--before
             (make-overlay (point-min) (+ agentel-focus--turn-start 2)))
       (overlay-put agentel-focus--before 'invisible 'agentel-focus)))
-  (agentel-focus--refresh))
+  (setq agentel-focus--latest (agentel-focus--current-latest))
+  (mapc #'agentel-focus--fix entries))
 
 (defun agentel-focus--last-turn ()
-  "Return the entries from the last prompt on, newest first."
+  "Return the entries from the last prompt on, oldest first."
   (let ((pos (marker-position agentel-chat--transcript-end))
         entries)
     (while (> pos (point-min))
@@ -135,7 +155,7 @@ The oldest of them is the last prompt, unless there is none."
         (push entry entries)
         (when (eq (agentel-chat-entry-type entry) 'user)
           (setq pos (point-min)))))
-    (nreverse entries)))
+    entries))
 
 (defun agentel-focus--on-entry-changed (entry)
   "Show or hide ENTRY, which was added or changed."
@@ -146,12 +166,8 @@ The oldest of them is the last prompt, unless there is none."
         ((and agentel-focus--turn-start
               (< (agentel-chat-entry-start entry) agentel-focus--turn-start)))
         (t
-         (push entry agentel-focus--turn)
-         (puthash entry nil agentel-focus--overlays)
-         (when (memq (agentel-chat-entry-type entry) (agentel-focus--activity))
-           (let ((previous agentel-focus--latest))
-             (setq agentel-focus--latest entry)
-             (when previous (agentel-focus--fix previous))))
+         (agentel-focus--add entry)
+         (agentel-focus--refresh)
          (agentel-focus--fix entry))))
 
 ;;;###autoload
