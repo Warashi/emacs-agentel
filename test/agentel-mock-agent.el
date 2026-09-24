@@ -21,6 +21,7 @@
 
 (require 'cl-lib)
 (require 'json)
+(require 'seq)
 (require 'subr-x)
 
 (defvar agentel-mock--next-id 1000)
@@ -278,13 +279,24 @@ KIND is the session update name and defaults to an agent message."
       (agentel-mock--finish id session-id)))))
 
 (defun agentel-mock--set-config (id params)
-  "Handle `session/set_config_option' request ID with PARAMS."
+  "Handle `session/set_config_option' request ID with PARAMS.
+Like the real adapter, a model may be given by an alias and other
+unknown values are rejected."
   (let* ((session-id (alist-get 'sessionId params))
          (state (gethash session-id agentel-mock--sessions))
-         (key (intern (alist-get 'configId params))))
-    (setf (alist-get key state) (alist-get 'value params))
-    (puthash session-id state agentel-mock--sessions)
-    (agentel-mock--respond id `((configOptions . ,(agentel-mock--config-options state))))))
+         (config-id (alist-get 'configId params))
+         (value (alist-get 'value params))
+         (option (seq-find (lambda (o) (equal (alist-get 'id o) config-id))
+                           (agentel-mock--config-options state)))
+         (values (mapcar (lambda (v) (alist-get 'value v)) (alist-get 'options option))))
+    (when (and (equal config-id "model") (equal value "opus"))
+      (setq value "opus[1m]"))
+    (if (not (member value values))
+        (agentel-mock--error id -32603 (format "Invalid value for config option %s: %s"
+                                               config-id value))
+      (setf (alist-get (intern config-id) state) value)
+      (puthash session-id state agentel-mock--sessions)
+      (agentel-mock--respond id `((configOptions . ,(agentel-mock--config-options state)))))))
 
 (defun agentel-mock--load (id params)
   "Handle `session/load' request ID with PARAMS by replaying history."
