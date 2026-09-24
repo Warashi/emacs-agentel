@@ -129,6 +129,14 @@
            (list (lambda (_s) "model") (lambda (_s) nil) (lambda (_s) "ctx"))))
       (should (string-match-p "model.*ctx" (agentel-chat--header-line))))))
 
+(ert-deftest agentel-chat-header-line-escapes-percent-signs ()
+  ;; `format-mode-line' renders nothing in batch mode, so check the
+  ;; mode line format the :eval form produces instead.
+  (agentel-chat-test-with-session
+    (let ((agentel-chat-header-functions (list (lambda (_s) "ctx 12%"))))
+      (should (string-match-p "ctx 12%%\\'"
+                              (eval (cadr header-line-format) t))))))
+
 (ert-deftest agentel-chat-answer-runs-the-oldest-question ()
   (agentel-chat-test-with-session
     (let (answered)

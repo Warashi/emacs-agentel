@@ -496,7 +496,9 @@ and send it with \\[agentel-chat-send]."
   (setq-local agentel-chat--entries (make-hash-table :test 'equal))
   (setq-local agentel-chat--transcript-end (point-min-marker))
   (set-marker-insertion-type agentel-chat--transcript-end t)
-  (setq-local header-line-format '(:eval (agentel-chat--header-line))))
+  ;; The result of :eval is itself a mode line format, where % is special.
+  (setq-local header-line-format
+              '(:eval (string-replace "%" "%%" (agentel-chat--header-line)))))
 
 (defun agentel-chat--on-changed (session)
   "Redisplay the header line of SESSION's buffer."
