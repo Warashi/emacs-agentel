@@ -1,0 +1,22 @@
+#+title: agentel
+
+An Agent Client Protocol (ACP) client for Emacs, built on acp.el.
+
+* Development
+
+=nix develop= provides an Emacs with the dependencies listed in the
+=Package-Requires= header of =agentel.el=. agentel itself is not part of
+that environment; load it from the working tree:
+
+#+begin_src sh
+nix develop -c emacs -L . -l agentel.el
+#+end_src
+
+After changing =Package-Requires=, regenerate the lock files in =lock/=.
+Fetching packages that are not locked yet requires impure evaluation:
+
+#+begin_src sh
+nix run --impure .#lock
+#+end_src
+
+To update the locked packages, run =nix flake update --flake ./lock=.
