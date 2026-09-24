@@ -12,6 +12,13 @@ that environment; load it from the working tree:
 nix develop -c emacs -L . -l agentel.el
 #+end_src
 
+Run the tests and the linters (byte compilation with warnings as
+errors, and checkdoc):
+
+#+begin_src sh
+nix develop -c make test lint
+#+end_src
+
 After changing =Package-Requires=, regenerate the lock files in =lock/=.
 Fetching packages that are not locked yet requires impure evaluation:
 
