@@ -4,8 +4,9 @@
 
 ;; `agentel-focus-mode' hides the transcript except what the user
 ;; answers next: the last prompt, the questions still waiting for an
-;; answer and errors of the turn, and then the last agent message once
-;; the turn ended, or the latest tool call or subagent while it runs.
+;; answer, errors and why the turn ended, and then the last agent
+;; message once the turn ended, or the latest tool call or subagent
+;; while it runs.
 ;; A subagent is also shown while it waits for an answer.
 ;;
 ;; Hidden entries are covered by overlays, so the transcript text and
@@ -66,7 +67,7 @@ The overlay is nil while the entry is shown.")
 (defun agentel-focus--hidden-p (entry)
   "Return non-nil if ENTRY of the current turn is hidden."
   (not (or (eq entry agentel-focus--latest)
-           (memq (agentel-chat-entry-type entry) '(user error))
+           (memq (agentel-chat-entry-type entry) '(user error stop))
            (agentel-focus--waits-p entry))))
 
 (defun agentel-focus--entry-end (entry)
@@ -174,8 +175,8 @@ The first of them is the last prompt, unless there is none."
 (define-minor-mode agentel-focus-mode
   "Show only what the next input to the session needs.
 The last prompt stays visible, with the questions waiting for an
-answer, errors of the turn, and the last agent message once the turn
-ended or the latest tool call or subagent while it runs."
+answer, errors and why the turn ended, and the last agent message
+once the turn ended or the latest tool call or subagent while it runs."
   :lighter " Focus"
   (if agentel-focus-mode
       (progn

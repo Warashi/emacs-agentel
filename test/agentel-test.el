@@ -30,7 +30,9 @@
     (agentel-test-send "slow")
     (agentel-test-wait-for-text "Working slowly")
     (agentel-chat-cancel)
-    (agentel-test-wait-for-text "Turn ended: cancelled")))
+    (agentel-test-wait-for-text "Turn ended: cancelled")
+    (should (eq (agentel-chat-entry-type (agentel-chat-entry-at (match-beginning 0)))
+                'stop))))
 
 (ert-deftest agentel-killing-the-buffer-stops-the-agent ()
   (agentel-test-with-started session nil

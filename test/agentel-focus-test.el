@@ -107,6 +107,16 @@
     (agentel-chat-notice session "Prompt failed: boom" 'error)
     (should (string-match-p "Prompt failed: boom" (agentel-focus-test-visible)))))
 
+(ert-deftest agentel-focus-shows-why-the-last-turn-ended ()
+  (agentel-focus-test-with-session
+    (agentel-focus-test-prompt session "do it")
+    (agentel-focus-test-chunk "agent_message_chunk" "Half an answer")
+    (agentel-session-set-busy session nil)
+    (agentel-chat-notice session "Turn ended: max_tokens" 'stop)
+    (let ((text (agentel-focus-test-visible)))
+      (should (string-match-p "Half an answer" text))
+      (should (string-match-p "Turn ended: max_tokens" text)))))
+
 (ert-deftest agentel-focus-shows-a-subagent-that-waits ()
   (agentel-focus-test-with-session
     (let ((child (agentel-session-create :parent session)))
@@ -195,7 +205,7 @@ STATE is a plist of the tool calls made and the questions open."
       (5 (agentel-session-set-busy session (zerop (random 2))))
       (6 (push (agentel-focus-test-question session "Q?") items))
       (7 (when items (agentel-session-remove-pending session (pop items))))
-      (8 (agentel-chat-notice session "n" (if (zerop (random 2)) 'error 'notice))))
+      (8 (agentel-chat-notice session "n" (seq-random-elt '(error stop notice)))))
     (list :tools tools :items items)))
 
 (ert-deftest agentel-focus-follows-changes-like-it-was-turned-on-afresh ()

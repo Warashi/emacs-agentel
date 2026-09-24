@@ -231,7 +231,7 @@ DATA its initial alist and COLLAPSED its initial folding."
 
 (defun agentel-chat-notice (session text &optional type)
   "Add the notice TEXT to the buffer of SESSION.
-TYPE is `error' for errors."
+TYPE is `error' for errors and `stop' for why a turn ended early."
   (when-let* ((buffer (agentel-session-buffer session))
               ((buffer-live-p buffer)))
     (with-current-buffer buffer
@@ -449,7 +449,7 @@ TYPE is `error' for errors."
      (agentel-chat--finish-turn session)
      (let ((reason (alist-get 'stopReason result)))
        (unless (member reason '("end_turn" nil))
-         (agentel-chat-notice session (format "Turn ended: %s" reason)))))
+         (agentel-chat-notice session (format "Turn ended: %s" reason) 'stop))))
    :on-failure
    (lambda (error)
      (agentel-chat--finish-turn session)
