@@ -218,7 +218,10 @@ KIND is the session update name and defaults to an agent message."
                                       ((const . "Blue") (title . "Blue")
                                        (description . "Cool"))])))
              (question_0_custom . ((type . "string") (title . "Other")
-                                   (description . "Type your own answer (optional).")))
+                                   (description . "Type your own answer (optional).")
+                                   (_meta . ((_askUserQuestionCustomAnswer
+                                              . ((questionId . "question_0")
+                                                 (isCustomAnswer . t)))))))
              (question_1 . ((type . "array") (title . "Fruits")
                             (description . "Which fruits do you like?")
                             (items . ((anyOf . [((const . "Apple") (title . "Apple"))
