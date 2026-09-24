@@ -198,7 +198,11 @@ DATA its initial alist and COLLAPSED its initial folding."
       (save-excursion
         (goto-char start)
         (delete-region start end)
-        (insert (agentel-chat--entry-string entry start))))
+        (insert (agentel-chat--entry-string entry start))
+        ;; The start of the next entry was left in front of the new text.
+        (when-let* ((next (and (< (point) agentel-chat--transcript-end)
+                               (agentel-chat-entry-at (point)))))
+          (set-marker (agentel-chat-entry-start next) (point)))))
     (run-hook-with-args 'agentel-chat-entry-changed-functions entry)
     (when offset
       (goto-char (min (+ start offset) (agentel-chat--entry-end entry))))))

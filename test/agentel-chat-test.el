@@ -105,6 +105,18 @@
     (let ((text (agentel-chat-test-transcript)))
       (should (string-match-p "ok 3 tests\n\nMeanwhile done\\'" text)))))
 
+(ert-deftest agentel-chat-updating-tools-in-any-order-keeps-each-in-place ()
+  (agentel-chat-test-with-session
+    (dolist (id '("t1" "t2" "t3"))
+      (agentel-chat-test-update
+       `((sessionUpdate . "tool_call") (toolCallId . ,id) (title . ,id))))
+    (dolist (id '("t2" "t3" "t1"))
+      (agentel-chat-test-update
+       `((sessionUpdate . "tool_call_update") (toolCallId . ,id)
+         (title . ,(concat id " again")))))
+    (should (string-match-p "\\`.*t1 again\n\n.*t2 again\n\n.*t3 again\\'"
+                            (agentel-chat-test-transcript)))))
+
 (ert-deftest agentel-chat-shows-the-latest-plan ()
   (agentel-chat-test-with-session
     (agentel-chat-test-update
