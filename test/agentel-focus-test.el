@@ -3,6 +3,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'benchmark)
 (require 'agentel-focus)
 
 (defmacro agentel-focus-test-with-session (&rest body)
@@ -131,6 +132,105 @@
     (goto-char (point-max))
     (insert "next question")
     (should (string-suffix-p "❯ next question" (agentel-focus-test-visible)))))
+
+(ert-deftest agentel-focus-can-be-turned-on-in-a-running-session ()
+  (agentel-focus-test-with-session
+    (agentel-focus-mode -1)
+    (agentel-focus-test-a-finished-turn session)
+    (agentel-session-set-busy session nil)
+    (agentel-focus-mode)
+    (let ((text (agentel-focus-test-visible)))
+      (should (string-prefix-p "❯ second prompt" text))
+      (should (string-match-p "second answer" text))
+      (should-not (string-match-p "Read README" text)))))
+
+(ert-deftest agentel-focus-keeps-updated-tool-calls-in-place ()
+  (agentel-focus-test-with-session
+    (agentel-focus-test-prompt session "do it")
+    (agentel-focus-test-tool "t1" "Read a.el")
+    (agentel-focus-test-tool "t2" "Read b.el")
+    (agentel-focus-test-tool "t3" "Read c.el")
+    ;; Updating a hidden tool call between hidden and shown ones.
+    (agentel-focus-test-tool "t2" "Read b.el again")
+    (agentel-focus-test-tool "t1" "Read a.el again")
+    (let ((text (agentel-focus-test-visible)))
+      (should (string-match-p "\\`❯ do it\n\n.*Read c\\.el\n\n❯ \\'" text)))
+    (agentel-focus-test-tool "t3" "Read c.el again")
+    (should (string-match-p "\\`❯ do it\n\n.*Read c\\.el again\n\n❯ \\'"
+                            (agentel-focus-test-visible)))))
+
+(ert-deftest agentel-focus-keeps-earlier-turns-hidden-when-they-change ()
+  (agentel-focus-test-with-session
+    (agentel-focus-test-prompt session "first")
+    (agentel-focus-test-tool "t1" "Read a.el")
+    (agentel-session-set-busy session nil)
+    (agentel-focus-test-prompt session "second")
+    (agentel-focus-test-tool "t1" "Read a.el later")
+    (should-not (string-match-p "Read a\\.el" (agentel-focus-test-visible)))))
+
+(ert-deftest agentel-focus-hides-a-streamed-message-while-running ()
+  (agentel-focus-test-with-session
+    (agentel-focus-test-prompt session "do it")
+    (agentel-focus-test-tool "t1" "Read a.el")
+    (agentel-focus-test-chunk "agent_message_chunk" "Some ")
+    (agentel-focus-test-chunk "agent_message_chunk" "text")
+    (should-not (string-match-p "Some\\|text" (agentel-focus-test-visible)))
+    (agentel-session-set-busy session nil)
+    (should (string-match-p "\\`❯ do it\n\nSome text\n\n❯ \\'"
+                            (agentel-focus-test-visible)))))
+
+(defun agentel-focus-test-random-step (session state)
+  "Change SESSION in one random way.
+STATE is a plist of the tool calls made and the questions open."
+  (let ((tools (or (plist-get state :tools) 0))
+        (items (plist-get state :items)))
+    (pcase (random 9)
+      (0 (agentel-focus-test-prompt session "p"))
+      (1 (agentel-focus-test-chunk "agent_message_chunk" "m"))
+      (2 (agentel-focus-test-chunk "agent_thought_chunk" "t"))
+      (3 (agentel-focus-test-tool (format "t%d" (cl-incf tools)) "new"))
+      (4 (when (> tools 0)
+           (agentel-focus-test-tool (format "t%d" (1+ (random tools)))
+                                    (make-string (1+ (random 5)) ?u))))
+      (5 (agentel-session-set-busy session (zerop (random 2))))
+      (6 (push (agentel-focus-test-question session "Q?") items))
+      (7 (when items (agentel-session-remove-pending session (pop items))))
+      (8 (agentel-chat-notice session "n" (if (zerop (random 2)) 'error 'notice))))
+    (list :tools tools :items items)))
+
+(ert-deftest agentel-focus-follows-changes-like-it-was-turned-on-afresh ()
+  (dotimes (seed 200)
+    (random (format "agentel-focus-%d" seed))
+    (agentel-focus-test-with-session
+      (let ((state nil))
+        (dotimes (_ (1+ (random 80)))
+          (setq state (agentel-focus-test-random-step session state)))
+        (let ((followed (agentel-focus-test-visible)))
+          (agentel-focus-mode -1)
+          (agentel-focus-mode)
+          (should (equal (list seed followed)
+                         (list seed (agentel-focus-test-visible)))))))))
+
+(defun agentel-focus-test-chunk-time (turns tools)
+  "Return the seconds a chunk takes after TURNS turns and TOOLS tool calls."
+  (agentel-focus-test-with-session
+    (dotimes (i turns)
+      (agentel-focus-test-prompt session (format "prompt %d" i))
+      (agentel-focus-test-tool (format "t%d" i) "Read x")
+      (agentel-focus-test-chunk "agent_message_chunk" "answer")
+      (agentel-session-set-busy session nil))
+    (agentel-focus-test-prompt session "now")
+    (dotimes (i tools)
+      (agentel-focus-test-tool (format "now%d" i) "Read x"))
+    (agentel-focus-test-chunk "agent_message_chunk" "x")
+    (garbage-collect)
+    (car (benchmark-run 100
+           (agentel-focus-test-chunk "agent_message_chunk" "more text ")))))
+
+(ert-deftest agentel-focus-follows-a-chunk-regardless-of-the-length ()
+  (let ((short (agentel-focus-test-chunk-time 10 10)))
+    (should (< (agentel-focus-test-chunk-time 1000 10) (* 5 short)))
+    (should (< (agentel-focus-test-chunk-time 10 3000) (* 5 short)))))
 
 (ert-deftest agentel-focus-can-be-turned-on-for-every-session-buffer ()
   (let ((agentel-session--registry nil)
