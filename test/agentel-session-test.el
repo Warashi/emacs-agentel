@@ -106,5 +106,12 @@
       (should (equal (agentel-session-children parent) (list child)))
       (should (equal (agentel-session-roots) (list parent))))))
 
+(ert-deftest agentel-session-name-is-one-line ()
+  (agentel-session-test-with-registry
+    (let ((session (agentel-session-create :cwd "/tmp/project/")))
+      (should (equal (agentel-session-name session) "project"))
+      (setf (agentel-session-title session) "first\nsecond")
+      (should (equal (agentel-session-name session) "first second")))))
+
 (provide 'agentel-session-test)
 ;;; agentel-session-test.el ends here

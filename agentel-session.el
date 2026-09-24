@@ -123,7 +123,8 @@ turn, and `idle' otherwise."
 
 (defun agentel-session-name (session)
   "Return a short human readable name for SESSION."
-  (or (agentel-session-title session)
+  (or (when-let* ((title (agentel-session-title session)))
+        (string-trim (replace-regexp-in-string "[\n\t ]+" " " title)))
       (and (agentel-session-cwd session)
            (file-name-nondirectory
             (directory-file-name (agentel-session-cwd session))))
