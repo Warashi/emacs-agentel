@@ -59,5 +59,19 @@
     (agentel-list-visit)
     (should (eq (window-buffer (selected-window)) (agentel-session-buffer child)))))
 
+(ert-deftest agentel-list-visits-a-session-whose-buffer-was-killed ()
+  (agentel-list-test-with-sessions
+    (kill-buffer (agentel-session-buffer child))
+    (goto-char (point-min))
+    (search-forward "Explore")
+    (agentel-list-visit)
+    (should (buffer-live-p (agentel-session-buffer child)))))
+
+(ert-deftest agentel-list-does-not-stop-a-subagent-alone ()
+  (agentel-list-test-with-sessions
+    (goto-char (point-min))
+    (search-forward "Explore")
+    (should-error (agentel-list-kill) :type 'user-error)))
+
 (provide 'agentel-list-test)
 ;;; agentel-list-test.el ends here

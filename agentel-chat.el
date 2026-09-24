@@ -562,5 +562,14 @@ With INPUT, the buffer has an input area for prompts."
     (setf (agentel-session-buffer session) buffer)
     buffer))
 
+(defun agentel-chat-buffer (session)
+  "Return the live buffer of SESSION, making a new one if it was killed.
+Only a subagent outlives its buffer, so the new one has no input area."
+  (let ((buffer (agentel-session-buffer session)))
+    (if (buffer-live-p buffer)
+        buffer
+      (prog1 (agentel-chat-open session :input (not (agentel-session-parent session)))
+        (agentel-chat-notice session "Earlier output was discarded with the buffer.")))))
+
 (provide 'agentel-chat)
 ;;; agentel-chat.el ends here

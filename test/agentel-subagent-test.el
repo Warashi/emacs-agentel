@@ -62,6 +62,17 @@
       (should (string-match-p "Replayed subagent text\\."
                               (agentel-subagent-test-text (agentel-session-buffer child)))))))
 
+(ert-deftest agentel-subagent-buffer-comes-back-after-being-killed ()
+  (agentel-test-with-started session nil
+    (let ((child (agentel-subagent-test-run session)))
+      (kill-buffer (agentel-session-buffer child))
+      (agentel-subagent-open child)
+      (should (buffer-live-p (agentel-session-buffer child)))
+      (should (eq (window-buffer (selected-window)) (agentel-session-buffer child)))
+      (should (memq child (agentel-session-list)))
+      (should (string-match-p "Earlier output"
+                              (agentel-subagent-test-text (agentel-session-buffer child)))))))
+
 (ert-deftest agentel-subagent-buffer-has-no-input ()
   (agentel-test-with-started session nil
     (let ((child (agentel-subagent-test-run session)))

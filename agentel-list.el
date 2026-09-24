@@ -90,24 +90,26 @@
 (defun agentel-list-visit ()
   "Show the buffer of the session at point."
   (interactive)
-  (pop-to-buffer (agentel-session-buffer (agentel-list--session))))
+  (pop-to-buffer (agentel-chat-buffer (agentel-list--session))))
 
 (defun agentel-list-answer ()
   "Answer the oldest question of the session at point."
   (interactive)
-  (with-current-buffer (agentel-session-buffer (agentel-list--session))
+  (with-current-buffer (agentel-chat-buffer (agentel-list--session))
     (agentel-chat-answer)))
 
 (defun agentel-list-cancel ()
   "Stop the current turn of the session at point."
   (interactive)
-  (with-current-buffer (agentel-session-buffer (agentel-list--session))
+  (with-current-buffer (agentel-chat-buffer (agentel-list--session))
     (agentel-chat-cancel)))
 
 (defun agentel-list-kill ()
   "Stop the session at point and kill its buffer."
   (interactive)
   (let ((session (agentel-list--session)))
+    (when (agentel-session-parent session)
+      (user-error "A subagent stops with the session that started it"))
     (when (yes-or-no-p (format "Stop %s? " (agentel-session-name session)))
       (kill-buffer (agentel-session-buffer session))
       (agentel-list--refresh))))

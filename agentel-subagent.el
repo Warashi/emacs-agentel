@@ -58,7 +58,7 @@
   (interactive)
   (let ((child (or child (get-text-property (point) 'agentel-subagent)
                    (user-error "No subagent at point"))))
-    (pop-to-buffer (agentel-session-buffer child))))
+    (pop-to-buffer (agentel-chat-buffer child))))
 
 (defun agentel-subagent--refresh (child)
   "Render the item of CHILD in its parent's buffer again."
