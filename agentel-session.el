@@ -56,10 +56,14 @@ the working directory.  The session has no id until
   (setq agentel-session--registry (delq session agentel-session--registry))
   (agentel-session-changed session))
 
-(defun agentel-session-get (id)
-  "Return the session whose id is ID, or nil."
+(defun agentel-session-get (id &optional connection)
+  "Return the session whose id is ID, or nil.
+With CONNECTION, only a session of that connection matches: ids are
+chosen by each agent, so two agents may use the same one."
   (and id
-       (seq-find (lambda (s) (equal (agentel-session-id s) id))
+       (seq-find (lambda (s) (and (equal (agentel-session-id s) id)
+                                  (or (not connection)
+                                      (eq (agentel-session-connection s) connection))))
                  agentel-session--registry)))
 
 (defun agentel-session-list ()
@@ -144,10 +148,11 @@ subagents, `running' during a turn, and `idle' otherwise."
             (directory-file-name (agentel-session-cwd session))))
       "agent"))
 
-(defun agentel-session-dispatch (params)
-  "Route the `session/update' notification PARAMS to its session."
+(defun agentel-session-dispatch (params &optional connection)
+  "Route the `session/update' notification PARAMS to its session.
+CONNECTION is the connection it arrived on."
   (let-alist params
-    (when-let* ((session (agentel-session-get .sessionId)))
+    (when-let* ((session (agentel-session-get .sessionId connection)))
       (when (equal (alist-get 'sessionUpdate .update) "session_info_update")
         (when-let* ((title (alist-get 'title .update)))
           (setf (agentel-session-title session) title)

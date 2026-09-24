@@ -58,7 +58,7 @@ params, for example to withdraw a question on `$/cancel_request'.")
   "Handle NOTIFICATION from the agent on CONNECTION."
   (let-alist notification
     (if (equal .method "session/update")
-        (agentel-session-dispatch .params)
+        (agentel-session-dispatch .params connection)
       (run-hook-with-args 'agentel-connection-notification-functions
                           connection .method .params))))
 

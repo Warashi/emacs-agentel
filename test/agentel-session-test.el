@@ -49,6 +49,21 @@
                      (list (cons session
                                  '((sessionUpdate . "agent_message_chunk")))))))))
 
+(ert-deftest agentel-session-dispatch-tells-connections-apart ()
+  (agentel-session-test-with-registry
+    (let ((a (agentel-session-create :connection 'conn-a))
+          (b (agentel-session-create :connection 'conn-b))
+          seen)
+      (agentel-session-register a "same")
+      (agentel-session-register b "same")
+      (add-hook 'agentel-session-update-functions
+                (lambda (s _update) (push s seen)))
+      (agentel-session-dispatch
+       '((sessionId . "same") (update . ((sessionUpdate . "plan"))))
+       'conn-b)
+      (should (equal seen (list b)))
+      (should (eq (agentel-session-get "same" 'conn-a) a)))))
+
 (ert-deftest agentel-session-dispatch-ignores-unknown-session ()
   (agentel-session-test-with-registry
     (let (seen)

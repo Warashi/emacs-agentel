@@ -229,7 +229,7 @@ Return (VALUES . TEXT) where TEXT joins answers matching no option."
 
 (defun agentel-elicitation--session (connection params)
   "Return the session of CONNECTION that PARAMS ask in."
-  (or (agentel-session-get (alist-get 'sessionId params))
+  (or (agentel-session-get (alist-get 'sessionId params) connection)
       (seq-find (lambda (s) (eq (agentel-session-connection s) connection))
                 (agentel-session-roots))))
 

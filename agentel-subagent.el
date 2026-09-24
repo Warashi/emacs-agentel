@@ -72,7 +72,8 @@
 (defun agentel-subagent--spawn (parent update)
   "Create the subagent announced by UPDATE under PARENT."
   (let-alist update
-    (unless (agentel-session-get .subagentSessionId)
+    (unless (agentel-session-get .subagentSessionId
+                                 (agentel-session-connection parent))
       (let ((child (agentel-session-create
                     :connection (agentel-session-connection parent)
                     :parent parent
@@ -90,10 +91,11 @@
             (agentel-chat-add (cons 'subagent .subagentSessionId) 'subagent
                               #'agentel-subagent--render `((child . ,child)))))))))
 
-(defun agentel-subagent--finish (update)
-  "Record the end of the subagent reported by UPDATE."
+(defun agentel-subagent--finish (parent update)
+  "Record the end of the subagent of PARENT reported by UPDATE."
   (let-alist update
-    (when-let* ((child (agentel-session-get .subagentSessionId)))
+    (when-let* ((child (agentel-session-get .subagentSessionId
+                                            (agentel-session-connection parent))))
       (agentel-session-set-ended child (intern .state)))))
 
 (defun agentel-subagent--note-activity (child update)
@@ -105,7 +107,7 @@
   "Handle subagent related UPDATE of SESSION."
   (pcase (alist-get 'sessionUpdate update)
     ("subagent_spawned" (agentel-subagent--spawn session update))
-    ("subagent_state_update" (agentel-subagent--finish update))
+    ("subagent_state_update" (agentel-subagent--finish session update))
     ((or "tool_call" "tool_call_update")
      (when (agentel-session-parent session)
        (agentel-subagent--note-activity session update)))))

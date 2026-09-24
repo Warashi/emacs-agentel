@@ -82,7 +82,7 @@
 
 (defun agentel-permission--handle (connection id params)
   "Handle the permission request ID with PARAMS on CONNECTION."
-  (if-let* ((session (agentel-session-get (alist-get 'sessionId params))))
+  (if-let* ((session (agentel-session-get (alist-get 'sessionId params) connection)))
       (let ((item (list :kind 'permission :id id :params params
                         :session session :connection connection)))
         (plist-put item :answer (lambda () (agentel-permission--ask item)))

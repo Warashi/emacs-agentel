@@ -326,7 +326,8 @@ unknown values are rejected."
                              (make-hash-table))))))))
     ("session/new"
      (let ((session-id (agentel-mock--new-session
-                        (format "mock-%d" (cl-incf agentel-mock--counter)))))
+                        (format "mock-%d-%d" (emacs-pid)
+                                (cl-incf agentel-mock--counter)))))
        (agentel-mock--respond
         id `((sessionId . ,session-id)
              (configOptions . ,(agentel-mock--config-options
