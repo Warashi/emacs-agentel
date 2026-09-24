@@ -91,6 +91,17 @@
       (should-not (string-match-p "Read a\\.el" text))
       (should-not (string-match-p "Reading more" text)))))
 
+(ert-deftest agentel-focus-shows-the-latest-thought-while-running ()
+  (agentel-focus-test-with-session
+    (agentel-focus-test-prompt session "do it")
+    (agentel-focus-test-chunk "agent_thought_chunk" "Where to start")
+    (should (string-match-p "Thinking: Where to start" (agentel-focus-test-visible)))
+    (agentel-focus-test-tool "t1" "Read a.el")
+    (agentel-focus-test-chunk "agent_thought_chunk" "What next")
+    (let ((text (agentel-focus-test-visible)))
+      (should (string-match-p "Thinking: What next" text))
+      (should-not (string-match-p "Read a\\.el\\|Where to start" text)))))
+
 (ert-deftest agentel-focus-shows-questions-until-they-are-answered ()
   (agentel-focus-test-with-session
     (agentel-focus-test-prompt session "do it")

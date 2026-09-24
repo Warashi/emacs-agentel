@@ -5,8 +5,8 @@
 ;; `agentel-focus-mode' hides the transcript except what the user
 ;; answers next: the last prompt, the questions still waiting for an
 ;; answer, errors and why the turn ended, and then the last agent
-;; message once the turn ended, or the latest tool call or subagent
-;; while it runs.
+;; message once the turn ended, or the latest thought, tool call or
+;; subagent while it runs.
 ;; A subagent is also shown while it waits for an answer.
 ;;
 ;; Hidden entries are covered by overlays, so the transcript text and
@@ -41,7 +41,7 @@ The overlay is nil while the entry is shown.")
   "Newest agent message of the current turn.")
 
 (defvar-local agentel-focus--last-activity nil
-  "Newest tool call or subagent of the current turn.")
+  "Newest thought, tool call or subagent of the current turn.")
 
 (defvar-local agentel-focus--askers nil
   "Entries of the current turn that may wait for an answer.")
@@ -99,7 +99,7 @@ MOVED means its text changed, so a hidden entry is covered again."
   (puthash entry nil agentel-focus--overlays)
   (pcase (agentel-chat-entry-type entry)
     ('agent (setq agentel-focus--last-message entry))
-    ((or 'tool 'subagent) (setq agentel-focus--last-activity entry)))
+    ((or 'thought 'tool 'subagent) (setq agentel-focus--last-activity entry)))
   (when (or (agentel-chat-entry-get entry 'item)
             (agentel-chat-entry-get entry 'child))
     (push entry agentel-focus--askers)))
@@ -176,7 +176,8 @@ The first of them is the last prompt, unless there is none."
   "Show only what the next input to the session needs.
 The last prompt stays visible, with the questions waiting for an
 answer, errors and why the turn ended, and the last agent message
-once the turn ended or the latest tool call or subagent while it runs."
+once the turn ended or the latest thought, tool call or subagent
+while it runs."
   :lighter " Focus"
   (if agentel-focus-mode
       (progn
