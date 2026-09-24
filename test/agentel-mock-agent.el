@@ -310,8 +310,17 @@ unknown values are rejected."
   (let ((session-id (agentel-mock--new-session (alist-get 'sessionId params))))
     (agentel-mock--say session-id "What was the plan?" "user_message_chunk")
     (agentel-mock--say session-id "The plan was to write tests first.")
-    (agentel-mock--say (concat session-id ":replay-subagent:toolu_1")
-                       "Replayed subagent text.")
+    ;; Like the adapter, replayed subagents are announced under a replay id
+    ;; and their terminal state is sent after the history.
+    (let ((child (concat session-id ":replay-subagent:toolu_1")))
+      (agentel-mock--update
+       session-id `((sessionUpdate . "subagent_spawned") (subagentSessionId . ,child)
+                    (name . "Review the parser") (task . "Read the parser.")
+                    (capabilities . ,(make-hash-table))))
+      (agentel-mock--say child "Replayed subagent text.")
+      (agentel-mock--update
+       session-id `((sessionUpdate . "subagent_state_update")
+                    (subagentSessionId . ,child) (state . "completed"))))
     (agentel-mock--respond
      id `((configOptions . ,(agentel-mock--config-options
                              (gethash session-id agentel-mock--sessions)))))

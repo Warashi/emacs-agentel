@@ -53,6 +53,15 @@
       (agentel-subagent-open)
       (should (eq (window-buffer (selected-window)) (agentel-session-buffer child))))))
 
+(ert-deftest agentel-subagent-history-is-replayed-into-its-buffer ()
+  (agentel-test-with-started session '(:session-id "old-1")
+    (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
+    (let ((child (car (agentel-session-children session))))
+      (should (equal (agentel-session-name child) "Review the parser"))
+      (should (eq (agentel-session-state child) 'completed))
+      (should (string-match-p "Replayed subagent text\\."
+                              (agentel-subagent-test-text (agentel-session-buffer child)))))))
+
 (ert-deftest agentel-subagent-buffer-has-no-input ()
   (agentel-test-with-started session nil
     (let ((child (agentel-subagent-test-run session)))

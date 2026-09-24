@@ -66,7 +66,9 @@
     (should (equal (agentel-session-id session) "old-1"))
     (agentel-test-wait-for-text "The plan was to write tests first.")
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
-    (should (agentel-chat-entry-get agentel-chat--last 'finished))
+    (goto-char (point-min))
+    (search-forward "The plan was")
+    (should (agentel-chat-entry-get (agentel-chat-entry-at) 'finished))
     (should-not (save-excursion (goto-char (point-min))
                                 (search-forward "Replayed subagent" nil t)))))
 
