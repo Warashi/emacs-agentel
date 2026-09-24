@@ -66,12 +66,18 @@ Each function is called with the session, the result of
       ;; The agent replays the history before it answers, so the session
       ;; must be found by id before the request is sent.
       (agentel-session-register session session-id)
+      (agentel-session-set-busy session t)
       (push (cons 'sessionId session-id) params))
     (agentel-connection-request
      connection (if session-id "session/load" "session/new") params
      :on-success
      (lambda (result)
-       (unless session-id
+       (if session-id
+           (progn
+             (agentel-session-set-busy session nil)
+             ;; The replayed history ends without a turn ending it.
+             (with-current-buffer (agentel-session-buffer session)
+               (agentel-chat-finish-message)))
          (agentel-session-register session (alist-get 'sessionId result)))
        (run-hook-with-args 'agentel-session-started-functions
                            session result options))
