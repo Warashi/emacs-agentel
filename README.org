@@ -32,6 +32,26 @@ uses its own tools.
 
   =:session-id= loads an earlier session instead of creating one.
 
+** Running the agent through a wrapper
+
+=agentel-command-prefix= is put in front of the agent command, so the
+agent can run in a container or a sandbox while =agentel-command=
+stays =claude-agent-acp=.  It is a list of strings, or a function that
+receives the session directory and returns one.  For Docker, mount the
+directory and keep stdin open; do not allocate a TTY (=-t=), since ACP
+speaks JSON over stdio:
+
+#+begin_src emacs-lisp
+(setq agentel-command-prefix
+      (lambda (cwd)
+        (list "docker" "run" "--rm" "-i"
+              "-v" (format "%s:%s" cwd cwd) "-w" cwd
+              "my-claude-agent-acp-image")))
+#+end_src
+
+=agentel-environment= goes to the first program of the prefix; pass
+the variables on yourself if the wrapper does not (=docker run -e=).
+
 ** Session buffer
 
 The transcript is read-only; the prompt is edited below it like any

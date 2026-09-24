@@ -49,6 +49,19 @@
       (agentel-test-send "hello")
       (agentel-test-wait-for-text "Echo: hello"))))
 
+(ert-deftest agentel-command-prefix-function-gets-the-session-directory ()
+  (let* ((directories nil)
+         (agentel-command-prefix (lambda (cwd)
+                                   (push cwd directories)
+                                   '("env" "AGENTEL_WRAPPED=1"))))
+    (agentel-test-with-started session nil
+      (should (equal directories (list (agentel-session-cwd session))))
+      (should (equal (seq-take (process-command
+                                (agentel-connection-process
+                                 (agentel-session-connection session)))
+                               2)
+                     '("env" "AGENTEL_WRAPPED=1"))))))
+
 (ert-deftest agentel-shows-why-the-agent-exited ()
   (let* ((agentel-session--registry nil)
          (agentel-command "sh")

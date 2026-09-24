@@ -44,8 +44,16 @@
 (defcustom agentel-command-prefix nil
   "Command line that runs `agentel-command', such as a container runner.
 The agent is started as this list followed by `agentel-command' and
-`agentel-command-args'.  When nil the agent is started directly."
-  :type '(repeat string)
+`agentel-command-args'.  When nil the agent is started directly.
+
+A function is called with the directory of the session and returns
+the list, or nil to start the agent directly, so the prefix can
+depend on the project:
+
+  (lambda (cwd)
+    (list \"docker\" \"run\" \"--rm\" \"-i\"
+          \"-v\" (format \"%s:%s\" cwd cwd) \"-w\" cwd \"image\"))"
+  :type '(choice (repeat string) function)
   :group 'agentel)
 
 (defcustom agentel-environment nil
@@ -55,9 +63,13 @@ program of the prefix, which may not pass them on to the agent."
   :type '(repeat string)
   :group 'agentel)
 
-(defun agentel--command-line ()
-  "Return the program and arguments that start the agent."
-  (append agentel-command-prefix (list agentel-command) agentel-command-args))
+(defun agentel--command-line (cwd)
+  "Return the program and arguments that start the agent in CWD."
+  (append (if (functionp agentel-command-prefix)
+              (funcall agentel-command-prefix cwd)
+            agentel-command-prefix)
+          (list agentel-command)
+          agentel-command-args))
 
 (defvar agentel-session-started-functions nil
   "Abnormal hook run once the agent created or loaded a session.
@@ -142,7 +154,7 @@ earlier session instead of creating one.  Other keywords, such as
   (let* ((cwd (file-name-as-directory (expand-file-name (or cwd default-directory))))
          (session (agentel-session-create :cwd cwd))
          (buffer (agentel-chat-open session :input t))
-         (command-line (agentel--command-line)))
+         (command-line (agentel--command-line cwd)))
     (with-current-buffer buffer
       (setq default-directory cwd)
       (add-hook 'kill-buffer-hook #'agentel--kill-sessions nil t))
