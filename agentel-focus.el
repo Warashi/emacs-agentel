@@ -74,6 +74,10 @@
                (when (> start (point-min))
                  (agentel-focus--hide start (+ start 2)))))))))
 
+(defun agentel-focus--on-entry-changed (_entry)
+  "Follow a change of the transcript of this buffer."
+  (agentel-focus--update))
+
 ;;;###autoload
 (define-minor-mode agentel-focus-mode
   "Show only what the next input to the session needs.
@@ -84,10 +88,10 @@ ended or the latest tool call or subagent while it runs."
   (if agentel-focus-mode
       (progn
         (add-to-invisibility-spec 'agentel-focus)
-        (add-hook 'agentel-chat-transcript-changed-hook #'agentel-focus--update nil t)
+        (add-hook 'agentel-chat-entry-changed-functions #'agentel-focus--on-entry-changed nil t)
         (agentel-focus--update))
     (remove-from-invisibility-spec 'agentel-focus)
-    (remove-hook 'agentel-chat-transcript-changed-hook #'agentel-focus--update t)
+    (remove-hook 'agentel-chat-entry-changed-functions #'agentel-focus--on-entry-changed t)
     (remove-overlays (point-min) (point-max) 'invisible 'agentel-focus)))
 
 (defun agentel-focus--on-changed (session)

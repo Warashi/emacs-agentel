@@ -68,8 +68,10 @@ sent to the agent as a prompt.")
 It is called with the text once the message is complete, so it never
 sees half of a construct, such as a code block, that spans chunks.")
 
-(defvar agentel-chat-transcript-changed-hook nil
-  "Normal hook run in a session buffer after its transcript changed.")
+(defvar agentel-chat-entry-changed-functions nil
+  "Abnormal hook run in a session buffer after the text of an entry changed.
+Each function is called with the entry, once it was added, rendered
+again or extended.")
 
 (defvar agentel-chat-prompt-string "❯ "
   "String in front of the input area.")
@@ -126,11 +128,10 @@ The change is not recorded for undo.  Undo records positions, and
 recorded input edits would point at the wrong text after the
 transcript grows above them, so the undo history is dropped."
   (declare (indent 0) (debug t))
-  `(prog1 (let ((inhibit-read-only t))
-            (prog1 (let ((buffer-undo-list t)) ,@body)
-              (unless (eq buffer-undo-list t)
-                (setq buffer-undo-list nil))))
-     (run-hooks 'agentel-chat-transcript-changed-hook)))
+  `(let ((inhibit-read-only t))
+     (prog1 (let ((buffer-undo-list t)) ,@body)
+       (unless (eq buffer-undo-list t)
+         (setq buffer-undo-list nil)))))
 
 (defun agentel-chat--entry-end (entry)
   "Return the position after the text of ENTRY."
@@ -185,6 +186,7 @@ DATA its initial alist and COLLAPSED its initial folding."
         (insert (agentel-chat--entry-string entry (point)))))
     (when key (puthash key entry agentel-chat--entries))
     (setq agentel-chat--last entry)
+    (run-hook-with-args 'agentel-chat-entry-changed-functions entry)
     entry))
 
 (defun agentel-chat-refresh (entry)
@@ -197,6 +199,7 @@ DATA its initial alist and COLLAPSED its initial folding."
         (goto-char start)
         (delete-region start end)
         (insert (agentel-chat--entry-string entry start))))
+    (run-hook-with-args 'agentel-chat-entry-changed-functions entry)
     (when offset
       (goto-char (min (+ start offset) (agentel-chat--entry-end entry))))))
 
@@ -207,7 +210,8 @@ DATA its initial alist and COLLAPSED its initial folding."
       (goto-char agentel-chat--transcript-end)
       (insert (agentel-chat--propertize
                entry
-               (propertize text 'face (agentel-chat--text-face entry)))))))
+               (propertize text 'face (agentel-chat--text-face entry))))))
+  (run-hook-with-args 'agentel-chat-entry-changed-functions entry))
 
 (defun agentel-chat-entry-at (&optional pos)
   "Return the entry at POS, which defaults to point."
