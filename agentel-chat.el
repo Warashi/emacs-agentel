@@ -174,6 +174,9 @@ DATA its initial alist and COLLAPSED its initial folding."
     (agentel-chat--with-transcript
       (save-excursion
         (goto-char agentel-chat--transcript-end)
+        ;; The gap in front of the prompt is hidden while nothing was said.
+        (when (and agentel-chat--input-start (= (point) (point-min)))
+          (remove-text-properties (point) (+ (point) 2) '(invisible nil)))
         (setf (agentel-chat-entry-start entry) (copy-marker (point)))
         (insert (agentel-chat--entry-string entry (point)))))
     (when key (puthash key entry agentel-chat--entries))
@@ -403,7 +406,8 @@ TYPE is `error' for errors."
   (agentel-chat--with-transcript
     (goto-char (point-max))
     (let ((end (point)))
-      (insert (propertize (concat "\n\n" agentel-chat-prompt-string)
+      (insert (propertize (concat (propertize "\n\n" 'invisible (= end (point-min)))
+                                  agentel-chat-prompt-string)
                           'face 'agentel-chat-prompt-face
                           'read-only t
                           'front-sticky '(read-only)

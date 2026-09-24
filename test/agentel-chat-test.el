@@ -36,6 +36,13 @@
     (should (equal (agentel-chat-input) ""))
     (should (equal (agentel-chat-test-transcript) ""))))
 
+(ert-deftest agentel-chat-hides-the-gap-before-the-prompt-until-something-is-said ()
+  (agentel-chat-test-with-session
+    (should (invisible-p (point-min)))
+    (agentel-chat-test-chunk "agent_message_chunk" "Hello")
+    (should-not (invisible-p (1- agentel-chat--input-start)))
+    (should-not (text-property-any (point-min) (point-max) 'invisible t))))
+
 (ert-deftest agentel-chat-streams-agent_message_chunks-into-one-message ()
   (agentel-chat-test-with-session
     (agentel-chat-test-chunk "agent_message_chunk" "Hello")
