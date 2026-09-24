@@ -68,6 +68,9 @@ sent to the agent as a prompt.")
 It is called with the text once the message is complete, so it never
 sees half of a construct, such as a code block, that spans chunks.")
 
+(defvar agentel-chat-transcript-changed-hook nil
+  "Normal hook run in a session buffer after its transcript changed.")
+
 (defvar agentel-chat-prompt-string "❯ "
   "String in front of the input area.")
 
@@ -123,10 +126,11 @@ The change is not recorded for undo.  Undo records positions, and
 recorded input edits would point at the wrong text after the
 transcript grows above them, so the undo history is dropped."
   (declare (indent 0) (debug t))
-  `(let ((inhibit-read-only t))
-     (prog1 (let ((buffer-undo-list t)) ,@body)
-       (unless (eq buffer-undo-list t)
-         (setq buffer-undo-list nil)))))
+  `(prog1 (let ((inhibit-read-only t))
+            (prog1 (let ((buffer-undo-list t)) ,@body)
+              (unless (eq buffer-undo-list t)
+                (setq buffer-undo-list nil))))
+     (run-hooks 'agentel-chat-transcript-changed-hook)))
 
 (defun agentel-chat--entry-end (entry)
   "Return the position after the text of ENTRY."

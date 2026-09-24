@@ -125,6 +125,22 @@
     (goto-char (point-min))
     (should-error (insert "x") :type 'text-read-only)))
 
+(ert-deftest agentel-chat-tells-when-the-transcript-changed ()
+  (agentel-chat-test-with-session
+    (let ((calls 0))
+      (add-hook 'agentel-chat-transcript-changed-hook (lambda () (cl-incf calls)) nil t)
+      (agentel-chat-test-chunk "agent_message_chunk" "Hel")
+      (should (= calls 1))
+      (agentel-chat-test-chunk "agent_message_chunk" "lo")
+      (should (= calls 2))
+      (agentel-chat-test-update '((sessionUpdate . "tool_call") (toolCallId . "t1")
+                                  (title . "Read") (status . "pending")))
+      (should (> calls 2))
+      (let ((before calls))
+        (goto-char (point-max))
+        (insert "typing")
+        (should (= calls before))))))
+
 (ert-deftest agentel-chat-notice-appears-in-transcript ()
   (agentel-chat-test-with-session
     (agentel-chat-notice session "Agent exited" 'error)
