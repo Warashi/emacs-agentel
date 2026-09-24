@@ -41,10 +41,23 @@
   :type '(repeat string)
   :group 'agentel)
 
-(defcustom agentel-environment nil
-  "Extra environment of `agentel-command', as \"VAR=value\" strings."
+(defcustom agentel-command-prefix nil
+  "Command line that runs `agentel-command', such as a container runner.
+The agent is started as this list followed by `agentel-command' and
+`agentel-command-args'.  When nil the agent is started directly."
   :type '(repeat string)
   :group 'agentel)
+
+(defcustom agentel-environment nil
+  "Extra environment of `agentel-command', as \"VAR=value\" strings.
+With `agentel-command-prefix' the variables are given to the first
+program of the prefix, which may not pass them on to the agent."
+  :type '(repeat string)
+  :group 'agentel)
+
+(defun agentel--command-line ()
+  "Return the program and arguments that start the agent."
+  (append agentel-command-prefix (list agentel-command) agentel-command-args))
 
 (defvar agentel-session-started-functions nil
   "Abnormal hook run once the agent created or loaded a session.
@@ -128,13 +141,14 @@ earlier session instead of creating one.  Other keywords, such as
   (agentel-start :cwd \"~/src/project/\" :model \"opus\" :mode \"plan\")"
   (let* ((cwd (file-name-as-directory (expand-file-name (or cwd default-directory))))
          (session (agentel-session-create :cwd cwd))
-         (buffer (agentel-chat-open session :input t)))
+         (buffer (agentel-chat-open session :input t))
+         (command-line (agentel--command-line)))
     (with-current-buffer buffer
       (setq default-directory cwd)
       (add-hook 'kill-buffer-hook #'agentel--kill-sessions nil t))
     (setf (agentel-session-connection session)
           (agentel-connection-start
-           :command agentel-command :args agentel-command-args
+           :command (car command-line) :args (cdr command-line)
            :env agentel-environment :cwd cwd
            :on-ready (lambda (_connection) (agentel--open-session session options))
            :on-failure (lambda (error)

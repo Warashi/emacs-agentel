@@ -39,6 +39,16 @@
       (agentel-test-wait-until (lambda () (not (process-live-p process))))
       (should-not (memq session (agentel-session-list))))))
 
+(ert-deftest agentel-command-prefix-wraps-the-agent ()
+  (let ((agentel-command-prefix '("env" "AGENTEL_WRAPPED=1")))
+    (agentel-test-with-started session nil
+      (let ((command (process-command
+                      (agentel-connection-process (agentel-session-connection session)))))
+        (should (equal (seq-take command 3)
+                       (list "env" "AGENTEL_WRAPPED=1" agentel-command))))
+      (agentel-test-send "hello")
+      (agentel-test-wait-for-text "Echo: hello"))))
+
 (ert-deftest agentel-shows-why-the-agent-exited ()
   (let* ((agentel-session--registry nil)
          (agentel-command "sh")
