@@ -63,6 +63,11 @@ Each is called with the session and returns a string or nil.")
 If a function returns non-nil, it handled the input and it is not
 sent to the agent as a prompt.")
 
+(defvar agentel-chat-format-message-function nil
+  "Function returning a finished agent message text formatted for display.
+It is called with the text once the message is complete, so it never
+sees half of a construct, such as a code block, that spans chunks.")
+
 (defvar agentel-chat-prompt-string "❯ "
   "String in front of the input area.")
 
@@ -163,6 +168,7 @@ transcript grows above them, so the undo history is dropped."
 KEY identifies the entry for `agentel-chat-find', TYPE is a symbol
 naming its kind, RENDER a function returning its text from the entry,
 DATA its initial alist and COLLAPSED its initial folding."
+  (agentel-chat-finish-message)
   (let ((entry (agentel-chat-entry--make :key key :type type :render render
                                          :data data :collapsed collapsed)))
     (agentel-chat--with-transcript
@@ -231,7 +237,20 @@ TYPE is `error' for errors."
     (pcase (agentel-chat-entry-type entry)
       ('user (propertize (concat agentel-chat-prompt-string text)
                          'face 'agentel-chat-user-face))
+      ('agent (if (and (agentel-chat-entry-get entry 'finished)
+                       agentel-chat-format-message-function)
+                  (funcall agentel-chat-format-message-function text)
+                text))
       (_ (propertize text 'face (agentel-chat--text-face entry))))))
+
+(defun agentel-chat-finish-message ()
+  "Mark the agent message at the end of this buffer as complete."
+  (let ((entry agentel-chat--last))
+    (when (and entry (eq (agentel-chat-entry-type entry) 'agent)
+               (not (agentel-chat-entry-get entry 'finished)))
+      (setf (agentel-chat-entry-get entry 'finished) t)
+      (when agentel-chat-format-message-function
+        (agentel-chat-refresh entry)))))
 
 (defun agentel-chat--render-thought (entry)
   "Render the thought ENTRY, folded to its first line when collapsed."
@@ -321,9 +340,12 @@ TYPE is `error' for errors."
           (let ((entry agentel-chat--last))
             (setf (agentel-chat-entry-get entry 'text)
                   (concat (agentel-chat-entry-get entry 'text) text))
-            (if (eq type 'thought)
-                (agentel-chat-refresh entry)
-              (agentel-chat--append entry text)))
+            (cond ((eq type 'thought) (agentel-chat-refresh entry))
+                  ((agentel-chat-entry-get entry 'finished)
+                   ;; Show the whole message unformatted until it ends again.
+                   (setf (agentel-chat-entry-get entry 'finished) nil)
+                   (agentel-chat-refresh entry))
+                  (t (agentel-chat--append entry text))))
         (agentel-chat-add nil type
                           (if (eq type 'thought)
                               #'agentel-chat--render-thought
@@ -391,6 +413,14 @@ TYPE is `error' for errors."
       (set-marker agentel-chat--transcript-end end))
     (setq agentel-chat--input-start (point-marker))))
 
+(defun agentel-chat--finish-turn (session)
+  "Record that the turn of SESSION ended."
+  (agentel-session-set-busy session nil)
+  (when-let* ((buffer (agentel-session-buffer session))
+              ((buffer-live-p buffer)))
+    (with-current-buffer buffer
+      (agentel-chat-finish-message))))
+
 (defun agentel-chat--prompt (session text)
   "Send TEXT to the agent as a prompt of SESSION."
   (agentel-session-set-busy session t)
@@ -400,13 +430,13 @@ TYPE is `error' for errors."
      (prompt . [((type . "text") (text . ,text))]))
    :on-success
    (lambda (result)
-     (agentel-session-set-busy session nil)
+     (agentel-chat--finish-turn session)
      (let ((reason (alist-get 'stopReason result)))
        (unless (member reason '("end_turn" nil))
          (agentel-chat-notice session (format "Turn ended: %s" reason)))))
    :on-failure
    (lambda (error)
-     (agentel-session-set-busy session nil)
+     (agentel-chat--finish-turn session)
      (agentel-chat-notice session
                           (format "Prompt failed: %s" (alist-get 'message error))
                           'error))))
