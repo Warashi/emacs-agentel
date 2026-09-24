@@ -104,6 +104,7 @@ sent to the agent as a prompt.")
   :doc "Keymap of `agentel-chat-mode'."
   "C-c C-c" #'agentel-chat-send
   "C-c C-k" #'agentel-chat-cancel
+  "C-c C-a" #'agentel-chat-answer
   "C-c C-i" #'agentel-chat-goto-input
   "M-p" #'agentel-chat-previous-input
   "M-n" #'agentel-chat-next-input)
@@ -451,6 +452,24 @@ TYPE is `error' for errors."
       (agentel-chat-previous-input (- n))
     (setq agentel-chat--history-index nil)
     (agentel-chat--set-input "")))
+
+(defun agentel-chat-ordered-completion (candidates)
+  "Return a completion table of CANDIDATES that keeps their order."
+  (lambda (string predicate action)
+    (if (eq action 'metadata)
+        '(metadata (display-sort-function . identity)
+                   (cycle-sort-function . identity))
+      (complete-with-action action candidates string predicate))))
+
+(defun agentel-chat-answer ()
+  "Answer the oldest question of this session or of its subagents.
+Questions are the pending items of sessions, plists whose :answer is a
+command that asks the user and replies to the agent."
+  (interactive)
+  (let ((pending (agentel-session-pending-items agentel-chat--session)))
+    (unless pending
+      (user-error "No question is waiting for an answer"))
+    (funcall (plist-get (cdar pending) :answer))))
 
 (defun agentel-chat-goto-input ()
   "Move point to the end of the input area."

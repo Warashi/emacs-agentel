@@ -129,5 +129,26 @@
            (list (lambda (_s) "model") (lambda (_s) nil) (lambda (_s) "ctx"))))
       (should (string-match-p "model.*ctx" (agentel-chat--header-line))))))
 
+(ert-deftest agentel-chat-answer-runs-the-oldest-question ()
+  (agentel-chat-test-with-session
+    (let (answered)
+      (agentel-session-add-pending
+       session (list :answer (lambda () (push 'first answered))))
+      (agentel-session-add-pending
+       session (list :answer (lambda () (push 'second answered))))
+      (agentel-chat-answer)
+      (should (equal answered '(first))))))
+
+(ert-deftest agentel-chat-answer-without-questions-is-a-user-error ()
+  (agentel-chat-test-with-session
+    (should-error (agentel-chat-answer) :type 'user-error)))
+
+(ert-deftest agentel-chat-ordered-completion-keeps-the-order ()
+  (let ((table (agentel-chat-ordered-completion '("Yes" "No"))))
+    (should (eq (completion-metadata-get
+                 (completion-metadata "" table nil) 'display-sort-function)
+                #'identity))
+    (should (equal (all-completions "" table) '("Yes" "No")))))
+
 (provide 'agentel-chat-test)
 ;;; agentel-chat-test.el ends here
