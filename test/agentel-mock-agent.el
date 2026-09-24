@@ -30,6 +30,8 @@
   "Session state by session id.")
 (defvar agentel-mock--prompt-id nil
   "Request id of the prompt that waits for a cancel.")
+(defvar agentel-mock--asking nil
+  "Id of the request to the client that a cancel withdraws.")
 (defvar agentel-mock--counter 0)
 (defvar agentel-mock--delay 0.02
   "Seconds between streamed chunks.")
@@ -60,6 +62,7 @@
   "Send a request METHOD with PARAMS and call CALLBACK with its result."
   (let ((id (cl-incf agentel-mock--next-id)))
     (puthash id callback agentel-mock--waiting)
+    (setq agentel-mock--asking id)
     (agentel-mock--send `((jsonrpc . "2.0") (id . ,id) (method . ,method)
                           (params . ,params)))))
 
@@ -137,6 +140,7 @@ KIND is the session update name and defaults to an agent message."
 
 (defun agentel-mock--finish (id session-id &optional stop-reason)
   "End prompt ID of SESSION-ID with STOP-REASON."
+  (setq agentel-mock--prompt-id nil)
   (agentel-mock--usage session-id)
   (agentel-mock--respond id `((stopReason . ,(or stop-reason "end_turn")))))
 
@@ -169,6 +173,7 @@ KIND is the session update name and defaults to an agent message."
                                (content . ((type . "text")
                                            (text . "Remove the build directory"))))])
                   (_meta . ((claudeCode . ((toolName . "Bash")))))))
+    (setq agentel-mock--prompt-id (cons id session-id))
     (agentel-mock--request
      "session/request_permission"
      `((sessionId . ,session-id)
@@ -198,6 +203,7 @@ KIND is the session update name and defaults to an agent message."
 
 (defun agentel-mock--ask (id session-id)
   "Ask the user a question in SESSION-ID, then end prompt ID."
+  (setq agentel-mock--prompt-id (cons id session-id))
   (agentel-mock--request
    "elicitation/create"
    `((mode . "form") (sessionId . ,session-id)
@@ -335,6 +341,12 @@ KIND is the session update name and defaults to an agent message."
         (funcall callback (alist-get 'result message))))
      (id (agentel-mock--handle-request id method (alist-get 'params message)))
      ((equal method "session/cancel")
+      ;; Like the SDK, withdraw the question the client has not answered.
+      (when (and agentel-mock--asking
+                 (gethash agentel-mock--asking agentel-mock--waiting))
+        (remhash agentel-mock--asking agentel-mock--waiting)
+        (agentel-mock--send `((jsonrpc . "2.0") (method . "$/cancel_request")
+                              (params . ((requestId . ,agentel-mock--asking))))))
       (when agentel-mock--prompt-id
         (agentel-mock--finish (car agentel-mock--prompt-id)
                               (cdr agentel-mock--prompt-id) "cancelled")

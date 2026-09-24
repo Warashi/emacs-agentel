@@ -29,6 +29,11 @@ The function is called with the connection, the request id and the
 params, and must answer with `agentel-connection-respond' or
 `agentel-connection-respond-error'.")
 
+(defvar agentel-connection-notification-functions nil
+  "Abnormal hook run for notifications other than `session/update'.
+Each function is called with the connection, the method and the
+params, for example to withdraw a question on `$/cancel_request'.")
+
 (cl-defstruct (agentel-connection (:constructor agentel-connection--make)
                                   (:copier nil))
   "One agent process."
@@ -49,11 +54,13 @@ params, and must answer with `agentel-connection-respond' or
           (lm-header "Version")))
       "0"))
 
-(defun agentel-connection--on-notification (notification)
-  "Handle NOTIFICATION from the agent."
+(defun agentel-connection--on-notification (connection notification)
+  "Handle NOTIFICATION from the agent on CONNECTION."
   (let-alist notification
-    (when (equal .method "session/update")
-      (agentel-session-dispatch .params))))
+    (if (equal .method "session/update")
+        (agentel-session-dispatch .params)
+      (run-hook-with-args 'agentel-connection-notification-functions
+                          connection .method .params))))
 
 (defun agentel-connection--on-request (connection request)
   "Handle REQUEST from the agent on CONNECTION."
@@ -83,7 +90,9 @@ the connection."
          (connection (agentel-connection--make :client client))
          (default-directory (file-name-as-directory (or cwd default-directory))))
     (acp-subscribe-to-notifications
-     :client client :on-notification #'agentel-connection--on-notification)
+     :client client
+     :on-notification (lambda (notification)
+                        (agentel-connection--on-notification connection notification)))
     (acp-subscribe-to-requests
      :client client
      :on-request (lambda (request)

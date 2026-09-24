@@ -110,6 +110,30 @@
                                   (agentel-test-wait-until (lambda () result)))
                        "end_turn"))))))
 
+(ert-deftest agentel-connection-passes-other-notifications-to-features ()
+  (let* ((agentel-connection-request-handlers
+          (list (cons "session/request_permission" #'ignore)))
+         seen
+         (agentel-connection-notification-functions
+          (list (lambda (_conn method params) (push (cons method params) seen)))))
+    (agentel-connection-test-with-mock conn
+      (let (session-id)
+        (agentel-connection-request
+         conn "session/new" `((cwd . ,temporary-file-directory) (mcpServers . []))
+         :on-success
+         (lambda (r)
+           (setq session-id (alist-get 'sessionId r))
+           (agentel-connection-request
+            conn "session/prompt"
+            `((sessionId . ,session-id)
+              (prompt . [((type . "text") (text . "permission"))])))))
+        (agentel-test-wait-until (lambda () session-id))
+        (sleep-for 0.5)
+        (agentel-connection-notify conn "session/cancel" `((sessionId . ,session-id)))
+        (should (alist-get 'requestId
+                           (cdr (agentel-test-wait-until
+                                 (lambda () (assoc "$/cancel_request" seen))))))))))
+
 (ert-deftest agentel-connection-exit-ends-its-sessions ()
   (agentel-connection-test-with-mock conn
     (let ((session (agentel-session-create :connection conn)))
