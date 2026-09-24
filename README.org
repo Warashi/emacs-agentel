@@ -2,6 +2,67 @@
 
 An Agent Client Protocol (ACP) client for Emacs, built on acp.el.
 
+It is written for [[https://github.com/agentclientprotocol/claude-agent-acp][claude-agent-acp]] and aims at the experience of the
+GUI agent apps:
+
+- each subagent gets a buffer of its own, and the parent shows one item
+  per subagent with its state and latest tool call
+- slash commands complete at the start of the prompt
+- the header line shows model, effort, mode, context usage and cost
+- model, effort and mode are start options of a Lisp function
+- a session list shows every running session, its subagents and
+  whether it waits for an answer
+- permission requests and AskUserQuestion forms are answered in the
+  transcript or from the minibuffer
+
+agentel does not offer file system or terminal capabilities; the agent
+uses its own tools.
+
+* Usage
+
+=claude-agent-acp= must be on =PATH= and logged in (=claude auth login=).
+
+- =M-x agentel= starts a session in the current project; with a prefix
+  argument it asks for the directory.
+- From Lisp, pass the settings to start with:
+
+  #+begin_src emacs-lisp
+  (agentel-start :cwd "~/src/project/" :model "opus" :effort "high" :mode "plan")
+  #+end_src
+
+  =:session-id= loads an earlier session instead of creating one.
+
+** Session buffer
+
+The transcript is read-only; the prompt is edited below it like any
+other text.
+
+| Key           | Command                                              |
+|---------------+------------------------------------------------------|
+| =C-c C-c=     | send the prompt                                      |
+| =C-c C-k=     | cancel the current turn                              |
+| =C-c C-a=     | answer the oldest question                           |
+| =C-c C-o=     | change a session option                              |
+| =C-c C-m=     | change the mode                                      |
+| =C-c C-l=     | list the sessions                                    |
+| =TAB=         | complete a slash command, or fold the entry at point |
+| =M-p= / =M-n= | previous / next sent prompt                          |
+
+=/resume= lists the earlier sessions of the directory and opens the
+chosen one with its history.
+
+** Session list
+
+=M-x agentel-list= (or =C-c C-l=). =RET= visits a session, =a= answers
+its oldest question, =c= cancels its turn and =k= stops it.
+
+* Design
+
+Each feature is one file that hooks into the session registry
+(=agentel-session.el=), the connection (=agentel-connection.el=) and the
+session buffer (=agentel-chat.el=), so it can be removed by deleting
+the file and its =require= in =agentel.el=.
+
 * Development
 
 =nix develop= provides an Emacs with the dependencies listed in the
@@ -18,6 +79,18 @@ errors, and checkdoc):
 #+begin_src sh
 nix develop -c make test lint
 #+end_src
+
+The tests drive =test/agentel-mock-agent.el=, a scripted stand-in for
+claude-agent-acp that runs in the same Emacs. To try the client
+without the real agent, point =agentel-command= at it:
+
+#+begin_src emacs-lisp
+(setq agentel-command "emacs"
+      agentel-command-args '("--batch" "-Q" "-l" "test/agentel-mock-agent.el"))
+#+end_src
+
+The mock reacts to words in the prompt: =tool=, =permission=, =ask=,
+=subagent=, =markdown=, =slow= and =fail=.
 
 After changing =Package-Requires=, regenerate the lock files in =lock/=.
 Fetching packages that are not locked yet requires impure evaluation:
