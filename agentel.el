@@ -79,6 +79,22 @@ Each function is called with the session, the result of
        (agentel--fail session (format "Could not start the session: %s"
                                       (alist-get 'message error)))))))
 
+(defun agentel--report-exit (connection)
+  "Tell the sessions of CONNECTION that their agent exited, and why."
+  (let ((stderr (agentel-connection-stderr connection)))
+    (dolist (session (agentel-session-roots))
+      (when (eq (agentel-session-connection session) connection)
+        (agentel-chat-notice
+         session
+         (concat "Agent exited"
+                 (if stderr
+                     (concat ":\n" (mapconcat (lambda (l) (concat "  " l))
+                                              (last stderr 5) "\n"))
+                   ""))
+         'error)))))
+
+(add-hook 'agentel-connection-exit-functions #'agentel--report-exit)
+
 (defun agentel--kill-sessions ()
   "Stop the agent of the session in the buffer being killed."
   (when-let* ((session agentel-chat--session)

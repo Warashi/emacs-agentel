@@ -418,6 +418,8 @@ TYPE is `error' for errors."
         (text (string-trim (agentel-chat-input))))
     (unless agentel-chat--input-start
       (user-error "This session does not take input"))
+    (when (agentel-session-ended session)
+      (user-error "This session has ended"))
     (unless (string-empty-p text)
       (push text agentel-chat--history)
       (setq agentel-chat--history-index nil)

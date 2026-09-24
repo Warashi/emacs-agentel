@@ -39,6 +39,28 @@
       (agentel-test-wait-until (lambda () (not (process-live-p process))))
       (should-not (memq session (agentel-session-list))))))
 
+(ert-deftest agentel-shows-why-the-agent-exited ()
+  (let* ((agentel-session--registry nil)
+         (agentel-command "sh")
+         (agentel-command-args '("-c" "echo 'Not logged in' >&2; exit 3"))
+         (session (agentel-start :cwd temporary-file-directory :display nil)))
+    (unwind-protect
+        (with-current-buffer (agentel-session-buffer session)
+          (agentel-test-wait-until
+           (lambda () (memq (agentel-session-state session) '(failed exited))))
+          (agentel-test-wait-for-text "Agent exited")
+          (agentel-test-wait-for-text "Not logged in"))
+      (kill-buffer (agentel-session-buffer session)))))
+
+(ert-deftest agentel-ended-session-refuses-input ()
+  (agentel-test-with-started session nil
+    (delete-process (agentel-connection-process (agentel-session-connection session)))
+    (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'exited)))
+    (goto-char (point-max))
+    (insert "hello")
+    (should-error (agentel-chat-send) :type 'user-error)
+    (should (equal (agentel-chat-input) "hello"))))
+
 (ert-deftest agentel-start-loads-a-previous-session ()
   (agentel-test-with-started session '(:session-id "old-1")
     (should (equal (agentel-session-id session) "old-1"))

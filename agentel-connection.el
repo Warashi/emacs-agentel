@@ -34,10 +34,23 @@ params, and must answer with `agentel-connection-respond' or
 Each function is called with the connection, the method and the
 params, for example to withdraw a question on `$/cancel_request'.")
 
+(defvar agentel-connection-exit-functions nil
+  "Abnormal hook run with a connection whose agent exited on its own.")
+
+(defconst agentel-connection--stderr-lines 20
+  "Number of stderr lines of the agent kept for error reports.")
+
 (cl-defstruct (agentel-connection (:constructor agentel-connection--make)
                                   (:copier nil))
   "One agent process."
-  client info)
+  client info stderr stopping)
+
+(defun agentel-connection--record-stderr (connection text)
+  "Keep the last lines of the stderr TEXT of CONNECTION."
+  (let ((lines (append (agentel-connection-stderr connection)
+                       (split-string text "\n" t "[ \t]+"))))
+    (setf (agentel-connection-stderr connection)
+          (last lines agentel-connection--stderr-lines))))
 
 (defun agentel-connection--capabilities ()
   "Return the client capabilities declared by the loaded features."
@@ -76,7 +89,9 @@ params, for example to withdraw a question on `$/cancel_request'.")
   (dolist (session (agentel-session-list))
     (when (and (eq (agentel-session-connection session) connection)
                (not (agentel-session-ended session)))
-      (agentel-session-set-ended session 'exited))))
+      (agentel-session-set-ended session 'exited)))
+  (unless (agentel-connection-stopping connection)
+    (run-hook-with-args 'agentel-connection-exit-functions connection)))
 
 (cl-defun agentel-connection-start (&key command args env cwd on-ready on-failure)
   "Start the agent COMMAND with ARGS in CWD and initialize it.
@@ -93,6 +108,11 @@ the connection."
      :client client
      :on-notification (lambda (notification)
                         (agentel-connection--on-notification connection notification)))
+    (acp-subscribe-to-errors
+     :client client
+     :on-error (lambda (error)
+                 (agentel-connection--record-stderr
+                  connection (or (alist-get 'message error) ""))))
     (acp-subscribe-to-requests
      :client client
      :on-request (lambda (request)
@@ -153,6 +173,7 @@ ON-SUCCESS is called with the result and ON-FAILURE with the error."
 
 (defun agentel-connection-shutdown (connection)
   "Stop the agent process of CONNECTION."
+  (setf (agentel-connection-stopping connection) t)
   (acp-shutdown :client (agentel-connection-client connection))
   (agentel-connection--on-exit connection))
 
