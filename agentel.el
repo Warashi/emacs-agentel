@@ -29,6 +29,7 @@
 (require 'agentel-usage)
 (require 'agentel-subagent)
 (require 'agentel-list)
+(require 'agentel-markdown)
 
 (defcustom agentel-command "claude-agent-acp"
   "Program that speaks ACP on stdio."

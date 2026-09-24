@@ -12,6 +12,7 @@
 ;;   subagent    a subagent that works in its own session
 ;;   slow        waits until the client cancels the turn
 ;;   fail        fails the prompt request
+;;   markdown    answers with headings, emphasis, a list and code
 ;;
 ;; Anything else is echoed back.  The initialize response carries the
 ;; client capabilities it received under `_meta.receivedCapabilities'
@@ -34,6 +35,9 @@
 (defvar agentel-mock--asking nil
   "Id of the request to the client that a cancel withdraws.")
 (defvar agentel-mock--counter 0)
+(defconst agentel-mock--markdown
+  "## Plan\n\nI will **change** `agentel-chat.el` and *then* test it:\n\n* write a test\n* run [make](https://www.gnu.org/software/make/)\n\n```emacs-lisp\n(defun agentel-hello ()\n  \"Say hello.\"\n  (message \"hello\"))\n```\n"
+  "Reply to a prompt that asks for markdown.")
 (defvar agentel-mock--delay 0.02
   "Seconds between streamed chunks.")
 
@@ -272,6 +276,9 @@ KIND is the session update name and defaults to an agent message."
      ((string-match-p "permission" text) (agentel-mock--permission id session-id))
      ((string-match-p "ask" text) (agentel-mock--ask id session-id))
      ((string-match-p "subagent" text) (agentel-mock--subagent id session-id))
+     ((string-match-p "markdown" text)
+      (agentel-mock--say session-id agentel-mock--markdown)
+      (agentel-mock--finish id session-id))
      (t
       (when (string-match-p "tool" text)
         (agentel-mock--tool session-id))
