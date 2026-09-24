@@ -34,6 +34,38 @@
         "type": "github"
       }
     },
+    "gnu-elpa": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790099159,
+        "narHash": "sha256-6+FpcgrScg5uIM+PFfNOK7Da6UTg9GagU+q3JNbJbc8=",
+        "owner": "elpa-mirrors",
+        "repo": "elpa",
+        "rev": "2129d367ed03c8e5d6e3cedca1c4224b62d03eb6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "elpa-mirrors",
+        "repo": "elpa",
+        "type": "github"
+      }
+    },
+    "melpa": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789941593,
+        "narHash": "sha256-07uxFxbmtUMoNFX2uvRWCwjd4kFmhvT5heV8eggOQ/I=",
+        "owner": "melpa",
+        "repo": "melpa",
+        "rev": "90353852a6deccab7c9781dfc7031f677799ceb3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "melpa",
+        "repo": "melpa",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1790238896,
@@ -50,15 +82,55 @@
         "type": "github"
       }
     },
+    "nongnu-elpa": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789161944,
+        "narHash": "sha256-krEDJE5G2czgNTRxJSSmaIDWP4VMYZ0RKbEJkJfhnlo=",
+        "owner": "elpa-mirrors",
+        "repo": "nongnu",
+        "rev": "da66b7cb9df4d472a5cd31079694d19ac6078645",
+        "type": "github"
+      },
+      "original": {
+        "owner": "elpa-mirrors",
+        "repo": "nongnu",
+        "type": "github"
+      }
+    },
+    "registries": {
+      "inputs": {
+        "gnu-elpa": "gnu-elpa",
+        "melpa": "melpa",
+        "nongnu-elpa": "nongnu-elpa"
+      },
+      "locked": {
+        "lastModified": 1740993700,
+        "narHash": "sha256-HYLXVuUTvPtLFyRrnpXZmkvF0ey2nRgqmLaupxpwWxM=",
+        "owner": "emacs-twist",
+        "repo": "registries",
+        "rev": "4a1546970f54a14dc88c92a9273bbbaad57c10f2",
+        "type": "github"
+      },
+      "original": {
+        "owner": "emacs-twist",
+        "repo": "registries",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
+        "elisp-helpers": "elisp-helpers",
         "nixpkgs": "nixpkgs",
+        "registries": "registries",
         "twist": "twist"
       }
     },
     "twist": {
       "inputs": {
-        "elisp-helpers": "elisp-helpers"
+        "elisp-helpers": [
+          "elisp-helpers"
+        ]
       },
       "locked": {
         "lastModified": 1790049679,

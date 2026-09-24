@@ -1,0 +1,14 @@
+{
+  "acp": {
+    "author": "Alvaro Ramirez https://xenodium.com",
+    "meta": {
+      "description": "An ACP (Agent Client Protocol) implementation",
+      "homepage": "https://github.com/xenodium/acp.el"
+    },
+    "narHash": "sha256-Gz8u3p+eaO2d/lD3u5i85ucNijwSATyfdndY+iJxKgg=",
+    "packageRequires": {
+      "emacs": "28.1"
+    },
+    "version": "0.15.2"
+  }
+}

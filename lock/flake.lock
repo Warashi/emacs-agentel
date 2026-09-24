@@ -1,0 +1,27 @@
+{
+  "nodes": {
+    "acp": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789391914,
+        "narHash": "sha256-Gz8u3p+eaO2d/lD3u5i85ucNijwSATyfdndY+iJxKgg=",
+        "owner": "xenodium",
+        "repo": "acp.el",
+        "rev": "242cef63d76cc1073485847f67a21f6d8406d158",
+        "type": "github"
+      },
+      "original": {
+        "owner": "xenodium",
+        "repo": "acp.el",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "acp": "acp"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
