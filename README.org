@@ -65,11 +65,21 @@ other text.
 | =C-c C-o=     | change a session option                              |
 | =C-c C-m=     | change the mode                                      |
 | =C-c C-l=     | list the sessions                                    |
+| =C-c C-f=     | toggle =agentel-focus-mode=                          |
 | =TAB=         | complete a slash command, or fold the entry at point |
 | =M-p= / =M-n= | previous / next sent prompt                          |
 
 =/resume= lists the earlier sessions of the directory and opens the
 chosen one with its history.
+
+=agentel-focus-mode= hides everything the next input does not need.
+It leaves the last prompt, the questions still open and errors,
+together with the final answer once the turn ended or the latest tool
+call or subagent while it runs.  To open every session this way:
+
+#+begin_src emacs-lisp
+(add-hook 'agentel-chat-mode-hook #'agentel-focus-mode)
+#+end_src
 
 ** Session list
 
