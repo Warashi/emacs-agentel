@@ -11,6 +11,9 @@
 ;;   ask         an AskUserQuestion form elicitation
 ;;   subagent    a subagent that works in its own session
 ;;   background  a subagent that keeps working until the client cancels
+;;   async       a background shell command, announced like the adapter
+;;               only to a client with the AIR asyncTasks capability; it
+;;               completes when the next prompt arrives
 ;;   slow        waits until the client cancels the turn
 ;;   fail        fails the prompt request
 ;;   markdown    answers with headings, emphasis, a list and code
@@ -35,6 +38,10 @@
   "Request id of the prompt that waits for a cancel.")
 (defvar agentel-mock--background nil
   "Session id of the subagent that works until a cancel.")
+(defvar agentel-mock--client-capabilities nil
+  "Client capabilities of the initialize request.")
+(defvar agentel-mock--async nil
+  "(SESSION-ID . TASK-ID) of the background command still running.")
 (defvar agentel-mock--asking nil
   "Id of the request to the client that a cancel withdraws.")
 (defvar agentel-mock--counter 0)
@@ -277,11 +284,42 @@ Like the adapter, the turn stays open while the subagent lives."
     (setq agentel-mock--background child
           agentel-mock--prompt-id (cons id session-id))))
 
+(defun agentel-mock--async-tasks-p ()
+  "Return non-nil if the client advertised the AIR asyncTasks capability."
+  (let ((air (alist-get 'air (alist-get 'jetbrains
+                                        (alist-get '_meta agentel-mock--client-capabilities)))))
+    (and (integerp (alist-get 'version air))
+         (>= (alist-get 'version air) 1)
+         (vectorp (alist-get 'capabilities air))
+         (seq-contains-p (alist-get 'capabilities air) "asyncTasks"))))
+
+(defun agentel-mock--async (id session-id)
+  "Start a background command in SESSION-ID and end prompt ID."
+  (when (agentel-mock--async-tasks-p)
+    (let ((task (format "bash-%d" (cl-incf agentel-mock--counter))))
+      (agentel-mock--update
+       session-id `((sessionUpdate . "async_task_spawned") (asyncTaskId . ,task)
+                    (name . "npm run dev") (taskType . "shell")
+                    (description . "npm run dev") (showInTranscript . t)
+                    (canStop . t)))
+      (agentel-mock--update
+       session-id `((sessionUpdate . "async_task_progress") (asyncTaskId . ,task)
+                    (summary . "Listening on port 3000")))
+      (setq agentel-mock--async (cons session-id task))))
+  (agentel-mock--say session-id "Started a background command.")
+  (agentel-mock--finish id session-id))
+
 (defun agentel-mock--prompt (id params)
   "Handle prompt request ID with PARAMS."
   (let* ((session-id (alist-get 'sessionId params))
          (text (mapconcat (lambda (block) (or (alist-get 'text block) ""))
                           (alist-get 'prompt params) "")))
+    (when agentel-mock--async
+      (agentel-mock--update
+       (car agentel-mock--async)
+       `((sessionUpdate . "async_task_state_update")
+         (asyncTaskId . ,(cdr agentel-mock--async)) (state . "completed")))
+      (setq agentel-mock--async nil))
     (agentel-mock--update
      session-id `((sessionUpdate . "session_info_update")
                   (title . ,(truncate-string-to-width text 40))))
@@ -295,6 +333,7 @@ Like the adapter, the turn stays open while the subagent lives."
      ((string-match-p "permission" text) (agentel-mock--permission id session-id))
      ((string-match-p "ask" text) (agentel-mock--ask id session-id))
      ((string-match-p "background" text) (agentel-mock--background id session-id))
+     ((string-match-p "async" text) (agentel-mock--async id session-id))
      ((string-match-p "subagent" text) (agentel-mock--subagent id session-id))
      ((string-match-p "markdown" text)
       (agentel-mock--say session-id agentel-mock--markdown)
@@ -350,6 +389,7 @@ unknown values are rejected."
   "Handle the client request ID calling METHOD with PARAMS."
   (pcase method
     ("initialize"
+     (setq agentel-mock--client-capabilities (alist-get 'clientCapabilities params))
      (agentel-mock--respond
       id `((protocolVersion . 1)
            (agentCapabilities . ((loadSession . t)
