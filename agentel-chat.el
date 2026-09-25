@@ -58,6 +58,12 @@
   "Functions returning segments of the header line.
 Each is called with the session and returns a string or nil.")
 
+(defvar agentel-chat-pin-functions nil
+  "Functions returning lines pinned above the prompt.
+Each is called with the session and returns a list of strings.  The
+lines are shown again whenever the session changes, or when
+`agentel-chat-refresh-pin' is called.")
+
 (defvar agentel-chat-send-functions nil
   "Abnormal hook run with the session and the input when it is sent.
 If a function returns non-nil, it handled the input and it is not
@@ -90,6 +96,9 @@ again or extended.")
 
 (defvar-local agentel-chat--input-start nil
   "Marker at the start of the input area, or nil without one.")
+
+(defvar-local agentel-chat--pin nil
+  "Overlay on the prompt that shows the pinned lines, or nil without one.")
 
 (defvar-local agentel-chat--history nil
   "Inputs sent from this buffer, newest first.")
@@ -427,6 +436,10 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
                           'field 'agentel-chat-prompt))
       ;; The transcript grows in front of the prompt, not after it.
       (set-marker agentel-chat--transcript-end end))
+    ;; Nothing is ever inserted into the prompt, so an overlay on it
+    ;; stays between the transcript and the input.
+    (setq agentel-chat--pin
+          (make-overlay (- (point) (length agentel-chat-prompt-string)) (point)))
     (setq agentel-chat--input-start (point-marker))))
 
 (defun agentel-chat--finish-turn (session)
@@ -548,12 +561,26 @@ and send it with \\[agentel-chat-send]."
   (setq-local header-line-format
               '(:eval (string-replace "%" "%%" (agentel-chat--header-line)))))
 
-(defun agentel-chat--on-changed (session)
-  "Redisplay the header line of SESSION's buffer."
+(defun agentel-chat-refresh-pin (session)
+  "Show the pinned lines of SESSION above its prompt again."
   (when-let* ((buffer (agentel-session-buffer session))
               ((buffer-live-p buffer)))
     (with-current-buffer buffer
-      (force-mode-line-update))))
+      (when agentel-chat--pin
+        (let* ((lines (mapcan (lambda (f) (copy-sequence (funcall f session)))
+                              agentel-chat-pin-functions))
+               (string (and lines (concat (string-join lines "\n") "\n"))))
+          ;; Setting an equal string still makes the window redisplay.
+          (unless (equal string (overlay-get agentel-chat--pin 'before-string))
+            (overlay-put agentel-chat--pin 'before-string string)))))))
+
+(defun agentel-chat--on-changed (session)
+  "Redisplay the header line and the pinned lines of SESSION's buffer."
+  (when-let* ((buffer (agentel-session-buffer session))
+              ((buffer-live-p buffer)))
+    (with-current-buffer buffer
+      (force-mode-line-update))
+    (agentel-chat-refresh-pin session)))
 
 (add-hook 'agentel-session-changed-functions #'agentel-chat--on-changed)
 

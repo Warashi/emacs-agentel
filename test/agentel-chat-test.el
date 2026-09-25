@@ -162,6 +162,45 @@
     (agentel-chat-notice session "Agent exited" 'error)
     (should (string-match-p "Agent exited" (agentel-chat-test-transcript)))))
 
+(defun agentel-chat-test-shown ()
+  "Return the text of the current buffer as shown, with overlay strings."
+  (let ((text "") (pos (point-min)))
+    (while (< pos (point-max))
+      (dolist (overlay (overlays-at pos))
+        (when (and (= (overlay-start overlay) pos) (overlay-get overlay 'before-string))
+          (setq text (concat text (overlay-get overlay 'before-string)))))
+      (unless (invisible-p pos)
+        (setq text (concat text (string (char-after pos)))))
+      (setq pos (1+ pos)))
+    (substring-no-properties text)))
+
+(ert-deftest agentel-chat-pins-feature-lines-above-the-prompt ()
+  (agentel-chat-test-with-session
+    (let* ((lines nil)
+           (agentel-chat-pin-functions (list (lambda (_) lines) (lambda (_) '("last"))))
+           (agentel-session-changed-functions (list #'agentel-chat--on-changed)))
+      (agentel-chat-test-chunk "agent_message_chunk" "Hello")
+      (agentel-session-changed session)
+      (should (equal (agentel-chat-test-shown) "Hello\n\nlast\n❯ "))
+      (setq lines '("one" "two"))
+      (agentel-session-changed session)
+      (should (equal (agentel-chat-test-shown) "Hello\n\none\ntwo\nlast\n❯ "))
+      (agentel-chat-test-chunk "agent_message_chunk" " again")
+      (agentel-chat-test-update '((sessionUpdate . "tool_call") (toolCallId . "t1")
+                                  (title . "Read")))
+      (goto-char (point-max))
+      (insert "typed")
+      (should (string-suffix-p "\n\none\ntwo\nlast\n❯ typed" (agentel-chat-test-shown)))
+      (agentel-chat--set-input "")
+      (should (string-suffix-p "Read\n\none\ntwo\nlast\n❯ " (agentel-chat-test-shown))))))
+
+(ert-deftest agentel-chat-pins-nothing-without-lines ()
+  (agentel-chat-test-with-session
+    (let ((agentel-chat-pin-functions (list (lambda (_) nil))))
+      (agentel-chat-test-chunk "agent_message_chunk" "Hello")
+      (agentel-chat-refresh-pin session)
+      (should (equal (agentel-chat-test-shown) "Hello\n\n❯ ")))))
+
 (ert-deftest agentel-chat-header-joins-feature-segments ()
   (agentel-chat-test-with-session
     (let ((agentel-chat-header-functions
