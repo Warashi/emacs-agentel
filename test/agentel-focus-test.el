@@ -102,6 +102,17 @@
       (should (string-match-p "Thinking: What next" text))
       (should-not (string-match-p "Read a\\.el\\|Where to start" text)))))
 
+(ert-deftest agentel-focus-leaves-running-subagents-to-the-pin ()
+  (agentel-focus-test-with-session
+    (let ((child (agentel-session-create :parent session)))
+      (agentel-session-register child "c1")
+      (agentel-focus-test-prompt session "delegate")
+      (agentel-focus-test-tool "t1" "Read a.el")
+      (agentel-chat-add nil 'subagent (lambda (_) "the subagent") `((child . ,child)))
+      (let ((text (agentel-focus-test-visible)))
+        (should (string-match-p "Read a\\.el" text))
+        (should-not (string-match-p "the subagent" text))))))
+
 (ert-deftest agentel-focus-shows-questions-until-they-are-answered ()
   (agentel-focus-test-with-session
     (agentel-focus-test-prompt session "do it")
