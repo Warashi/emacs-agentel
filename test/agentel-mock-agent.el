@@ -10,6 +10,7 @@
 ;;   permission  a Bash tool call that asks for permission first
 ;;   ask         an AskUserQuestion form elicitation
 ;;   subagent    a subagent that works in its own session
+;;   background  a subagent that keeps working until the client cancels
 ;;   slow        waits until the client cancels the turn
 ;;   fail        fails the prompt request
 ;;   markdown    answers with headings, emphasis, a list and code
@@ -32,6 +33,8 @@
   "Session state by session id.")
 (defvar agentel-mock--prompt-id nil
   "Request id of the prompt that waits for a cancel.")
+(defvar agentel-mock--background nil
+  "Session id of the subagent that works until a cancel.")
 (defvar agentel-mock--asking nil
   "Id of the request to the client that a cancel withdraws.")
 (defvar agentel-mock--counter 0)
@@ -258,6 +261,22 @@ KIND is the session update name and defaults to an agent message."
     (agentel-mock--say session-id "The subagent reported a README.")
     (agentel-mock--finish id session-id)))
 
+(defun agentel-mock--background (id session-id)
+  "Run a subagent under SESSION-ID that works until prompt ID is cancelled.
+Like the adapter, the turn stays open while the subagent lives."
+  (let ((child (format "task-%d" (cl-incf agentel-mock--counter))))
+    (agentel-mock--update
+     session-id `((sessionUpdate . "subagent_spawned")
+                  (subagentSessionId . ,child)
+                  (name . "Watch the build")
+                  (task . "Tell me when the build is green.")
+                  (capabilities . ,(make-hash-table))))
+    (agentel-mock--update
+     child `((sessionUpdate . "tool_call") (toolCallId . "toolu_watch")
+             (title . "make watch") (kind . "execute") (status . "in_progress")))
+    (setq agentel-mock--background child
+          agentel-mock--prompt-id (cons id session-id))))
+
 (defun agentel-mock--prompt (id params)
   "Handle prompt request ID with PARAMS."
   (let* ((session-id (alist-get 'sessionId params))
@@ -275,6 +294,7 @@ KIND is the session update name and defaults to an agent message."
       (setq agentel-mock--prompt-id (cons id session-id)))
      ((string-match-p "permission" text) (agentel-mock--permission id session-id))
      ((string-match-p "ask" text) (agentel-mock--ask id session-id))
+     ((string-match-p "background" text) (agentel-mock--background id session-id))
      ((string-match-p "subagent" text) (agentel-mock--subagent id session-id))
      ((string-match-p "markdown" text)
       (agentel-mock--say session-id agentel-mock--markdown)
@@ -379,6 +399,13 @@ unknown values are rejected."
         (remhash agentel-mock--asking agentel-mock--waiting)
         (agentel-mock--send `((jsonrpc . "2.0") (method . "$/cancel_request")
                               (params . ((requestId . ,agentel-mock--asking))))))
+      (when agentel-mock--background
+        (agentel-mock--update
+         (cdr agentel-mock--prompt-id)
+         `((sessionUpdate . "subagent_state_update")
+           (subagentSessionId . ,agentel-mock--background)
+           (state . "cancelled")))
+        (setq agentel-mock--background nil))
       (when agentel-mock--prompt-id
         (agentel-mock--finish (car agentel-mock--prompt-id)
                               (cdr agentel-mock--prompt-id) "cancelled")

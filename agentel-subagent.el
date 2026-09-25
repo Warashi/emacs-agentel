@@ -12,6 +12,9 @@
 ;; Each child gets a read-only buffer of its own, so its output never
 ;; mixes with the parent's.  The parent shows one item per child with
 ;; its state and latest tool call, from which the child buffer opens.
+;; Children that have not ended are also pinned above the parent's
+;; prompt, since background subagents outlive the turn that spawned
+;; them.
 
 ;;; Code:
 
@@ -53,12 +56,47 @@
      'keymap agentel-subagent-item-map
      'agentel-subagent child)))
 
+(defun agentel-subagent--running (session)
+  "Return the subagents of SESSION that have not ended, oldest first."
+  (seq-remove #'agentel-session-ended (agentel-session-children session)))
+
+(defun agentel-subagent--read-running ()
+  "Ask for a running subagent of this buffer's session and return it."
+  (let ((children (mapcar (lambda (child) (cons (agentel-session-name child) child))
+                          (and agentel-chat--session
+                               (agentel-subagent--running agentel-chat--session)))))
+    (unless children
+      (user-error "No subagent at point or running"))
+    (cdr (assoc (completing-read "Subagent: "
+                                 (agentel-chat-ordered-completion children) nil t)
+                children))))
+
 (defun agentel-subagent-open (&optional child)
-  "Show the buffer of the subagent CHILD, by default the one at point."
+  "Show the buffer of the subagent CHILD.
+Interactively it is the subagent at point, or one of the running
+subagents of the session read from the minibuffer."
   (interactive)
   (let ((child (or child (get-text-property (point) 'agentel-subagent)
-                   (user-error "No subagent at point"))))
+                   (agentel-subagent--read-running))))
     (pop-to-buffer (agentel-chat-buffer child))))
+
+(defun agentel-subagent--pin-line (child)
+  "Return the pinned line of the running subagent CHILD."
+  (let ((activity (agentel-session-data child 'subagent-activity))
+        (map (make-sparse-keymap)))
+    (keymap-set map "<mouse-1>" (lambda () (interactive) (agentel-subagent-open child)))
+    (propertize
+     (concat "⎇ "
+             (propertize (agentel-session-name child) 'face 'agentel-subagent-face)
+             (format " [%s]" (agentel-session-state child))
+             (if activity (concat " ↳ " activity) ""))
+     'keymap map
+     'mouse-face 'highlight
+     'help-echo "mouse-1: visit the subagent")))
+
+(defun agentel-subagent--pin (session)
+  "Return the pinned lines of the running subagents of SESSION."
+  (mapcar #'agentel-subagent--pin-line (agentel-subagent--running session)))
 
 (defun agentel-subagent--refresh (child)
   "Render the item of CHILD in its parent's buffer again."
@@ -113,13 +151,16 @@
        (agentel-subagent--note-activity session update)))))
 
 (defun agentel-subagent--on-changed (session)
-  "Keep the parent's item of SESSION in step with it."
-  (when (agentel-session-parent session)
-    (agentel-subagent--refresh session)))
+  "Keep the parent's item and pin of SESSION in step with it."
+  (when-let* ((parent (agentel-session-parent session)))
+    (agentel-subagent--refresh session)
+    (agentel-chat-refresh-pin parent)))
 
 (add-hook 'agentel-connection-capability-functions #'agentel-subagent--capabilities)
 (add-hook 'agentel-session-update-functions #'agentel-subagent--on-update)
 (add-hook 'agentel-session-changed-functions #'agentel-subagent--on-changed)
+(add-hook 'agentel-chat-pin-functions #'agentel-subagent--pin)
+(keymap-set agentel-chat-mode-map "C-c C-j" #'agentel-subagent-open)
 
 (provide 'agentel-subagent)
 ;;; agentel-subagent.el ends here
