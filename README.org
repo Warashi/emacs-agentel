@@ -7,6 +7,7 @@ GUI agent apps:
 
 - each subagent gets a buffer of its own, and the parent shows one item
   per subagent with its state and latest tool call
+- running subagents and background tasks stay pinned above the prompt
 - slash commands complete at the start of the prompt
 - the header line shows model, effort, mode, context usage and cost
 - model, effort and mode are start options of a Lisp function
@@ -66,16 +67,25 @@ other text.
 | =C-c C-m=     | change the mode                                      |
 | =C-c C-l=     | list the sessions                                    |
 | =C-c C-f=     | toggle =agentel-focus-mode=                          |
+| =C-c C-j=     | visit a running subagent                             |
 | =TAB=         | complete a slash command, or fold the entry at point |
 | =M-p= / =M-n= | previous / next sent prompt                          |
 
 =/resume= lists the earlier sessions of the directory and opens the
 chosen one with its history.
 
+Subagents that have not ended and background tasks of the agent, such
+as a shell command left running, are pinned between the transcript and
+the prompt, so work that outlives a turn stays in view.  Clicking a
+subagent there, or =C-c C-j=, visits its buffer.  Background tasks are
+reported through the =asyncTasks= capability of the JetBrains AIR
+extension, which agentel advertises.
+
 =agentel-focus-mode= hides everything the next input does not need.
-It leaves the last prompt, the questions still open and errors,
-together with the final answer once the turn ended or the latest tool
-call or subagent while it runs.  To open every session this way:
+It leaves the last prompt, the questions still open, errors and why
+the turn ended, together with the final answer once the turn ended or
+the latest thought, tool call or subagent while it runs.  To open
+every session this way:
 
 #+begin_src emacs-lisp
 (add-hook 'agentel-chat-mode-hook #'agentel-focus-mode)
@@ -120,7 +130,7 @@ without the real agent, point =agentel-command= at it:
 #+end_src
 
 The mock reacts to words in the prompt: =tool=, =permission=, =ask=,
-=subagent=, =markdown=, =slow= and =fail=.
+=subagent=, =background=, =async=, =markdown=, =slow= and =fail=.
 
 After changing =Package-Requires=, regenerate the lock files in =lock/=.
 Fetching packages that are not locked yet requires impure evaluation:
