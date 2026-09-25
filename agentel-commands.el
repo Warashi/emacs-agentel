@@ -1,5 +1,8 @@
 ;;; agentel-commands.el --- Slash commands for agentel  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Completes slash commands at the start of the input.  The candidates

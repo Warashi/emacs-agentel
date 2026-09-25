@@ -1,5 +1,8 @@
 ;;; agentel-usage.el --- Context and cost display for agentel  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Follows `usage_update' and shows how full the context window is and

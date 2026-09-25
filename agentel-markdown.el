@@ -1,5 +1,8 @@
 ;;; agentel-markdown.el --- Markdown in agent messages for agentel  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Agents answer in Markdown.  Once a message is complete, its headings,

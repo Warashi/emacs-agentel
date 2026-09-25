@@ -1,5 +1,8 @@
 ;;; agentel-config.el --- Model, effort and mode for agentel  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Keeps the session config options the agent reports (model, effort,

@@ -1,5 +1,8 @@
 ;;; agentel.el --- ACP client for Emacs  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;; Author: Shinnosuke Sawada-Dazai <3600530+Warashi@users.noreply.github.com>
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "31.1") (acp "0.15"))

@@ -1,5 +1,8 @@
 ;;; agentel-connection.el --- Agent process connection for agentel  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; A connection is one agent process spoken to over ACP with acp.el.

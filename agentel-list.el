@@ -1,5 +1,8 @@
 ;;; agentel-list.el --- List of running sessions for agentel  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; `agentel-list' shows every running session with its subagents below

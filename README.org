@@ -140,3 +140,7 @@ nix run --impure .#lock
 #+end_src
 
 To update the locked packages, run =nix flake update --flake ./lock=.
+
+* License
+
+GPL-3.0-or-later.  See [[file:LICENSE][LICENSE]].

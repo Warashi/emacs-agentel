@@ -1,5 +1,8 @@
 ;;; agentel-resume.el --- Resume earlier sessions for agentel  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; The /resume command lists the earlier sessions of the working

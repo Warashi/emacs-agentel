@@ -1,5 +1,8 @@
 ;;; agentel-subagent.el --- Subagents in their own buffers for agentel  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; With the `subagents' client capability, claude-agent-acp runs each

@@ -1,5 +1,8 @@
 ;;; agentel-elicitation.el --- Form elicitation for agentel  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Answers `elicitation/create' requests in form mode.  Claude asks

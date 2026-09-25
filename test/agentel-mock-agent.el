@@ -1,5 +1,8 @@
 ;;; agentel-mock-agent.el --- A scripted stand-in for claude-agent-acp  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; Run with `emacs --batch -Q -l test/agentel-mock-agent.el'.  It speaks

@@ -1,5 +1,8 @@
 ;;; agentel-focus.el --- Show only what the next input needs  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; `agentel-focus-mode' hides the transcript except what the user

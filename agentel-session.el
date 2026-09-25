@@ -1,5 +1,8 @@
 ;;; agentel-session.el --- Session registry for agentel  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Commentary:
 
 ;; A session is one ACP session: a top-level conversation or a subagent

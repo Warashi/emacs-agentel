@@ -1,5 +1,8 @@
 ;;; agentel-list-test.el --- Tests for agentel-list  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Shinnosuke Sawada-Dazai
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
 ;;; Code:
 
 (require 'ert)
