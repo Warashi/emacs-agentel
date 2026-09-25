@@ -32,7 +32,9 @@
   "Merge the alist FIELDS into the task ID of SESSION.
 A task that is neither running nor paused is forgotten."
   (let* ((tasks (copy-alist (agentel-session-data session 'async-tasks)))
-         (task (append fields (alist-get id tasks nil nil #'equal))))
+         (task (copy-alist (alist-get id tasks nil nil #'equal))))
+    (pcase-dolist (`(,key . ,value) fields)
+      (setf (alist-get key task) value))
     (setf (alist-get id tasks nil t #'equal)
           (and (member (alist-get 'state task) '("running" "paused")) task))
     (setf (agentel-session-data session 'async-tasks) tasks)))
