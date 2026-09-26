@@ -47,5 +47,23 @@
                                             (search-forward "not available" nil t)))))
           (kill-buffer (agentel-session-buffer cleared)))))))
 
+(ert-deftest agentel-clear-stops-a-running-turn ()
+  (agentel-test-with-started session nil
+    (agentel-test-send "slow")
+    (agentel-test-wait-for-text "Working slowly")
+    (let ((process (agentel-connection-process (agentel-session-connection session)))
+          (cleared (agentel-clear session "")))
+      (unwind-protect
+          (progn
+            (agentel-test-wait-until (lambda () (not (process-live-p process))))
+            (agentel-test-wait-until
+             (lambda () (eq (agentel-session-state cleared) 'idle)))
+            (with-current-buffer (agentel-session-buffer cleared)
+              (agentel-test-send "hello")
+              (agentel-test-wait-for-text "Echo: hello")
+              (should-not (save-excursion (goto-char (point-min))
+                                          (search-forward "failed" nil t)))))
+        (kill-buffer (agentel-session-buffer cleared))))))
+
 (provide 'agentel-clear-test)
 ;;; agentel-clear-test.el ends here
