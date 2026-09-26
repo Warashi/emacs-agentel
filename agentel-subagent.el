@@ -99,14 +99,17 @@ subagents of the session read from the minibuffer."
   "Return the pinned lines of the running subagents of SESSION."
   (mapcar #'agentel-subagent--pin-line (agentel-subagent--running session)))
 
-(defun agentel-subagent--refresh (child)
-  "Render the item of CHILD in its parent's buffer again."
-  (when-let* ((parent (agentel-session-parent child))
-              (buffer (agentel-session-buffer parent))
-              ((buffer-live-p buffer)))
-    (with-current-buffer buffer
-      (when-let* ((entry (agentel-chat-find (cons 'subagent (agentel-session-id child)))))
-        (agentel-chat-refresh entry)))))
+(agentel-chat-define-entry 'subagent
+  :update (lambda (message _data)
+            (pcase message
+              (`(show ,child) `((child . ,child)))))
+  :view #'agentel-subagent--render)
+
+(defun agentel-subagent--show (child)
+  "Show the state of CHILD as an item of its parent's transcript."
+  (agentel-chat-dispatch (agentel-session-parent child)
+                         (cons 'subagent (agentel-session-id child))
+                         'subagent `(show ,child)))
 
 (defun agentel-subagent--spawn (parent update)
   "Create the subagent announced by UPDATE under PARENT."
@@ -124,11 +127,7 @@ subagents of the session read from the minibuffer."
         (with-current-buffer (agentel-chat-open child)
           (setq default-directory (or (agentel-session-cwd parent) default-directory))
           (agentel-chat-notice child (concat "Task: " (or .task ""))))
-        (when-let* ((buffer (agentel-session-buffer parent))
-                    ((buffer-live-p buffer)))
-          (with-current-buffer buffer
-            (agentel-chat-add (cons 'subagent .subagentSessionId) 'subagent
-                              #'agentel-subagent--render `((child . ,child)))))))))
+        (agentel-subagent--show child)))))
 
 (defun agentel-subagent--finish (parent update)
   "Record the end of the subagent of PARENT reported by UPDATE."
@@ -154,7 +153,7 @@ subagents of the session read from the minibuffer."
 (defun agentel-subagent--on-changed (session)
   "Keep the parent's item and pin of SESSION in step with it."
   (when-let* ((parent (agentel-session-parent session)))
-    (agentel-subagent--refresh session)
+    (agentel-subagent--show session)
     (agentel-chat-refresh-pin parent)))
 
 (add-hook 'agentel-connection-capability-functions #'agentel-subagent--capabilities)
