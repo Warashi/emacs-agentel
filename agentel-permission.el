@@ -47,16 +47,17 @@
         (alist-get 'options (plist-get item :params))
         " ")))))
 
+(agentel-chat-define-entry 'permission
+  :update (lambda (message _data)
+            (pcase message
+              (`(show ,item) `((item . ,item)))))
+  :view #'agentel-permission--render)
+
 (defun agentel-permission--show (item)
   "Show the state of the permission request ITEM in its session buffer."
-  (let ((buffer (agentel-session-buffer (plist-get item :session)))
-        (key (cons 'permission (plist-get item :id))))
-    (when (buffer-live-p buffer)
-      (with-current-buffer buffer
-        (if-let* ((entry (agentel-chat-find key)))
-            (agentel-chat-refresh entry)
-          (agentel-chat-add key 'permission #'agentel-permission--render
-                            `((item . ,item))))))))
+  (agentel-chat-dispatch (plist-get item :session)
+                         (cons 'permission (plist-get item :id))
+                         'permission `(show ,item)))
 
 (defun agentel-permission--close (item outcome)
   "Stop waiting for ITEM, recording OUTCOME as its answer."
