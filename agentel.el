@@ -28,6 +28,7 @@
 (require 'agentel-elicitation)
 (require 'agentel-commands)
 (require 'agentel-resume)
+(require 'agentel-clear)
 (require 'agentel-config)
 (require 'agentel-usage)
 (require 'agentel-subagent)
