@@ -68,7 +68,7 @@ A task that is neither running nor paused is forgotten."
               (agentel-ui-one-line
                (concat "⚙ " (propertize (or .name "Background task")
                                         'face 'agentel-async-task-face)
-                       (format " [%s]" .state)
+                       " " (agentel-ui-state (intern .state))
                        (if .progress " ↳ " ""))
                .progress)))
           (reverse (agentel-session-data session 'async-tasks))))

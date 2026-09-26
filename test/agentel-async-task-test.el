@@ -28,7 +28,7 @@
     (agentel-test-send "async please")
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
     (should (equal (agentel-async-task-test-pin)
-                   "⚙ npm run dev [running] ↳ Listening on port 3000\n"))
+                   "⚙ npm run dev 🏃 ↳ Listening on port 3000\n"))
     (agentel-test-send "hello")
     (agentel-test-wait-for-text "Echo: hello")
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
@@ -58,7 +58,7 @@
      session '((sessionUpdate . "async_task_progress") (asyncTaskId . "b1")
                (summary . "Compiling\nerror: missing semicolon")))
     (should (equal (mapcar #'substring-no-properties (agentel-async-task--pin session))
-                   '("⚙ dev [running] ↳ Compiling…")))))
+                   '("⚙ dev 🏃 ↳ Compiling…")))))
 
 (ert-deftest agentel-async-task-is-not-sent-without-the-capability ()
   (let ((agentel-connection-capability-functions
