@@ -45,7 +45,7 @@
 (ert-deftest agentel-subagent-is-one-item-in-the-parent ()
   (agentel-test-with-started session nil
     (agentel-subagent-test-run session)
-    (agentel-test-wait-for-text "⎇ Explore the repository \\[completed\\]")
+    (agentel-test-wait-for-text "⎇ Explore the repository ✅")
     (agentel-test-wait-for-text "Read README\\.org")))
 
 (ert-deftest agentel-subagent-item-opens-the-child-buffer ()
@@ -97,7 +97,7 @@
 (ert-deftest agentel-subagent-running-is-pinned-above-the-prompt ()
   (agentel-test-with-started session nil
     (agentel-subagent-test-background session)
-    (should (string-match-p "\\`⎇ Watch the build \\[running\\] ↳ make watch\n\\'"
+    (should (string-match-p "\\`⎇ Watch the build 🏃 ↳ make watch\n\\'"
                             (substring-no-properties (agentel-subagent-test-pin))))
     (agentel-chat-cancel)
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
@@ -121,7 +121,7 @@
 (ert-deftest agentel-subagent-pin-shows-the-activity-on-one-line ()
   (let ((line (substring-no-properties
                (agentel-subagent--pin-line (agentel-subagent-test-busy-child)))))
-    (should (string-match-p "\\`⎇ Build \\[[a-z]+\\] ↳ make all…\\'" line))))
+    (should (string-match-p "\\`⎇ Build ⏳ ↳ make all…\\'" line))))
 
 (ert-deftest agentel-subagent-finished-is-not-pinned ()
   (agentel-test-with-started session nil

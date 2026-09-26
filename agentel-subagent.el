@@ -48,7 +48,7 @@
     (propertize
      (concat "⎇ "
              (propertize (agentel-session-name child) 'face 'agentel-subagent-face)
-             (format " [%s]" (agentel-session-state child))
+             " " (agentel-ui-state (agentel-session-state child))
              "\n"
              (agentel-ui-one-line "    " (agentel-session-data child 'subagent-task))
              (if activity (concat "\n" (agentel-ui-one-line "    ↳ " activity)) ""))
@@ -88,7 +88,7 @@ subagents of the session read from the minibuffer."
      (agentel-ui-one-line
       (concat "⎇ "
               (propertize (agentel-session-name child) 'face 'agentel-subagent-face)
-              (format " [%s]" (agentel-session-state child))
+              " " (agentel-ui-state (agentel-session-state child))
               (if activity " ↳ " ""))
       activity)
      'keymap map
