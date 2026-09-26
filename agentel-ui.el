@@ -13,20 +13,22 @@
 
 (require 'subr-x)
 
-(defvar agentel-ui-line-width 80
-  "Width of a summary line, including its prefix.")
+(defcustom agentel-ui-max-line-width 80
+  "Largest width of a summary line, including its prefix."
+  :type 'natnum
+  :group 'agentel)
 
 (defun agentel-ui-one-line (prefix text)
   "Return PREFIX followed by the first line of TEXT as one summary line.
-The line fits in `agentel-ui-line-width' and ends in … when part of
+The line fits in `agentel-ui-max-line-width' and ends in … when part of
 TEXT is left out."
   (let* ((lines (split-string (string-trim (or text "")) "\n"))
          (line (concat prefix (car lines))))
     (if (cdr lines)
         (concat (truncate-string-to-width
-                 line (- agentel-ui-line-width (string-width "…")))
+                 line (- agentel-ui-max-line-width (string-width "…")))
                 "…")
-      (truncate-string-to-width line agentel-ui-line-width nil nil "…"))))
+      (truncate-string-to-width line agentel-ui-max-line-width nil nil "…"))))
 
 (provide 'agentel-ui)
 ;;; agentel-ui.el ends here

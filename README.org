@@ -104,11 +104,11 @@ text.
 | =M-p= / =M-n= | previous / next sent prompt                          |
 
 A tool call, a folded thought, the task and latest tool call of a
-subagent and a pinned line each keep to one line of
-=agentel-ui-line-width= columns, cut with =…=.  A tool
-call leads with the reason the agent gives for it, such as the
-description of a Bash command, then its title; unfolding it shows the
-whole title and the output.
+subagent and a pinned line each keep to one line of at most
+=agentel-ui-max-line-width= columns, cut with =…=.  A tool call leads
+with the reason the agent gives for it, such as the description of a
+Bash command, then its title; unfolding it shows the whole title and
+the output.
 
 =/resume= lists the earlier sessions of the directory and opens the
 chosen one with its history.  =/clear= starts a new conversation in the

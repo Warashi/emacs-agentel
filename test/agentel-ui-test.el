@@ -13,7 +13,7 @@
                  "▸ Read README.org")))
 
 (ert-deftest agentel-ui-one-line-fits-the-whole-line-in-the-width ()
-  (let* ((agentel-ui-line-width 10)
+  (let* ((agentel-ui-max-line-width 10)
          (line (agentel-ui-one-line "> " "abcdefghijkl")))
     (should (equal line "> abcdefg…"))
     (should (= (string-width line) 10))))
