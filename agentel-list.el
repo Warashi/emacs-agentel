@@ -7,8 +7,8 @@
 
 ;; `agentel-list' shows every running session with its subagents below
 ;; it and whether it works or waits for the user, like the session
-;; sidebar of GUI agent apps.  A session takes two lines, its project
-;; with its state and then its title, so the list stays readable in a
+;; sidebar of GUI agent apps.  A session takes two lines, its state
+;; with its project and then its title, so the list stays readable in a
 ;; narrow window.  Sessions waiting for the user come first, then the
 ;; unread ones, marked with a dot: those whose turn ended while their
 ;; buffer was out of sight, until it is shown again.  The list stays
@@ -109,9 +109,10 @@ The previous busy value is kept here rather than with
 
 (defun agentel-list--insert-session (session depth)
   "Insert the lines of SESSION and its subagents indented by DEPTH.
-A top-level session shows its project, or its directory outside of
-one, and then its title; a subagent
-has no project of its own and shows only its title."
+Each session leads with its state, which is short and would be cut off
+at the end of a long line in a narrow window.  A top-level session
+shows its project, or its directory outside of one, and then its
+title; a subagent has no project of its own and shows only its title."
   (let ((start (point)))
     (insert (if (gethash session agentel-list--unread)
                 (propertize "●" 'face 'agentel-list-unread-face)
@@ -119,10 +120,10 @@ has no project of its own and shows only its title."
             " ")
     (if (> depth 0)
         (insert (make-string (* 2 depth) ?\s) "└ "
-                (agentel-session-name session) " "
-                (agentel-list--state session) "\n")
-      (insert (agentel-session-project-name session) " "
-              (agentel-list--state session) "\n")
+                (agentel-list--state session) " "
+                (agentel-session-name session) "\n")
+      (insert (agentel-list--state session) " "
+              (agentel-session-project-name session) "\n")
       (when (agentel-session-title session)
         (insert "    " (propertize (agentel-session-name session)
                                    'face 'agentel-list-title-face)

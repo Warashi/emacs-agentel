@@ -109,7 +109,7 @@ from anywhere:
 (keymap-global-set "C-c a" #'agentel-list)
 #+end_src
 
-Each session takes two lines: its project with its state, then its
+Each session takes two lines: its state with its project, then its
 title.  Subagents follow the session that started them.  Sessions
 waiting for the user, or for an answer to one of their subagents, come
 first.  Next come the unread sessions, marked with =●=: their turn

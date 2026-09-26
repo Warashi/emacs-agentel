@@ -40,34 +40,34 @@
 (ert-deftest agentel-list-shows-the-project-then-the-title-of-a-session ()
   (agentel-list-test-with-sessions
     (should (equal (agentel-list-test-lines)
-                   '("  repo-one [idle]" "    Fix things"
-                     "    └ Explore [idle]"
-                     "  two [idle]")))))
+                   '("  [idle] repo-one" "    Fix things"
+                     "    └ [idle] Explore"
+                     "  [idle] two")))))
 
 (ert-deftest agentel-list-shows-the-directory-of-a-session-outside-a-project ()
   (agentel-list-test-with-sessions
     (setf (agentel-session-title other) "Something")
     (agentel-list--refresh)
     (should (equal (last (agentel-list-test-lines) 2)
-                   '("  two [idle]" "    Something")))))
+                   '("  [idle] two" "    Something")))))
 
 (ert-deftest agentel-list-shows-when-a-subagent-waits-for-the-user ()
   (agentel-list-test-with-sessions
     (agentel-session-add-pending child 'question)
     (agentel-list--refresh)
     (should (equal (agentel-list-test-lines)
-                   '("  repo-one [waiting]" "    Fix things"
-                     "    └ Explore [waiting]"
-                     "  two [idle]")))))
+                   '("  [waiting] repo-one" "    Fix things"
+                     "    └ [waiting] Explore"
+                     "  [idle] two")))))
 
 (ert-deftest agentel-list-puts-sessions-waiting-for-the-user-first ()
   (agentel-list-test-with-sessions
     (agentel-session-add-pending other 'question)
     (agentel-list--refresh)
     (should (equal (agentel-list-test-lines)
-                   '("  two [waiting]"
-                     "  repo-one [idle]" "    Fix things"
-                     "    └ Explore [idle]")))))
+                   '("  [waiting] two"
+                     "  [idle] repo-one" "    Fix things"
+                     "    └ [idle] Explore")))))
 
 (ert-deftest agentel-list-marks-a-session-whose-turn-ended-out-of-sight ()
   (agentel-list-test-with-sessions
@@ -75,9 +75,9 @@
     (agentel-session-set-busy other nil)
     (agentel-list--refresh)
     (should (equal (agentel-list-test-lines)
-                   '("● two [idle]"
-                     "  repo-one [idle]" "    Fix things"
-                     "    └ Explore [idle]")))))
+                   '("● [idle] two"
+                     "  [idle] repo-one" "    Fix things"
+                     "    └ [idle] Explore")))))
 
 (ert-deftest agentel-list-puts-waiting-sessions-before-unread-ones ()
   (agentel-list-test-with-sessions
@@ -85,7 +85,7 @@
     (agentel-session-set-busy other nil)
     (agentel-session-add-pending child 'question)
     (agentel-list--refresh)
-    (should (equal (car (agentel-list-test-lines)) "  repo-one [waiting]"))))
+    (should (equal (car (agentel-list-test-lines)) "  [waiting] repo-one"))))
 
 (ert-deftest agentel-list-does-not-mark-a-session-whose-turn-ended-in-sight ()
   (agentel-list-test-with-sessions
@@ -94,7 +94,7 @@
       (agentel-session-set-busy other t)
       (agentel-session-set-busy other nil))
     (agentel-list--refresh)
-    (should (equal (car (last (agentel-list-test-lines))) "  two [idle]"))))
+    (should (equal (car (last (agentel-list-test-lines))) "  [idle] two"))))
 
 (ert-deftest agentel-list-does-not-mark-a-subagent ()
   (agentel-list-test-with-sessions
@@ -112,7 +112,7 @@
       (switch-to-buffer (agentel-session-buffer other))
       (agentel-list--forget-shown (selected-frame)))
     (agentel-list--refresh)
-    (should (equal (car (last (agentel-list-test-lines))) "  two [idle]"))))
+    (should (equal (car (last (agentel-list-test-lines))) "  [idle] two"))))
 
 (ert-deftest agentel-list-fits-a-narrow-window ()
   (agentel-list-test-with-sessions
@@ -147,7 +147,7 @@
     (agentel-session-set-busy other t)
     (agentel-list--refresh)
     (goto-char (point-min))
-    (should (search-forward "two [running]" nil t))))
+    (should (search-forward "[running] two" nil t))))
 
 (ert-deftest agentel-list-visits-the-session-on-its-title-line ()
   (agentel-list-test-with-sessions
@@ -180,36 +180,36 @@
     (goto-char (point-min))
     (agentel-list-next)
     (should (bolp))
-    (should (equal (agentel-list-test-line) "    └ Explore [idle]"))
+    (should (equal (agentel-list-test-line) "    └ [idle] Explore"))
     (agentel-list-next)
-    (should (equal (agentel-list-test-line) "  two [idle]"))))
+    (should (equal (agentel-list-test-line) "  [idle] two"))))
 
 (ert-deftest agentel-list-moves-to-the-first-line-of-the-previous-session ()
   (agentel-list-test-with-sessions
     (goto-char (point-min))
     (search-forward "two")
     (agentel-list-previous)
-    (should (equal (agentel-list-test-line) "    └ Explore [idle]"))
+    (should (equal (agentel-list-test-line) "    └ [idle] Explore"))
     (agentel-list-previous)
     (should (bolp))
-    (should (equal (agentel-list-test-line) "  repo-one [idle]"))))
+    (should (equal (agentel-list-test-line) "  [idle] repo-one"))))
 
 (ert-deftest agentel-list-moves-by-as-many-sessions-as-the-prefix ()
   (agentel-list-test-with-sessions
     (goto-char (point-min))
     (agentel-list-next 2)
-    (should (equal (agentel-list-test-line) "  two [idle]"))
+    (should (equal (agentel-list-test-line) "  [idle] two"))
     (agentel-list-next -2)
-    (should (equal (agentel-list-test-line) "  repo-one [idle]"))))
+    (should (equal (agentel-list-test-line) "  [idle] repo-one"))))
 
 (ert-deftest agentel-list-stays-at-the-ends-of-the-list ()
   (agentel-list-test-with-sessions
     (goto-char (point-min))
     (agentel-list-previous)
-    (should (equal (agentel-list-test-line) "  repo-one [idle]"))
+    (should (equal (agentel-list-test-line) "  [idle] repo-one"))
     (search-forward "two")
     (agentel-list-next)
-    (should (equal (agentel-list-test-line) "  two [idle]"))))
+    (should (equal (agentel-list-test-line) "  [idle] two"))))
 
 (ert-deftest agentel-list-binds-n-and-p-to-the-next-and-previous-session ()
   (should (eq (keymap-lookup agentel-list-mode-map "n") #'agentel-list-next))
