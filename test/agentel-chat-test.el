@@ -140,6 +140,13 @@
     (agentel-chat-toggle)
     (should (string-match-p "\\`.*ls\\'" (agentel-chat-test-transcript)))))
 
+(ert-deftest agentel-chat-cannot-fold-a-tool-title-ending-in-a-newline ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-update
+     '((sessionUpdate . "tool_call") (toolCallId . "t1")
+       (title . "ls\n") (status . "completed")))
+    (should (string-match-p "\\`  ✓ ls\\'" (agentel-chat-test-transcript)))))
+
 (ert-deftest agentel-chat-updating-an-old-tool-keeps-later-entries-intact ()
   (agentel-chat-test-with-session
     (agentel-chat-test-update
