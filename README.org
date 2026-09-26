@@ -113,6 +113,7 @@ title.  Subagents follow the session that started them.  Sessions
 waiting for the user, or for an answer to one of their subagents, come
 first.  Next come the unread sessions, marked with =●=: their turn
 ended while their buffer was not shown, and the mark goes once it is.
+=n= and =p= move to the next and previous session, subagents included.
 =RET= visits a session, =a= answers its oldest question, =c= cancels
 its turn and =k= stops it.
 

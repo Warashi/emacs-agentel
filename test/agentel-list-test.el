@@ -171,6 +171,50 @@
     (agentel-list-visit)
     (should (buffer-live-p (agentel-session-buffer child)))))
 
+(defun agentel-list-test-line ()
+  "Return the line at point."
+  (buffer-substring-no-properties (line-beginning-position) (line-end-position)))
+
+(ert-deftest agentel-list-moves-to-the-next-session-past-the-title-line ()
+  (agentel-list-test-with-sessions
+    (goto-char (point-min))
+    (agentel-list-next)
+    (should (bolp))
+    (should (equal (agentel-list-test-line) "    └ Explore [idle]"))
+    (agentel-list-next)
+    (should (equal (agentel-list-test-line) "  two [idle]"))))
+
+(ert-deftest agentel-list-moves-to-the-first-line-of-the-previous-session ()
+  (agentel-list-test-with-sessions
+    (goto-char (point-min))
+    (search-forward "two")
+    (agentel-list-previous)
+    (should (equal (agentel-list-test-line) "    └ Explore [idle]"))
+    (agentel-list-previous)
+    (should (bolp))
+    (should (equal (agentel-list-test-line) "  repo-one [idle]"))))
+
+(ert-deftest agentel-list-moves-by-as-many-sessions-as-the-prefix ()
+  (agentel-list-test-with-sessions
+    (goto-char (point-min))
+    (agentel-list-next 2)
+    (should (equal (agentel-list-test-line) "  two [idle]"))
+    (agentel-list-next -2)
+    (should (equal (agentel-list-test-line) "  repo-one [idle]"))))
+
+(ert-deftest agentel-list-stays-at-the-ends-of-the-list ()
+  (agentel-list-test-with-sessions
+    (goto-char (point-min))
+    (agentel-list-previous)
+    (should (equal (agentel-list-test-line) "  repo-one [idle]"))
+    (search-forward "two")
+    (agentel-list-next)
+    (should (equal (agentel-list-test-line) "  two [idle]"))))
+
+(ert-deftest agentel-list-binds-n-and-p-to-the-next-and-previous-session ()
+  (should (eq (keymap-lookup agentel-list-mode-map "n") #'agentel-list-next))
+  (should (eq (keymap-lookup agentel-list-mode-map "p") #'agentel-list-previous)))
+
 (defun agentel-list-test-window ()
   "Return the window showing the list, or nil."
   (get-buffer-window agentel-list-buffer-name))

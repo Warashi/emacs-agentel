@@ -207,6 +207,36 @@ of the same session, since the lines are drawn again from scratch."
   (or (get-text-property (point) 'agentel-list-session)
       (user-error "No session on this line")))
 
+(defun agentel-list-next (&optional n)
+  "Move to the first line of the Nth next session.
+With a negative N, move to the previous ones.  Point stays at the
+ends of the list."
+  (interactive "p")
+  (setq n (or n 1))
+  (if (< n 0)
+      (agentel-list-previous (- n))
+    (dotimes (_ n)
+      (let ((next (next-single-property-change (point) 'agentel-list-session)))
+        (when (and next (get-text-property next 'agentel-list-session))
+          (goto-char next))))))
+
+(defun agentel-list-previous (&optional n)
+  "Move to the first line of the Nth previous session.
+With a negative N, move to the next ones.  Point stays at the ends
+of the list."
+  (interactive "p")
+  (setq n (or n 1))
+  (if (< n 0)
+      (agentel-list-next (- n))
+    (dotimes (_ n)
+      (let ((start (previous-single-property-change
+                    (min (1+ (point)) (point-max)) 'agentel-list-session
+                    nil (point-min))))
+        (goto-char (if (> start (point-min))
+                       (previous-single-property-change
+                        start 'agentel-list-session nil (point-min))
+                     start))))))
+
 (defun agentel-list-visit ()
   "Show the buffer of the session at point."
   (interactive)
@@ -238,6 +268,8 @@ of the same session, since the lines are drawn again from scratch."
   :doc "Keymap of `agentel-list-mode'."
   :parent special-mode-map
   "RET" #'agentel-list-visit
+  "n" #'agentel-list-next
+  "p" #'agentel-list-previous
   "a" #'agentel-list-answer
   "c" #'agentel-list-cancel
   "k" #'agentel-list-kill)
