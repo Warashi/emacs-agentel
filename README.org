@@ -7,6 +7,7 @@ GUI agent apps:
 
 - each subagent gets a buffer of its own, and the parent shows one item
   per subagent with its state and latest tool call
+- each tool call takes one line, led by why the agent calls it
 - running subagents and background tasks stay pinned above the prompt
 - slash commands complete at the start of the prompt
 - the header line shows the state, project and title of the session,
@@ -101,6 +102,12 @@ text.
 | =C-c C-j=     | visit a running subagent                             |
 | =TAB=         | complete a slash command, or fold the entry at point |
 | =M-p= / =M-n= | previous / next sent prompt                          |
+
+A tool call, a folded thought, a subagent and a pinned line each keep
+to one line of =agentel-ui-line-width= columns, cut with =…=.  A tool
+call leads with the reason the agent gives for it, such as the
+description of a Bash command, then its title; unfolding it shows the
+whole title and the output.
 
 =/resume= lists the earlier sessions of the directory and opens the
 chosen one with its history.  =/clear= starts a new conversation in the
