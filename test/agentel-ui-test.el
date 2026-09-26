@@ -56,5 +56,21 @@
   (with-temp-buffer
     (should (= (agentel-ui-line-width) agentel-ui-max-line-width))))
 
+(ert-deftest agentel-ui-one-line-is-marked-as-fitting-the-width ()
+  (should (get-text-property 0 'agentel-ui-fits-width (agentel-ui-one-line "> " "x"))))
+
+(ert-deftest agentel-ui-follow-width-reports-only-a-change ()
+  (agentel-ui-test-with-narrow-window
+    (let* ((calls 0)
+           (agentel-ui--followers nil))
+      (agentel-ui-follow-width (lambda () (setq calls (1+ calls))))
+      (agentel-ui--check-widths)
+      (should (= calls 0))
+      (delete-other-windows)
+      (agentel-ui--check-widths)
+      (should (= calls 1))
+      (agentel-ui--check-widths)
+      (should (= calls 1)))))
+
 (provide 'agentel-ui-test)
 ;;; agentel-ui-test.el ends here

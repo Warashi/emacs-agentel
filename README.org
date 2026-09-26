@@ -106,7 +106,8 @@ text.
 A tool call, a folded thought, the task and latest tool call of a
 subagent and a pinned line each keep to one line, cut with =…= at the
 narrowest window showing the buffer and at most at
-=agentel-ui-max-line-width= columns.  A tool call leads
+=agentel-ui-max-line-width= columns.  They are cut again when the
+windows change.  A tool call leads
 with the reason the agent gives for it, such as the description of a
 Bash command, then its title; unfolding it shows the whole title and
 the output.

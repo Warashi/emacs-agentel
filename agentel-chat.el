@@ -572,7 +572,21 @@ and send it with \\[agentel-chat-send]."
   (set-marker-insertion-type agentel-chat--transcript-end t)
   ;; The result of :eval is itself a mode line format, where % is special.
   (setq-local header-line-format
-              '(:eval (string-replace "%" "%%" (agentel-chat--header-line)))))
+              '(:eval (string-replace "%" "%%" (agentel-chat--header-line))))
+  (agentel-ui-follow-width #'agentel-chat--fit-width))
+
+(defun agentel-chat--fit-width ()
+  "Render the entries and pinned lines that fit the line width again."
+  (let ((pos (point-min)) entries)
+    (while (< pos agentel-chat--transcript-end)
+      (let* ((entry (agentel-chat-entry-at pos))
+             (end (agentel-chat--entry-end entry)))
+        (when (text-property-any pos end 'agentel-ui-fits-width t)
+          (push entry entries))
+        (setq pos end)))
+    (mapc #'agentel-chat-refresh entries))
+  (when agentel-chat--session
+    (agentel-chat-refresh-pin agentel-chat--session)))
 
 (defun agentel-chat-refresh-pin (session)
   "Show the pinned lines of SESSION above its prompt again."
