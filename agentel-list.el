@@ -109,7 +109,8 @@ The previous busy value is kept here rather than with
 
 (defun agentel-list--insert-session (session depth)
   "Insert the lines of SESSION and its subagents indented by DEPTH.
-A top-level session shows its project and then its title; a subagent
+A top-level session shows its project, or its directory outside of
+one, and then its title; a subagent
 has no project of its own and shows only its title."
   (let ((start (point)))
     (insert (if (gethash session agentel-list--unread)
@@ -121,10 +122,11 @@ has no project of its own and shows only its title."
                 (agentel-session-name session) " "
                 (agentel-list--state session) "\n")
       (insert (or (agentel-session-project session)
-                  (agentel-session-name session))
+                  (when-let* ((cwd (agentel-session-cwd session)))
+                    (file-name-nondirectory (directory-file-name cwd)))
+                  "agent")
               " " (agentel-list--state session) "\n")
-      (when (and (agentel-session-project session)
-                 (agentel-session-title session))
+      (when (agentel-session-title session)
         (insert "    " (propertize (agentel-session-name session)
                                    'face 'agentel-list-title-face)
                 "\n")))

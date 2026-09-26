@@ -44,6 +44,13 @@
                      "    └ Explore [idle]"
                      "  two [idle]")))))
 
+(ert-deftest agentel-list-shows-the-directory-of-a-session-outside-a-project ()
+  (agentel-list-test-with-sessions
+    (setf (agentel-session-title other) "Something")
+    (agentel-list--refresh)
+    (should (equal (last (agentel-list-test-lines) 2)
+                   '("  two [idle]" "    Something")))))
+
 (ert-deftest agentel-list-shows-when-a-subagent-waits-for-the-user ()
   (agentel-list-test-with-sessions
     (agentel-session-add-pending child 'question)
