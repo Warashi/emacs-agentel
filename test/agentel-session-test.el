@@ -52,6 +52,23 @@
                      (list (cons session
                                  '((sessionUpdate . "agent_message_chunk")))))))))
 
+(ert-deftest agentel-session-dispatch-withholds-update-a-feature-rejects ()
+  (agentel-session-test-with-registry
+    (let ((agentel-session-withhold-functions nil)
+          (session (agentel-session-create))
+          seen)
+      (agentel-session-register session "s1")
+      (add-hook 'agentel-session-withhold-functions
+                (lambda (s update)
+                  (and (eq s session)
+                       (equal (alist-get 'sessionUpdate update) "plan"))))
+      (add-hook 'agentel-session-update-functions
+                (lambda (_s update) (push (alist-get 'sessionUpdate update) seen)))
+      (dolist (kind '("plan" "agent_message_chunk"))
+        (agentel-session-dispatch
+         `((sessionId . "s1") (update . ((sessionUpdate . ,kind))))))
+      (should (equal seen '("agent_message_chunk"))))))
+
 (ert-deftest agentel-session-dispatch-tells-connections-apart ()
   (agentel-session-test-with-registry
     (let ((a (agentel-session-create :connection 'conn-a))

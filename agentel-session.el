@@ -13,7 +13,8 @@
 ;; Features keep their own per-session values in `agentel-session-data'
 ;; and react through `agentel-session-update-functions' and
 ;; `agentel-session-changed-functions', so each feature can be removed
-;; without touching this file.
+;; without touching this file.  `agentel-session-withhold-functions'
+;; lets a feature keep an update from the others.
 
 ;;; Code:
 
@@ -34,6 +35,12 @@
 (defvar agentel-session-update-functions nil
   "Abnormal hook run for each `session/update' of a registered session.
 Each function is called with the session and the update alist.")
+
+(defvar agentel-session-withhold-functions nil
+  "Abnormal hook asked whether to withhold a `session/update'.
+Each function is called with the session and the update alist.  When
+one returns non-nil, `agentel-session-update-functions' is not run for
+the update.")
 
 (defvar agentel-session-changed-functions nil
   "Abnormal hook run with a session whenever its visible state changes.")
@@ -176,8 +183,10 @@ CONNECTION is the connection it arrived on."
         (when-let* ((title (alist-get 'title .update)))
           (setf (agentel-session-title session) title)
           (agentel-session-changed session)))
-      (run-hook-with-args 'agentel-session-update-functions
-                          session .update))))
+      (unless (run-hook-with-args-until-success
+               'agentel-session-withhold-functions session .update)
+        (run-hook-with-args 'agentel-session-update-functions
+                            session .update)))))
 
 (provide 'agentel-session)
 ;;; agentel-session.el ends here
