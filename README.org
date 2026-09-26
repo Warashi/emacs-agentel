@@ -9,7 +9,8 @@ GUI agent apps:
   per subagent with its state and latest tool call
 - running subagents and background tasks stay pinned above the prompt
 - slash commands complete at the start of the prompt
-- the header line shows model, effort, mode, context usage and cost
+- the header line shows the state, project and title of the session,
+  then model, effort, mode, context usage and cost
 - model, effort and mode are start options of a Lisp function
 - a session list shows every running session, its subagents and
   whether it waits for an answer

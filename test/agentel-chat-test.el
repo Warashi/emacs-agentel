@@ -214,7 +214,26 @@
   (agentel-chat-test-with-session
     (let ((agentel-chat-header-functions nil))
       (setf (agentel-session-title session) "Fix things")
-      (should (equal (agentel-chat--header-line) "[idle] Fix things")))))
+      (should (string-prefix-p "[idle] " (agentel-chat--header-line))))))
+
+(ert-deftest agentel-chat-header-shows-the-project-before-the-title ()
+  (agentel-chat-test-with-session
+    (let ((agentel-chat-header-functions nil))
+      (setf (agentel-session-title session) "Fix things")
+      (should (equal (agentel-chat--header-line) "[idle] project  │  Fix things")))))
+
+(ert-deftest agentel-chat-header-of-a-subagent-shows-the-project-of-its-parent ()
+  (agentel-chat-test-with-session
+    (let* ((agentel-chat-header-functions nil)
+           (child (agentel-session-create :parent session :cwd "/tmp/project/"))
+           (buffer (agentel-chat-open child)))
+      (agentel-session-register child "c1")
+      (setf (agentel-session-project session) "repo"
+            (agentel-session-title child) "Explore")
+      (unwind-protect
+          (with-current-buffer buffer
+            (should (equal (agentel-chat--header-line) "[idle] repo  │  Explore")))
+        (kill-buffer buffer)))))
 
 (ert-deftest agentel-chat-header-line-escapes-percent-signs ()
   ;; `format-mode-line' renders nothing in batch mode, so check the
