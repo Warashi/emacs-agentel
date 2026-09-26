@@ -113,6 +113,15 @@
     (should (string-match-p "\\`.*Remove the build directory — rm -rf build\\'"
                             (agentel-chat-test-transcript)))))
 
+(ert-deftest agentel-chat-shows-a-reason-already-in-the-title-once ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-update
+     '((sessionUpdate . "tool_call") (toolCallId . "t1")
+       (title . "Explore the repository") (status . "pending")
+       (rawInput . ((description . "Explore the repository")))))
+    (should (string-match-p "\\`[^—]*Explore the repository\\'"
+                            (agentel-chat-test-transcript)))))
+
 (ert-deftest agentel-chat-keeps-a-tool-on-one-line-whatever-the-reason-says ()
   (agentel-chat-test-with-session
     (agentel-chat-test-update

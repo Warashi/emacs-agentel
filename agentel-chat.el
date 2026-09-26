@@ -328,7 +328,7 @@ tells it; a title cut short there shows in full on top of the output."
          (title (propertize (or (agentel-chat-entry-get entry 'title) "Tool")
                             'face 'agentel-chat-tool-face))
          (why (alist-get 'description (agentel-chat-entry-get entry 'rawInput)))
-         (summary (if (stringp why)
+         (summary (if (and (stringp why) (not (equal why title)))
                       (concat (propertize (concat why " — ") 'face 'agentel-chat-tool-face)
                               title)
                     title))
