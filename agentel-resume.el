@@ -30,8 +30,8 @@
             "  "
             (or .title .sessionId))))
 
-(defun agentel-resume--choose (sessions cwd)
-  "Let the user choose one of SESSIONS and open it in CWD."
+(defun agentel-resume--choose (sessions agent cwd)
+  "Let the user choose one of SESSIONS and open it with AGENT in CWD."
   (let* ((candidates (mapcar (lambda (s) (cons (agentel-resume--describe s) s))
                              sessions))
          (choice (completing-read "Resume session: "
@@ -40,6 +40,7 @@
                                   nil t))
          (session (cdr (assoc choice candidates))))
     (let ((resumed (agentel-start :cwd (or (alist-get 'cwd session) cwd)
+                                  :agent agent
                                   :session-id (alist-get 'sessionId session))))
       (setf (agentel-session-title resumed) (alist-get 'title session))
       (agentel-session-changed resumed)
@@ -47,7 +48,8 @@
 
 (defun agentel-resume (session _args)
   "Choose an earlier session in the directory of SESSION and open it."
-  (let ((cwd (agentel-session-cwd session)))
+  (let ((agent (agentel-session-agent session))
+        (cwd (agentel-session-cwd session)))
     (agentel-connection-request
      (agentel-session-connection session) "session/list" `((cwd . ,cwd))
      :on-success
@@ -57,7 +59,7 @@
                         (alist-get 'sessions result))))
          (if sessions
              ;; Leave the process filter before reading from the minibuffer.
-             (run-at-time 0 nil #'agentel-resume--choose sessions cwd)
+             (run-at-time 0 nil #'agentel-resume--choose sessions agent cwd)
            (message "No other session to resume in %s" cwd))))
      :on-failure
      (lambda (error)

@@ -35,8 +35,8 @@ Return the value of PREDICATE, failing the test on timeout."
   (declare (indent 2))
   `(let* ((agentel-session--registry nil)
           (command (agentel-test-mock-command))
-          (agentel-command (car command))
-          (agentel-command-args (cdr command))
+          (agentel-agents (cons (cons 'mock command) agentel-agents))
+          (agentel-default-agent 'mock)
           (,var (apply #'agentel-start :cwd temporary-file-directory
                        :display nil ,options)))
      (unwind-protect

@@ -76,7 +76,8 @@
       (let ((command (process-command
                       (agentel-connection-process (agentel-session-connection session)))))
         (should (equal (seq-take command 3)
-                       (list "env" "AGENTEL_WRAPPED=1" agentel-command))))
+                       (list "env" "AGENTEL_WRAPPED=1"
+                             (car (alist-get 'mock agentel-agents))))))
       (agentel-test-send "hello")
       (agentel-test-wait-for-text "Echo: hello"))))
 
@@ -93,10 +94,30 @@
                                2)
                      '("env" "AGENTEL_WRAPPED=1"))))))
 
+(ert-deftest agentel-start-runs-the-chosen-agent ()
+  (let ((agentel-agents (list (cons 'other (append '("env" "AGENTEL_OTHER=1")
+                                                   (agentel-test-mock-command))))))
+    (agentel-test-with-started session '(:agent other)
+      (should (eq (agentel-session-agent session) 'other))
+      (should (equal (seq-take (process-command
+                                (agentel-connection-process
+                                 (agentel-session-connection session)))
+                               2)
+                     '("env" "AGENTEL_OTHER=1"))))))
+
+(ert-deftest agentel-start-runs-the-default-agent ()
+  (agentel-test-with-started session nil
+    (should (eq (agentel-session-agent session) 'mock))))
+
+(ert-deftest agentel-start-refuses-an-unknown-agent ()
+  (let ((agentel-session--registry nil))
+    (should-error (agentel-start :agent 'nonexistent :display nil) :type 'user-error)
+    (should-not (agentel-session-list))))
+
 (ert-deftest agentel-shows-why-the-agent-exited ()
   (let* ((agentel-session--registry nil)
-         (agentel-command "sh")
-         (agentel-command-args '("-c" "echo 'Not logged in' >&2; exit 3"))
+         (agentel-agents '((sh "sh" "-c" "echo 'Not logged in' >&2; exit 3")))
+         (agentel-default-agent 'sh)
          (session (agentel-start :cwd temporary-file-directory :display nil)))
     (unwind-protect
         (with-current-buffer (agentel-session-buffer session)
@@ -132,8 +153,8 @@
          (list (lambda (_session) '(:model "opus"))
                (lambda (_session) '(:mode "plan")))))
     (should (equal (agentel-session-restart-options
-                    (agentel-session-create :cwd "/tmp/project/"))
-                   '(:cwd "/tmp/project/" :model "opus" :mode "plan")))))
+                    (agentel-session-create :cwd "/tmp/project/" :agent 'copilot))
+                   '(:cwd "/tmp/project/" :agent copilot :model "opus" :mode "plan")))))
 
 (provide 'agentel-test)
 ;;; agentel-test.el ends here

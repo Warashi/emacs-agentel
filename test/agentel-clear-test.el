@@ -57,6 +57,14 @@
                          "*agentel: renamed*"))
         (kill-buffer (agentel-session-buffer cleared))))))
 
+(ert-deftest agentel-clear-keeps-the-agent ()
+  (let ((agentel-agents (list (cons 'other (agentel-test-mock-command)))))
+    (agentel-test-with-started session '(:agent other)
+      (let ((cleared (agentel-clear session "")))
+        (unwind-protect
+            (should (eq (agentel-session-agent cleared) 'other))
+          (kill-buffer (agentel-session-buffer cleared)))))))
+
 (ert-deftest agentel-clear-stops-a-running-turn ()
   (agentel-test-with-started session nil
     (agentel-test-send "slow")

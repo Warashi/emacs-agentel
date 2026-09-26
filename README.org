@@ -34,11 +34,22 @@ uses its own tools.
 
   =:session-id= loads an earlier session instead of creating one.
 
+** Choosing the agent
+
+=agentel-agents= names the agents and their command lines, and
+=agentel-default-agent= is the one =M-x agentel= starts.  =:agent=
+starts another one; =/clear= and =/resume= keep the agent of the
+session:
+
+#+begin_src emacs-lisp
+(agentel-start :cwd "~/src/project/" :agent 'copilot)
+#+end_src
+
 ** Running the agent through a wrapper
 
 =agentel-command-prefix= is put in front of the agent command, so the
-agent can run in a container or a sandbox while =agentel-command=
-stays =claude-agent-acp=.  It is a list of strings, or a function that
+agent can run in a container or a sandbox while =agentel-agents=
+keeps the plain command.  It is a list of strings, or a function that
 receives the session directory and returns one.  For Docker, mount the
 directory and keep stdin open; do not allocate a TTY (=-t=), since ACP
 speaks JSON over stdio:
@@ -144,11 +155,12 @@ nix develop -c make test lint
 
 The tests drive =test/agentel-mock-agent.el=, a scripted stand-in for
 claude-agent-acp that runs in the same Emacs. To try the client
-without the real agent, point =agentel-command= at it:
+without the real agent, add it to =agentel-agents=:
 
 #+begin_src emacs-lisp
-(setq agentel-command "emacs"
-      agentel-command-args '("--batch" "-Q" "-l" "test/agentel-mock-agent.el"))
+(add-to-list 'agentel-agents
+             '(mock "emacs" "--batch" "-Q" "-l" "test/agentel-mock-agent.el"))
+(agentel-start :agent 'mock)
 #+end_src
 
 The mock reacts to words in the prompt: =tool=, =permission=, =ask=,

@@ -39,20 +39,23 @@
 (require 'agentel-markdown)
 (require 'agentel-focus)
 
-(defcustom agentel-command "claude-agent-acp"
-  "Program that speaks ACP on stdio."
-  :type 'string
+(defcustom agentel-agents
+  '((claude "claude-agent-acp")
+    (copilot "copilot" "--acp"))
+  "Agents that speak ACP on stdio, as (NAME PROGRAM ARG...).
+`agentel-start' runs the one its :agent names."
+  :type '(alist :key-type symbol :value-type (repeat string))
   :group 'agentel)
 
-(defcustom agentel-command-args nil
-  "Arguments of `agentel-command'."
-  :type '(repeat string)
+(defcustom agentel-default-agent 'claude
+  "Name of the agent in `agentel-agents' a session runs by default."
+  :type 'symbol
   :group 'agentel)
 
 (defcustom agentel-command-prefix nil
-  "Command line that runs `agentel-command', such as a container runner.
-The agent is started as this list followed by `agentel-command' and
-`agentel-command-args'.  When nil the agent is started directly.
+  "Command line that runs the agent, such as a container runner.
+The agent is started as this list followed by its program and
+arguments in `agentel-agents'.  When nil the agent is started directly.
 
 A function is called with the directory of the session and returns
 the list, or nil to start the agent directly, so the prefix can
@@ -65,19 +68,19 @@ depend on the project:
   :group 'agentel)
 
 (defcustom agentel-environment nil
-  "Extra environment of `agentel-command', as \"VAR=value\" strings.
+  "Extra environment of the agent, as \"VAR=value\" strings.
 With `agentel-command-prefix' the variables are given to the first
 program of the prefix, which may not pass them on to the agent."
   :type '(repeat string)
   :group 'agentel)
 
-(defun agentel--command-line (cwd)
-  "Return the program and arguments that start the agent in CWD."
+(defun agentel--command-line (agent cwd)
+  "Return the program and arguments that start AGENT in CWD."
   (append (if (functionp agentel-command-prefix)
               (funcall agentel-command-prefix cwd)
             agentel-command-prefix)
-          (list agentel-command)
-          agentel-command-args))
+          (or (alist-get agent agentel-agents)
+              (user-error "No agent named %s in `agentel-agents'" agent))))
 
 (defvar agentel-session-started-functions nil
   "Abnormal hook run once the agent created or loaded a session.
@@ -96,7 +99,8 @@ session can start as the current one is now.")
 The new session starts empty, in the directory and with the settings
 of SESSION."
   (apply #'append
-         (list :cwd (agentel-session-cwd session))
+         (list :cwd (agentel-session-cwd session)
+               :agent (agentel-session-agent session))
          (mapcar (lambda (function) (funcall function session))
                  agentel-session-restart-options-functions)))
 
@@ -164,23 +168,27 @@ of SESSION."
             (kill-buffer buffer)))))))
 
 ;;;###autoload
-(cl-defun agentel-start (&rest options &key cwd (display t) &allow-other-keys)
-  "Start an agent in CWD and open a buffer for a new session.
+(cl-defun agentel-start (&rest options &key cwd (agent agentel-default-agent)
+                                (display t) &allow-other-keys)
+  "Start AGENT in CWD and open a buffer for a new session.
 Return the session.
 
-OPTIONS are keyword arguments.  CWD defaults to `default-directory'.
-When DISPLAY is nil the buffer is not shown.  :session-id loads that
-earlier session instead of creating one.  Other keywords, such as
-:model, :effort and :mode, are read by the features that handle them.
+OPTIONS are keyword arguments.  AGENT names an entry of
+`agentel-agents' and defaults to `agentel-default-agent'.  CWD
+defaults to `default-directory'.  When DISPLAY is nil the buffer is
+not shown.  :session-id loads that earlier session instead of creating
+one.  Other keywords, such as :model, :effort and :mode, are read by
+the features that handle them.
 
   (agentel-start :cwd \"~/src/project/\" :model \"opus\" :mode \"plan\")"
   (let* ((cwd (file-name-as-directory (expand-file-name (or cwd default-directory))))
+         (command-line (agentel--command-line agent cwd))
          (session (agentel-session-create
                    :cwd cwd
+                   :agent agent
                    :project (when-let* ((project (project-current nil cwd)))
                               (project-name project))))
-         (buffer (agentel-chat-open session :input t))
-         (command-line (agentel--command-line cwd)))
+         (buffer (agentel-chat-open session :input t)))
     (with-current-buffer buffer
       (setq default-directory cwd)
       (add-hook 'kill-buffer-hook #'agentel--kill-sessions nil t))
