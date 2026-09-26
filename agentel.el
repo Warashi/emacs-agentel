@@ -15,7 +15,9 @@
 ;; `agentel-start' starts an agent and opens a session buffer.  Its
 ;; keyword arguments are also handed to the features through
 ;; `agentel-session-started-functions', so a feature can take its own
-;; start options without this file knowing them.
+;; start options without this file knowing them.  In return,
+;; `agentel-session-restart-options-functions' asks the features for
+;; the options that start a session again as it is now.
 
 ;;; Code:
 
