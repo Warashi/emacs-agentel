@@ -20,9 +20,14 @@ GUI agent apps:
 agentel does not offer file system or terminal capabilities; the agent
 uses its own tools.
 
+[[https://github.com/github/copilot-cli][Copilot CLI]] (=copilot --acp=) runs too, with the same model, effort
+and mode options.  Its subagents stay in the transcript of the parent.
+
 * Usage
 
 =claude-agent-acp= must be on =PATH= and logged in (=claude auth login=).
+For Copilot CLI, =copilot= must be on =PATH= and logged in (=copilot
+login=).
 
 - =M-x agentel= starts a session in the current project; with a prefix
   argument it asks for the directory.
@@ -42,8 +47,12 @@ starts another one; =/clear= and =/resume= keep the agent of the
 session:
 
 #+begin_src emacs-lisp
-(agentel-start :cwd "~/src/project/" :agent 'copilot)
+(agentel-start :cwd "~/src/project/" :agent 'copilot :model "gpt-5.5" :mode "plan")
 #+end_src
+
+=:model=, =:effort= and =:mode= take the values the agent lists, or
+their names as =C-c C-o= shows them: Copilot CLI takes =plan= for its
+Plan mode, whose value is a URL.
 
 ** Running the agent through a wrapper
 
@@ -59,8 +68,11 @@ speaks JSON over stdio:
       (lambda (cwd)
         (list "docker" "run" "--rm" "-i"
               "-v" (format "%s:%s" cwd cwd) "-w" cwd
-              "my-claude-agent-acp-image")))
+              "my-agent-image")))
 #+end_src
+
+The prefix is the same for every agent, so the image needs the
+commands of all agents in =agentel-agents= that you start.
 
 =agentel-environment= goes to the first program of the prefix; pass
 the variables on yourself if the wrapper does not (=docker run -e=).
