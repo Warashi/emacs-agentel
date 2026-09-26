@@ -18,17 +18,25 @@
   :type 'natnum
   :group 'agentel)
 
+(defun agentel-ui-line-width ()
+  "Return the width of a summary line in this buffer.
+It is the narrowest window showing the buffer, up to
+`agentel-ui-max-line-width'."
+  (apply #'min agentel-ui-max-line-width
+         (mapcar #'window-max-chars-per-line
+                 (get-buffer-window-list nil nil t))))
+
 (defun agentel-ui-one-line (prefix text)
   "Return PREFIX followed by the first line of TEXT as one summary line.
-The line fits in `agentel-ui-max-line-width' and ends in … when part of
+The line fits in `agentel-ui-line-width' and ends in … when part of
 TEXT is left out."
-  (let* ((lines (split-string (string-trim (or text "")) "\n"))
+  (let* ((width (agentel-ui-line-width))
+         (lines (split-string (string-trim (or text "")) "\n"))
          (line (concat prefix (car lines))))
     (if (cdr lines)
-        (concat (truncate-string-to-width
-                 line (- agentel-ui-max-line-width (string-width "…")))
+        (concat (truncate-string-to-width line (- width (string-width "…")))
                 "…")
-      (truncate-string-to-width line agentel-ui-max-line-width nil nil "…"))))
+      (truncate-string-to-width line width nil nil "…"))))
 
 (provide 'agentel-ui)
 ;;; agentel-ui.el ends here
