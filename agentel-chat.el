@@ -268,11 +268,7 @@ has no live buffer."
 (defun agentel-chat-notice (session text &optional type)
   "Add the notice TEXT to the buffer of SESSION.
 TYPE is `error' for errors and `stop' for why a turn ended early."
-  (when-let* ((buffer (agentel-session-buffer session))
-              ((buffer-live-p buffer)))
-    (with-current-buffer buffer
-      (agentel-chat-add nil (or type 'notice) #'agentel-chat--render-notice
-                        `((text . ,text))))))
+  (agentel-chat-dispatch session nil (or type 'notice) `(show ,text)))
 
 ;;;; Rendering
 
@@ -330,6 +326,13 @@ More text makes a finished message unfinished until it ends again."
               'face (if (eq (agentel-chat-entry-type entry) 'error)
                         'agentel-chat-error-face
                       'agentel-chat-notice-face)))
+
+(dolist (type '(notice error stop))
+  (agentel-chat-define-entry type
+    :update (lambda (message _data)
+              (pcase message
+                (`(show ,text) `((text . ,text)))))
+    :view #'agentel-chat--render-notice))
 
 (defconst agentel-chat--status-icons
   '(("pending" . "…") ("in_progress" . "⟳") ("completed" . "✓") ("failed" . "✗"))
