@@ -25,6 +25,7 @@
 (require 'agentel-session)
 (require 'agentel-connection)
 (require 'agentel-chat)
+(require 'agentel-ui)
 
 (defface agentel-subagent-face
   '((t :inherit font-lock-type-face))
@@ -34,11 +35,6 @@
 (defun agentel-subagent--capabilities ()
   "Return the client capability of hosting subagent sessions."
   '((subagents . nil)))
-
-(defun agentel-subagent--first-line (text)
-  "Return the first line of TEXT, shortened."
-  (truncate-string-to-width (car (split-string (string-trim (or text "")) "\n"))
-                            80 nil nil "…"))
 
 (defvar-keymap agentel-subagent-item-map
   :doc "Keymap on subagent items of a parent transcript."
@@ -53,8 +49,8 @@
      (concat "⎇ "
              (propertize (agentel-session-name child) 'face 'agentel-subagent-face)
              (format " [%s]" (agentel-session-state child))
-             "\n    "
-             (agentel-subagent--first-line (agentel-session-data child 'subagent-task))
+             "\n"
+             (agentel-ui-one-line "    " (agentel-session-data child 'subagent-task))
              (if activity (concat "\n    ↳ " activity) ""))
      'keymap agentel-subagent-item-map
      'agentel-subagent child)))

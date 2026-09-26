@@ -23,6 +23,7 @@
 (require 'subr-x)
 (require 'agentel-session)
 (require 'agentel-connection)
+(require 'agentel-ui)
 
 (defgroup agentel nil
   "Agent Client Protocol client."
@@ -284,9 +285,7 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
   (let ((text (agentel-chat-entry-get entry 'text)))
     (propertize
      (if (agentel-chat-entry-collapsed entry)
-         (concat "▸ Thinking: "
-                 (truncate-string-to-width
-                  (car (split-string (string-trim text) "\n")) 60 nil nil "…"))
+         (agentel-ui-one-line "▸ Thinking: " text)
        (concat "▾ Thinking\n" text))
      'face 'agentel-chat-thought-face
      'keymap agentel-chat-entry-map)))
