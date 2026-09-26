@@ -176,7 +176,10 @@ earlier session instead of creating one.  Other keywords, such as
   (agentel-start :cwd \"~/src/project/\" :model \"opus\" :mode \"plan\")"
   (let* ((cwd (file-name-as-directory (expand-file-name (or cwd default-directory))))
          (session (agentel-session-create :cwd cwd))
-         (buffer (agentel-chat-open session :input t))
+         (buffer (agentel-chat-open
+                  session :input t
+                  :name (when-let* ((project (project-current nil cwd)))
+                          (project-name project))))
          (command-line (agentel--command-line cwd)))
     (with-current-buffer buffer
       (setq default-directory cwd)

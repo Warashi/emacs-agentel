@@ -14,6 +14,26 @@
     (should (string-prefix-p "mock-" (agentel-session-id session)))
     (should (eq major-mode 'agentel-chat-mode))))
 
+(cl-defmethod project-root ((project (head agentel-test-project)))
+  (nth 1 project))
+
+(cl-defmethod project-name ((project (head agentel-test-project)))
+  (nth 2 project))
+
+(ert-deftest agentel-start-names-the-buffer-after-the-project ()
+  (let ((project-find-functions
+         (list (lambda (dir) (list 'agentel-test-project dir "repo/worktree")))))
+    (agentel-test-with-started session nil
+      (should (equal (buffer-name) "*agentel: repo/worktree*")))))
+
+(ert-deftest agentel-start-outside-a-project-names-the-buffer-after-the-directory ()
+  (let ((project-find-functions nil))
+    (agentel-test-with-started session nil
+      (should (equal (buffer-name)
+                     (format "*agentel: %s*"
+                             (file-name-nondirectory
+                              (directory-file-name temporary-file-directory))))))))
+
 (ert-deftest agentel-prompt-shows-reply-and-returns-to-idle ()
   (agentel-test-with-started session nil
     (agentel-test-send "hello")

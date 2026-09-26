@@ -587,15 +587,16 @@ and send it with \\[agentel-chat-send]."
 
 (add-hook 'agentel-session-changed-functions #'agentel-chat--on-changed)
 
-(defun agentel-chat--buffer-name (session)
-  "Return a buffer name for SESSION."
+(defun agentel-chat--buffer-name (session &optional name)
+  "Return a buffer name for SESSION, from NAME if given."
   (generate-new-buffer-name
-   (format "*agentel: %s*" (agentel-session-name session))))
+   (format "*agentel: %s*" (or name (agentel-session-name session)))))
 
-(cl-defun agentel-chat-open (session &key input)
+(cl-defun agentel-chat-open (session &key input name)
   "Create and return the buffer of SESSION.
-With INPUT, the buffer has an input area for prompts."
-  (let ((buffer (get-buffer-create (agentel-chat--buffer-name session))))
+With INPUT, the buffer has an input area for prompts.  NAME, when
+non-nil, names the buffer instead of the name of SESSION."
+  (let ((buffer (get-buffer-create (agentel-chat--buffer-name session name))))
     (with-current-buffer buffer
       (agentel-chat-mode)
       (setq agentel-chat--session session)
