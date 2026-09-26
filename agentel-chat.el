@@ -249,16 +249,6 @@ a nil KEY adds one every time."
                         (funcall (plist-get kind :update) message nil)
                         (plist-get kind :collapsed)))))
 
-(defun agentel-chat--append (entry text)
-  "Append TEXT to ENTRY, which must be the last entry."
-  (agentel-chat--with-transcript
-    (save-excursion
-      (goto-char agentel-chat--transcript-end)
-      (insert (agentel-chat--propertize
-               entry
-               (propertize text 'face (agentel-chat--text-face entry))))))
-  (run-hook-with-args 'agentel-chat-entry-changed-functions entry))
-
 (defun agentel-chat-entry-at (&optional pos)
   "Return the entry at POS, which defaults to point."
   (get-text-property (or pos (point)) 'agentel-chat-entry))
@@ -282,11 +272,12 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
 
 ;;;; Rendering
 
-(defun agentel-chat--text-face (entry)
-  "Return the face of streamed text in ENTRY."
-  (pcase (agentel-chat-entry-type entry)
-    ('user 'agentel-chat-user-face)
-    ('thought 'agentel-chat-thought-face)))
+(defun agentel-chat--update-text (message data)
+  "Return the DATA of a text message entry changed by MESSAGE.
+More text makes a finished message unfinished until it ends again."
+  (pcase message
+    (`(chunk ,text) `((text . ,(concat (alist-get 'text data) text))))
+    ('(finish) `((text . ,(alist-get 'text data)) (finished . t)))))
 
 (defun agentel-chat--render-text (entry)
   "Render the text message ENTRY."
@@ -297,17 +288,22 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
       ('agent (if (and (agentel-chat-entry-get entry 'finished)
                        agentel-chat-format-message-function)
                   (funcall agentel-chat-format-message-function text)
-                text))
-      (_ (propertize text 'face (agentel-chat--text-face entry))))))
+                text)))))
+
+(agentel-chat-define-entry 'user
+  :update #'agentel-chat--update-text
+  :view #'agentel-chat--render-text)
+
+(agentel-chat-define-entry 'agent
+  :update #'agentel-chat--update-text
+  :view #'agentel-chat--render-text)
 
 (defun agentel-chat-finish-message ()
   "Mark the agent message at the end of this buffer as complete."
   (let ((entry agentel-chat--last))
     (when (and entry (eq (agentel-chat-entry-type entry) 'agent)
                (not (agentel-chat-entry-get entry 'finished)))
-      (setf (agentel-chat-entry-get entry 'finished) t)
-      (when agentel-chat-format-message-function
-        (agentel-chat-refresh entry)))))
+      (agentel-chat-update entry '(finish)))))
 
 (defun agentel-chat--render-thought (entry)
   "Render the thought ENTRY, folded to its first line when collapsed."
@@ -318,6 +314,11 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
        (concat "▾ Thinking\n" text))
      'face 'agentel-chat-thought-face
      'keymap agentel-chat-entry-map)))
+
+(agentel-chat-define-entry 'thought
+  :update #'agentel-chat--update-text
+  :view #'agentel-chat--render-thought
+  :collapsed t)
 
 (defun agentel-chat--render-notice (entry)
   "Render the notice ENTRY."
@@ -421,21 +422,8 @@ tells it; a title cut short there shows in full on top of the output."
     (when (and text (not (string-empty-p text)))
       (if (and agentel-chat--last
                (eq (agentel-chat-entry-type agentel-chat--last) type))
-          (let ((entry agentel-chat--last))
-            (setf (agentel-chat-entry-get entry 'text)
-                  (concat (agentel-chat-entry-get entry 'text) text))
-            (cond ((eq type 'thought) (agentel-chat-refresh entry))
-                  ((agentel-chat-entry-get entry 'finished)
-                   ;; Show the whole message unformatted until it ends again.
-                   (setf (agentel-chat-entry-get entry 'finished) nil)
-                   (agentel-chat-refresh entry))
-                  (t (agentel-chat--append entry text))))
-        (agentel-chat-add nil type
-                          (if (eq type 'thought)
-                              #'agentel-chat--render-thought
-                            #'agentel-chat--render-text)
-                          `((text . ,text))
-                          (eq type 'thought))))))
+          (agentel-chat-update agentel-chat--last `(chunk ,text))
+        (agentel-chat-dispatch nil type `(chunk ,text))))))
 
 (defun agentel-chat--on-update (session update)
   "Show UPDATE of SESSION in its buffer."
@@ -532,7 +520,7 @@ tells it; a title cut short there shows in full on top of the output."
       (agentel-chat--set-input "")
       (unless (run-hook-with-args-until-success 'agentel-chat-send-functions
                                                 session text)
-        (agentel-chat-add nil 'user #'agentel-chat--render-text `((text . ,text)))
+        (agentel-chat-dispatch nil 'user `(chunk ,text))
         (agentel-chat--prompt session text)))))
 
 (defun agentel-chat-cancel ()

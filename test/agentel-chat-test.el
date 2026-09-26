@@ -225,6 +225,7 @@
         (should (equal changed (list message)))
         (agentel-chat-test-chunk "agent_message_chunk" "lo")
         (should (equal changed (list message message))))
+      (agentel-chat-finish-message)
       (setq changed nil)
       (agentel-chat-test-update '((sessionUpdate . "tool_call") (toolCallId . "t1")
                                   (title . "Read") (status . "pending")))
