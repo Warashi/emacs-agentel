@@ -98,8 +98,10 @@ every session this way:
 
 ** Session list
 
-=M-x agentel-list= (or =C-c C-l=). =RET= visits a session, =a= answers
-its oldest question, =c= cancels its turn and =k= stops it.
+=M-x agentel-list= (or =C-c C-l=). Each session takes two lines: its
+project with its state, then its title.  Subagents follow the session
+that started them.  =RET= visits a session, =a= answers its oldest
+question, =c= cancels its turn and =k= stops it.
 
 * Design
 

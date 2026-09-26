@@ -6,14 +6,13 @@
 ;;; Commentary:
 
 ;; `agentel-list' shows every running session with its subagents below
-;; it, what it is doing and whether it waits for the user, like the
-;; session sidebar of GUI agent apps.  The details column reuses the
-;; header line segments of the session buffers, so it shows whatever
-;; the loaded features show there without depending on them.
+;; it and whether it works or waits for the user, like the session
+;; sidebar of GUI agent apps.  A session takes two lines, its project
+;; with its state and then its title, so the list stays readable in a
+;; narrow window.
 
 ;;; Code:
 
-(require 'tabulated-list)
 (require 'agentel-session)
 (require 'agentel-connection)
 (require 'agentel-chat)
@@ -36,48 +35,93 @@
   "Face of sessions that ended."
   :group 'agentel)
 
+(defface agentel-list-title-face
+  '((t :inherit shadow))
+  "Face of the title line of a session."
+  :group 'agentel)
+
 (defvar agentel-list--refresh-timer nil
   "Timer that refreshes the list after sessions changed.")
 
 (defun agentel-list--state (session)
-  "Return the state column of SESSION."
+  "Return the state of SESSION in brackets."
   (let ((state (agentel-session-state session)))
-    (propertize (symbol-name state)
+    (propertize (format "[%s]" state)
                 'face (pcase state
                         ('waiting 'agentel-list-waiting-face)
                         ((or 'running 'starting) 'agentel-list-running-face)
                         ('idle 'default)
                         (_ 'agentel-list-ended-face)))))
 
-(defun agentel-list--details (session)
-  "Return the details column of SESSION."
-  (string-join (delq nil (mapcar (lambda (f) (funcall f session))
-                                 agentel-chat-header-functions))
-               "  "))
+(defun agentel-list--insert-session (session depth)
+  "Insert the lines of SESSION and its subagents indented by DEPTH.
+A top-level session shows its project and then its title; a subagent
+has no project of its own and shows only its title."
+  (let ((start (point)))
+    (if (> depth 0)
+        (insert (make-string (* 2 depth) ?\s) "└ "
+                (agentel-session-name session) " "
+                (agentel-list--state session) "\n")
+      (insert (or (agentel-session-project session)
+                  (agentel-session-name session))
+              " " (agentel-list--state session) "\n")
+      (when (and (agentel-session-project session)
+                 (agentel-session-title session))
+        (insert "  " (propertize (agentel-session-name session)
+                                 'face 'agentel-list-title-face)
+                "\n")))
+    (put-text-property start (point) 'agentel-list-session session))
+  (dolist (child (agentel-session-children session))
+    (agentel-list--insert-session child (1+ depth))))
 
-(defun agentel-list--rows (session depth)
-  "Return the rows of SESSION and its subagents indented by DEPTH."
-  (cons (list session
-              (vector (agentel-list--state session)
-                      (concat (make-string (* 2 depth) ?\s)
-                              (if (> depth 0) "└ " "")
-                              (agentel-session-name session))
-                      (agentel-list--details session)
-                      (abbreviate-file-name (or (agentel-session-cwd session) ""))))
-        (mapcan (lambda (child) (agentel-list--rows child (1+ depth)))
-                (agentel-session-children session))))
+(defun agentel-list--position (pos)
+  "Return where POS is as (SESSION LINE COLUMN).
+LINE counts the lines from the first one of SESSION."
+  (save-excursion
+    (goto-char pos)
+    (let ((session (get-text-property (point) 'agentel-list-session)))
+      (list session
+            (if session
+                (count-lines (text-property-any (point-min) (point-max)
+                                                'agentel-list-session session)
+                             (line-beginning-position))
+              0)
+            (current-column)))))
 
-(defun agentel-list--entries ()
-  "Return the rows of all sessions."
-  (mapcan (lambda (session) (agentel-list--rows session 0))
-          (agentel-session-roots)))
+(defun agentel-list--goto (position)
+  "Move point to POSITION returned by `agentel-list--position'."
+  (pcase-let ((`(,session ,line ,column) position))
+    (goto-char (or (and session
+                        (text-property-any (point-min) (point-max)
+                                           'agentel-list-session session))
+                   (point-min)))
+    (when (and session (zerop (forward-line line)))
+      (unless (eq (get-text-property (point) 'agentel-list-session) session)
+        (forward-line -1)))
+    (move-to-column column)
+    (point)))
+
+(defun agentel-list--render ()
+  "Redraw the list in the current buffer.
+Point and the point of every window showing the list stay on the line
+of the same session, since the lines are drawn again from scratch."
+  (let ((point (agentel-list--position (point)))
+        (windows (mapcar (lambda (w) (cons w (agentel-list--position (window-point w))))
+                         (get-buffer-window-list nil nil t)))
+        (inhibit-read-only t))
+    (erase-buffer)
+    (dolist (root (agentel-session-roots))
+      (agentel-list--insert-session root 0))
+    (pcase-dolist (`(,window . ,position) windows)
+      (set-window-point window (agentel-list--goto position)))
+    (agentel-list--goto point)))
 
 (defun agentel-list--refresh ()
   "Redraw the session list if it is open."
   (setq agentel-list--refresh-timer nil)
   (when-let* ((buffer (get-buffer agentel-list-buffer-name)))
     (with-current-buffer buffer
-      (tabulated-list-print t))))
+      (agentel-list--render))))
 
 (defun agentel-list--schedule-refresh (&rest _)
   "Redraw the session list soon, once for many changes."
@@ -88,7 +132,8 @@
 
 (defun agentel-list--session ()
   "Return the session of the row at point."
-  (or (tabulated-list-get-id) (user-error "No session on this line")))
+  (or (get-text-property (point) 'agentel-list-session)
+      (user-error "No session on this line")))
 
 (defun agentel-list-visit ()
   "Show the buffer of the session at point."
@@ -119,21 +164,17 @@
 
 (defvar-keymap agentel-list-mode-map
   :doc "Keymap of `agentel-list-mode'."
-  :parent tabulated-list-mode-map
+  :parent special-mode-map
   "RET" #'agentel-list-visit
   "a" #'agentel-list-answer
   "c" #'agentel-list-cancel
   "k" #'agentel-list-kill)
 
-(define-derived-mode agentel-list-mode tabulated-list-mode "agentel sessions"
+(define-derived-mode agentel-list-mode special-mode "agentel sessions"
   "Major mode listing agentel sessions."
-  (setq tabulated-list-format [("State" 9 nil)
-                               ("Session" 36 nil)
-                               ("Details" 64 nil)
-                               ("Directory" 0 nil)])
-  (setq tabulated-list-entries #'agentel-list--entries)
-  (setq tabulated-list-sort-key nil)
-  (tabulated-list-init-header))
+  (setq truncate-lines t)
+  (setq-local revert-buffer-function
+              (lambda (&rest _) (agentel-list--render))))
 
 (defun agentel-list-noselect ()
   "Return the session list buffer, creating it if needed."
@@ -141,7 +182,7 @@
     (with-current-buffer buffer
       (unless (derived-mode-p 'agentel-list-mode)
         (agentel-list-mode))
-      (tabulated-list-print t))
+      (agentel-list--render))
     buffer))
 
 ;;;###autoload
