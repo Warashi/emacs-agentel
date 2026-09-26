@@ -20,6 +20,7 @@
 (require 'agentel-session)
 (require 'agentel-connection)
 (require 'agentel-chat)
+(require 'agentel-ui)
 
 (defconst agentel-list-buffer-name "*agentel sessions*"
   "Name of the session list buffer.")
@@ -32,21 +33,6 @@
 (defcustom agentel-list-width 40
   "Width of the window of `agentel-list'."
   :type 'natnum
-  :group 'agentel)
-
-(defface agentel-list-waiting-face
-  '((t :inherit warning :weight bold))
-  "Face of sessions waiting for the user."
-  :group 'agentel)
-
-(defface agentel-list-running-face
-  '((t :inherit success))
-  "Face of sessions working on a turn."
-  :group 'agentel)
-
-(defface agentel-list-ended-face
-  '((t :inherit shadow))
-  "Face of sessions that ended."
   :group 'agentel)
 
 (defface agentel-list-unread-face
@@ -97,16 +83,6 @@ The previous busy value is kept here rather than with
         (remhash session agentel-list--unread))
       (agentel-list--schedule-refresh))))
 
-(defun agentel-list--state (session)
-  "Return the state of SESSION in brackets."
-  (let ((state (agentel-session-state session)))
-    (propertize (format "[%s]" state)
-                'face (pcase state
-                        ('waiting 'agentel-list-waiting-face)
-                        ((or 'running 'starting) 'agentel-list-running-face)
-                        ('idle 'default)
-                        (_ 'agentel-list-ended-face)))))
-
 (defun agentel-list--insert-session (session depth)
   "Insert the lines of SESSION and its subagents indented by DEPTH.
 Each session leads with its state, which is short and would be cut off
@@ -120,9 +96,9 @@ title; a subagent has no project of its own and shows only its title."
             " ")
     (if (> depth 0)
         (insert (make-string (* 2 depth) ?\s) "└ "
-                (agentel-list--state session) " "
+                (agentel-ui-state (agentel-session-state session)) " "
                 (agentel-session-name session) "\n")
-      (insert (agentel-list--state session) " "
+      (insert (agentel-ui-state (agentel-session-state session)) " "
               (agentel-session-project-name session) "\n")
       (when (agentel-session-title session)
         (insert "    " (propertize (agentel-session-name session)
