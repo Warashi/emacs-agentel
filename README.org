@@ -55,8 +55,10 @@ the variables on yourself if the wrapper does not (=docker run -e=).
 
 ** Session buffer
 
-The transcript is read-only; the prompt is edited below it like any
-other text.
+The buffer is named after the project of the session directory
+(=project-name=), or after the directory outside a project.  The
+transcript is read-only; the prompt is edited below it like any other
+text.
 
 | Key           | Command                                              |
 |---------------+------------------------------------------------------|
