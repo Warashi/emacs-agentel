@@ -47,6 +47,16 @@
                                             (search-forward "not available" nil t)))))
           (kill-buffer (agentel-session-buffer cleared)))))))
 
+(ert-deftest agentel-clear-keeps-the-buffer-name ()
+  (agentel-test-with-started session nil
+    (with-current-buffer (agentel-session-buffer session)
+      (rename-buffer "*agentel: renamed*"))
+    (let ((cleared (agentel-clear session "")))
+      (unwind-protect
+          (should (equal (buffer-name (agentel-session-buffer cleared))
+                         "*agentel: renamed*"))
+        (kill-buffer (agentel-session-buffer cleared))))))
+
 (ert-deftest agentel-clear-stops-a-running-turn ()
   (agentel-test-with-started session nil
     (agentel-test-send "slow")
