@@ -52,6 +52,15 @@
                      "  └ Explore [waiting]"
                      "two [idle]")))))
 
+(ert-deftest agentel-list-puts-sessions-waiting-for-the-user-first ()
+  (agentel-list-test-with-sessions
+    (agentel-session-add-pending other 'question)
+    (agentel-list--refresh)
+    (should (equal (agentel-list-test-lines)
+                   '("two [waiting]"
+                     "repo-one [idle]" "  Fix things"
+                     "  └ Explore [idle]")))))
+
 (ert-deftest agentel-list-fits-a-narrow-window ()
   (agentel-list-test-with-sessions
     (should (<= (apply #'max (mapcar #'string-width (agentel-list-test-lines)))

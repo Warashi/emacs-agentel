@@ -9,8 +9,9 @@
 ;; it and whether it works or waits for the user, like the session
 ;; sidebar of GUI agent apps.  A session takes two lines, its project
 ;; with its state and then its title, so the list stays readable in a
-;; narrow window.  It stays open in a side window until closed with
-;; the same command, and `other-window' passes over it.
+;; narrow window.  Sessions waiting for the user come first.  It stays
+;; open in a side window until closed with the same command, and
+;; `other-window' passes over it.
 
 ;;; Code:
 
@@ -85,6 +86,15 @@ has no project of its own and shows only its title."
   (dolist (child (agentel-session-children session))
     (agentel-list--insert-session child (1+ depth))))
 
+(defun agentel-list--rank (session)
+  "Return where SESSION goes in the list, lower first."
+  (if (eq (agentel-session-state session) 'waiting) 0 1))
+
+(defun agentel-list--roots ()
+  "Return the top-level sessions in the order the list shows them.
+Sessions that need the user come first, oldest first within a rank."
+  (seq-sort-by #'agentel-list--rank #'< (agentel-session-roots)))
+
 (defun agentel-list--position (pos)
   "Return where POS is as (SESSION LINE COLUMN).
 LINE counts the lines from the first one of SESSION."
@@ -121,7 +131,7 @@ of the same session, since the lines are drawn again from scratch."
                          (get-buffer-window-list nil nil t)))
         (inhibit-read-only t))
     (erase-buffer)
-    (dolist (root (agentel-session-roots))
+    (dolist (root (agentel-list--roots))
       (agentel-list--insert-session root 0))
     (pcase-dolist (`(,window . ,position) windows)
       (set-window-point window (agentel-list--goto position)))

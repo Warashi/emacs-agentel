@@ -110,7 +110,8 @@ from anywhere:
 
 Each session takes two lines: its
 project with its state, then its title.  Subagents follow the session
-that started them.  =RET= visits a session, =a= answers its oldest
+that started them.  Sessions waiting for the user, or for an answer to
+one of their subagents, come first.  =RET= visits a session, =a= answers its oldest
 question, =c= cancels its turn and =k= stops it.
 
 * Design
