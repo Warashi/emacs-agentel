@@ -83,8 +83,8 @@ extension, which agentel advertises.
 
 =agentel-focus-mode= hides everything the next input does not need.
 It leaves the last prompt, the questions still open, errors and why
-the turn ended, together with the final answer once the turn ended or
-the latest thought or tool call while it runs.  To open
+the turn ended, together with the last agent message and, while the
+turn runs, the latest thought or tool call.  To open
 every session this way:
 
 #+begin_src emacs-lisp

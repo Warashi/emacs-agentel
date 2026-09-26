@@ -86,13 +86,11 @@
   (agentel-focus-test-with-session
     (agentel-focus-test-prompt session "do it")
     (agentel-focus-test-tool "t1" "Read a.el")
-    (agentel-focus-test-chunk "agent_message_chunk" "Reading more.")
     (agentel-focus-test-tool "t2" "Read b.el")
     (let ((text (agentel-focus-test-visible)))
       (should (string-match-p "do it" text))
       (should (string-match-p "Read b\\.el" text))
-      (should-not (string-match-p "Read a\\.el" text))
-      (should-not (string-match-p "Reading more" text)))))
+      (should-not (string-match-p "Read a\\.el" text)))))
 
 (ert-deftest agentel-focus-shows-the-latest-thought-while-running ()
   (agentel-focus-test-with-session
@@ -203,13 +201,17 @@
     (agentel-focus-test-tool "t1" "Read a.el later")
     (should-not (string-match-p "Read a\\.el" (agentel-focus-test-visible)))))
 
-(ert-deftest agentel-focus-hides-a-streamed-message-while-running ()
+(ert-deftest agentel-focus-shows-the-last-message-while-running ()
   (agentel-focus-test-with-session
     (agentel-focus-test-prompt session "do it")
+    (agentel-focus-test-chunk "agent_message_chunk" "Let me look.")
     (agentel-focus-test-tool "t1" "Read a.el")
+    (should (string-match-p "\\`❯ do it\n\nLet me look\\.\n\n.*Read a\\.el\n\n❯ \\'"
+                            (agentel-focus-test-visible)))
     (agentel-focus-test-chunk "agent_message_chunk" "Some ")
     (agentel-focus-test-chunk "agent_message_chunk" "text")
-    (should-not (string-match-p "Some\\|text" (agentel-focus-test-visible)))
+    (should (string-match-p "\\`❯ do it\n\n.*Read a\\.el\n\nSome text\n\n❯ \\'"
+                            (agentel-focus-test-visible)))
     (agentel-session-set-busy session nil)
     (should (string-match-p "\\`❯ do it\n\nSome text\n\n❯ \\'"
                             (agentel-focus-test-visible)))))

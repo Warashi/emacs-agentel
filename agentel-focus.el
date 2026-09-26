@@ -7,9 +7,8 @@
 
 ;; `agentel-focus-mode' hides the transcript except what the user
 ;; answers next: the last prompt, the questions still waiting for an
-;; answer, errors and why the turn ended, and then the last agent
-;; message once the turn ended, or the latest thought or tool call
-;; while it runs.  A subagent is shown while it waits for an answer;
+;; answer, errors and why the turn ended, the last agent message, and
+;; the latest thought or tool call while the turn runs.  A subagent is shown while it waits for an answer;
 ;; while it runs it is pinned above the prompt instead.
 ;;
 ;; Hidden entries are covered by overlays, so the transcript text and
@@ -50,14 +49,14 @@ The overlay is nil while the entry is shown.")
   "Entries of the current turn that may wait for an answer.")
 
 (defvar-local agentel-focus--latest nil
-  "Entry shown as the answer or the current activity of the turn.")
+  "Entries shown as the last message and the current activity of the turn.")
 
 (defun agentel-focus--current-latest ()
-  "Return the entry that shows the state of the turn."
+  "Return the entries that show the state of the turn."
   (let ((session agentel-chat--session))
-    (if (and session (agentel-session-busy session))
-        agentel-focus--last-activity
-      agentel-focus--last-message)))
+    (delq nil (list agentel-focus--last-message
+                    (and session (agentel-session-busy session)
+                         agentel-focus--last-activity)))))
 
 (defun agentel-focus--waits-p (entry)
   "Return non-nil if ENTRY shows something owing an answer."
@@ -69,7 +68,7 @@ The overlay is nil while the entry is shown.")
 
 (defun agentel-focus--hidden-p (entry)
   "Return non-nil if ENTRY of the current turn is hidden."
-  (not (or (eq entry agentel-focus--latest)
+  (not (or (memq entry agentel-focus--latest)
            (memq (agentel-chat-entry-type entry) '(user error stop))
            (agentel-focus--waits-p entry))))
 
@@ -111,9 +110,8 @@ MOVED means its text changed, so a hidden entry is covered again."
   "Show or hide the entries that the state of the session can change."
   (let ((previous agentel-focus--latest))
     (setq agentel-focus--latest (agentel-focus--current-latest))
-    (unless (eq previous agentel-focus--latest)
-      (when previous (agentel-focus--fix previous))
-      (when agentel-focus--latest (agentel-focus--fix agentel-focus--latest))))
+    (mapc #'agentel-focus--fix previous)
+    (mapc #'agentel-focus--fix agentel-focus--latest))
   (dolist (entry agentel-focus--askers)
     (agentel-focus--fix entry)))
 
@@ -178,9 +176,8 @@ The first of them is the last prompt, unless there is none."
 (define-minor-mode agentel-focus-mode
   "Show only what the next input to the session needs.
 The last prompt stays visible, with the questions waiting for an
-answer, errors and why the turn ended, and the last agent message
-once the turn ended or the latest thought or tool call while it
-runs."
+answer, errors and why the turn ended, the last agent message, and
+the latest thought or tool call while the turn runs."
   :lighter " Focus"
   (if agentel-focus-mode
       (progn
