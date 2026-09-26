@@ -318,13 +318,13 @@
   (agentel-chat-test-with-session
     (let ((agentel-chat-header-functions nil))
       (setf (agentel-session-title session) "Fix things")
-      (should (string-prefix-p "[idle] " (agentel-chat--header-line))))))
+      (should (string-prefix-p "💤 " (agentel-chat--header-line))))))
 
 (ert-deftest agentel-chat-header-shows-the-project-before-the-title ()
   (agentel-chat-test-with-session
     (let ((agentel-chat-header-functions nil))
       (setf (agentel-session-title session) "Fix things")
-      (should (equal (agentel-chat--header-line) "[idle] project  │  Fix things")))))
+      (should (equal (agentel-chat--header-line) "💤 project  │  Fix things")))))
 
 (ert-deftest agentel-chat-header-of-a-subagent-shows-the-project-of-its-parent ()
   (agentel-chat-test-with-session
@@ -336,7 +336,7 @@
             (agentel-session-title child) "Explore")
       (unwind-protect
           (with-current-buffer buffer
-            (should (equal (agentel-chat--header-line) "[idle] repo  │  Explore")))
+            (should (equal (agentel-chat--header-line) "💤 repo  │  Explore")))
         (kill-buffer buffer)))))
 
 (ert-deftest agentel-chat-header-line-escapes-percent-signs ()
