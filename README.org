@@ -21,7 +21,11 @@ agentel does not offer file system or terminal capabilities; the agent
 uses its own tools.
 
 [[https://docs.github.com/copilot/how-tos/copilot-cli][Copilot CLI]] (=copilot --acp=) runs too, with the same model, effort
-and mode options.  Its subagents stay in the transcript of the parent.
+and mode options.  A subagent of Copilot CLI shows in the transcript of
+the parent as one tool call, whose content is the reply of the
+subagent; what the subagent does meanwhile is left out.  Copilot CLI
+does not mark the replies and thoughts of a subagent started in the
+background, so those still mix with the parent's.
 
 * Usage
 
