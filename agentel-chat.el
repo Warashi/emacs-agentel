@@ -320,17 +320,21 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
   (replace-regexp-in-string "^" "    " text))
 
 (defun agentel-chat--render-tool (entry)
-  "Render the tool call ENTRY."
+  "Render the tool call ENTRY.
+The header is one line; a title cut short there shows in full on top
+of the output."
   (let* ((status (agentel-chat-entry-get entry 'status))
          (icon (or (cdr (assoc status agentel-chat--status-icons)) "…"))
-         (body (agentel-chat--content-text (agentel-chat-entry-get entry 'content)))
+         (title (propertize (or (agentel-chat-entry-get entry 'title) "Tool")
+                            'face 'agentel-chat-tool-face))
+         (line (lambda (marker) (agentel-ui-one-line (concat marker icon " ") title)))
+         (cut (not (equal (funcall line "  ") (concat "  " icon " " title))))
+         (output (agentel-chat--content-text (agentel-chat-entry-get entry 'content)))
+         (body (string-join (delete "" (list (if cut title "") output)) "\n"))
          (foldable (not (string-empty-p body)))
-         (header (concat (cond ((not foldable) "  ")
-                               ((agentel-chat-entry-collapsed entry) "▸ ")
-                               (t "▾ "))
-                         icon " "
-                         (propertize (or (agentel-chat-entry-get entry 'title) "Tool")
-                                     'face 'agentel-chat-tool-face))))
+         (header (funcall line (cond ((not foldable) "  ")
+                                     ((agentel-chat-entry-collapsed entry) "▸ ")
+                                     (t "▾ ")))))
     (propertize
      (if (or (not foldable) (agentel-chat-entry-collapsed entry))
          header

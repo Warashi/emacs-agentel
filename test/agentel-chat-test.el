@@ -90,6 +90,29 @@
     (agentel-chat-toggle)
     (should (string-match-p "file body" (agentel-chat-test-transcript)))))
 
+(ert-deftest agentel-chat-keeps-a-long-tool-title-on-one-line-until-toggled ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-update
+     '((sessionUpdate . "tool_call") (toolCallId . "t1")
+       (title . "cat <<'EOF' > notes.txt\nhello\nEOF") (status . "completed")))
+    (should (string-match-p "\\`.*cat <<'EOF' > notes\\.txt…\\'"
+                            (agentel-chat-test-transcript)))
+    (goto-char (point-min))
+    (search-forward "cat")
+    (agentel-chat-toggle)
+    (should (string-match-p "notes\\.txt\n +hello\n +EOF\\'"
+                            (agentel-chat-test-transcript)))))
+
+(ert-deftest agentel-chat-cannot-fold-a-short-tool-title-without-output ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-update
+     '((sessionUpdate . "tool_call") (toolCallId . "t1")
+       (title . "ls") (status . "completed")))
+    (goto-char (point-min))
+    (search-forward "ls")
+    (agentel-chat-toggle)
+    (should (string-match-p "\\`.*ls\\'" (agentel-chat-test-transcript)))))
+
 (ert-deftest agentel-chat-updating-an-old-tool-keeps-later-entries-intact ()
   (agentel-chat-test-with-session
     (agentel-chat-test-update
