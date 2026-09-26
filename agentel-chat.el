@@ -378,6 +378,19 @@ tells it; a title cut short there shows in full on top of the output."
                            'face 'agentel-chat-tool-body-face)))
      'keymap agentel-chat-entry-map)))
 
+(defun agentel-chat--update-tool (message data)
+  "Return the DATA of a tool call entry changed by MESSAGE."
+  (pcase message
+    (`(update ,update)
+     (dolist (field '(title kind status content rawInput locations) data)
+       (when-let* ((value (alist-get field update)))
+         (setf (alist-get field data) value))))))
+
+(agentel-chat-define-entry 'tool
+  :update #'agentel-chat--update-tool
+  :view #'agentel-chat--render-tool
+  :collapsed t)
+
 (defconst agentel-chat--plan-marks
   '(("completed" . "[x]") ("in_progress" . "[-]") ("pending" . "[ ]"))
   "Check boxes of plan entry statuses.")
@@ -393,6 +406,12 @@ tells it; a title cut short there shows in full on top of the output."
                             "[ ]")
                         (alist-get 'content item)))
               (agentel-chat-entry-get entry 'entries) "")))
+
+(agentel-chat-define-entry 'plan
+  :update (lambda (message _data)
+            (pcase message
+              (`(show ,entries) `((entries . ,entries)))))
+  :view #'agentel-chat--render-plan)
 
 ;;;; Updates from the agent
 
@@ -418,23 +437,6 @@ tells it; a title cut short there shows in full on top of the output."
                           `((text . ,text))
                           (eq type 'thought))))))
 
-(defun agentel-chat--tool (update)
-  "Show or update the tool call described by UPDATE."
-  (let* ((key (cons 'tool (alist-get 'toolCallId update)))
-         (entry (or (agentel-chat-find key)
-                    (agentel-chat-add key 'tool #'agentel-chat--render-tool nil t))))
-    (dolist (field '(title kind status content rawInput locations))
-      (when-let* ((value (alist-get field update)))
-        (setf (agentel-chat-entry-get entry field) value)))
-    (agentel-chat-refresh entry)))
-
-(defun agentel-chat--plan (update)
-  "Show the plan in UPDATE, replacing the previous one."
-  (let ((entry (or (agentel-chat-find 'plan)
-                   (agentel-chat-add 'plan 'plan #'agentel-chat--render-plan))))
-    (setf (agentel-chat-entry-get entry 'entries) (alist-get 'entries update))
-    (agentel-chat-refresh entry)))
-
 (defun agentel-chat--on-update (session update)
   "Show UPDATE of SESSION in its buffer."
   (when-let* ((buffer (agentel-session-buffer session))
@@ -444,8 +446,12 @@ tells it; a title cut short there shows in full on top of the output."
         ("agent_message_chunk" (agentel-chat--text-chunk 'agent update))
         ("agent_thought_chunk" (agentel-chat--text-chunk 'thought update))
         ("user_message_chunk" (agentel-chat--text-chunk 'user update))
-        ((or "tool_call" "tool_call_update") (agentel-chat--tool update))
-        ("plan" (agentel-chat--plan update))))))
+        ((or "tool_call" "tool_call_update")
+         (agentel-chat-dispatch (cons 'tool (alist-get 'toolCallId update))
+                                'tool `(update ,update)))
+        ;; A plan replaces the previous one.
+        ("plan" (agentel-chat-dispatch 'plan 'plan
+                                       `(show ,(alist-get 'entries update))))))))
 
 (add-hook 'agentel-session-update-functions #'agentel-chat--on-update)
 
