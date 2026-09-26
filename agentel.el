@@ -34,6 +34,7 @@
 (require 'agentel-config)
 (require 'agentel-usage)
 (require 'agentel-subagent)
+(require 'agentel-copilot-subagent)
 (require 'agentel-async-task)
 (require 'agentel-list)
 (require 'agentel-markdown)

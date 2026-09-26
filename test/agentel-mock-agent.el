@@ -26,7 +26,9 @@
 ;; so tests can inspect them.
 ;;
 ;; With `agentel-mock-flavor' set to copilot before loading, the session
-;; config options take the shape of Copilot CLI 1.0.88 (`copilot --acp').
+;; config options take the shape of Copilot CLI 1.0.88 (`copilot --acp'),
+;; and subagent runs a task tool call in the session like Copilot CLI,
+;; in the background when the prompt also says background.
 
 ;;; Code:
 
@@ -318,6 +320,50 @@ KIND is the session update name and defaults to an agent message."
     (agentel-mock--say session-id "The subagent reported a README.")
     (agentel-mock--finish id session-id)))
 
+(defun agentel-mock--copilot-subagent (id session-id background)
+  "Run a subagent under SESSION-ID the way Copilot CLI does, then end prompt ID.
+The subagent runs as a task tool call of the session and its reply
+comes as unmarked agent message chunks.  With BACKGROUND the task ends
+as soon as the subagent starts and the session goes on meanwhile."
+  (let ((task (format "toolu_task_%d" (cl-incf agentel-mock--counter)))
+        (tool (format "call_%d" (cl-incf agentel-mock--counter)))
+        (meta '((github.com/copilot . ((agentId . "agent-1"))))))
+    (agentel-mock--say session-id "Delegating to a subagent.")
+    (agentel-mock--update
+     session-id `((sessionUpdate . "tool_call") (toolCallId . ,task)
+                  (title . "Explore the repository") (kind . "other")
+                  (status . "pending")
+                  (rawInput . ((name . "explore-repo") (agent_type . "explore")
+                               (description . "Explore the repository")
+                               (prompt . "List the files and summarize them.")
+                               ,@(when background '((mode . "background")))))))
+    (when background
+      (agentel-mock--update
+       session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,task)
+                    (status . "completed")
+                    (content . [((type . "content")
+                                 (content . ((type . "text")
+                                             (text . "Agent started in background."))))])))
+      (agentel-mock--say session-id "Waiting for it."))
+    (agentel-mock--update
+     session-id `((sessionUpdate . "tool_call") (toolCallId . ,tool)
+                  (title . "Viewing /tmp/README.org") (kind . "read")
+                  (status . "pending") (rawInput . ((path . "/tmp/README.org")))
+                  (_meta . ,meta)))
+    (agentel-mock--update
+     session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,tool)
+                  (status . "completed") (_meta . ,meta)))
+    (agentel-mock--say session-id "The repository has a README.")
+    (unless background
+      (agentel-mock--update
+       session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,task)
+                    (status . "completed")
+                    (content . [((type . "content")
+                                 (content . ((type . "text")
+                                             (text . "The repository has a README."))))]))))
+    (agentel-mock--say session-id " The subagent reported a README.")
+    (agentel-mock--finish id session-id)))
+
 (defun agentel-mock--background (id session-id)
   "Run a subagent under SESSION-ID that works until prompt ID is cancelled.
 Like the adapter, the turn stays open while the subagent lives."
@@ -380,6 +426,9 @@ Like the adapter, the turn stays open while the subagent lives."
      ((string-match-p "slow" text)
       (agentel-mock--say session-id "Working slowly")
       (setq agentel-mock--prompt-id (cons id session-id)))
+     ((and (eq agentel-mock-flavor 'copilot) (string-match-p "subagent" text))
+      (agentel-mock--copilot-subagent id session-id
+                                      (string-match-p "background" text)))
      ((string-match-p "permission" text) (agentel-mock--permission id session-id))
      ((string-match-p "ask" text) (agentel-mock--ask id session-id))
      ((string-match-p "background" text) (agentel-mock--background id session-id))
