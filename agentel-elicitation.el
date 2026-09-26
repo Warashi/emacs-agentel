@@ -127,16 +127,17 @@
        " "
        (buttonize "[Decline]" (lambda (_) (agentel-elicitation-decline item)))))))
 
+(agentel-chat-define-entry 'elicitation
+  :update (lambda (message _data)
+            (pcase message
+              (`(show ,item) `((item . ,item)))))
+  :view #'agentel-elicitation--render)
+
 (defun agentel-elicitation--show (item)
   "Show the state of the form ITEM in its session buffer."
-  (let ((buffer (agentel-session-buffer (plist-get item :session)))
-        (key (cons 'elicitation (plist-get item :id))))
-    (when (buffer-live-p buffer)
-      (with-current-buffer buffer
-        (if-let* ((entry (agentel-chat-find key)))
-            (agentel-chat-refresh entry)
-          (agentel-chat-add key 'elicitation #'agentel-elicitation--render
-                            `((item . ,item))))))))
+  (agentel-chat-dispatch (plist-get item :session)
+                         (cons 'elicitation (plist-get item :id))
+                         'elicitation `(show ,item)))
 
 ;;;; Answering
 
