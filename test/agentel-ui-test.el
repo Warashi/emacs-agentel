@@ -72,5 +72,14 @@
       (agentel-ui--check-widths)
       (should (= calls 1)))))
 
+(ert-deftest agentel-ui-follow-width-forgets-a-buffer-that-changed-its-mode ()
+  (agentel-ui-test-with-narrow-window
+    (let ((agentel-ui--followers nil))
+      (agentel-ui-follow-width #'ignore)
+      (fundamental-mode)
+      (delete-other-windows)
+      (agentel-ui--check-widths)
+      (should-not agentel-ui--followers))))
+
 (provide 'agentel-ui-test)
 ;;; agentel-ui-test.el ends here

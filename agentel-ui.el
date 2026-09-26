@@ -64,7 +64,12 @@ FUNCTION makes the text depending on `agentel-ui-line-width' again."
 
 (defun agentel-ui--check-widths (&rest _)
   "Tell the followers whose line width changed."
-  (setq agentel-ui--followers (seq-filter #'buffer-live-p agentel-ui--followers))
+  (setq agentel-ui--followers
+        (seq-filter (lambda (buffer)
+                      ;; Changing the major mode kills the local function.
+                      (and (buffer-live-p buffer)
+                           (buffer-local-value 'agentel-ui--on-width-change buffer)))
+                    agentel-ui--followers))
   (dolist (buffer agentel-ui--followers)
     (with-current-buffer buffer
       (let ((width (agentel-ui-line-width)))
