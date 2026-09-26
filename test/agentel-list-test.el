@@ -109,6 +109,60 @@
     (agentel-list-visit)
     (should (buffer-live-p (agentel-session-buffer child)))))
 
+(defun agentel-list-test-window ()
+  "Return the window showing the list, or nil."
+  (get-buffer-window agentel-list-buffer-name))
+
+(ert-deftest agentel-list-opens-in-a-side-window-and-moves-to-it ()
+  (agentel-list-test-with-sessions
+    (save-window-excursion
+      (switch-to-buffer (agentel-session-buffer parent))
+      (agentel-list)
+      (let ((window (agentel-list-test-window)))
+        (should (eq (selected-window) window))
+        (should (eq (window-parameter window 'window-side) agentel-list-side))
+        (should (window-parameter window 'no-other-window))))))
+
+(ert-deftest agentel-list-moves-to-the-list-already-shown ()
+  (agentel-list-test-with-sessions
+    (save-window-excursion
+      (switch-to-buffer (agentel-session-buffer parent))
+      (agentel-list)
+      (other-window -1 t)
+      (let ((windows (length (window-list))))
+        (agentel-list)
+        (should (eq (selected-window) (agentel-list-test-window)))
+        (should (= (length (window-list)) windows))))))
+
+(ert-deftest agentel-list-closes-the-list-from-inside ()
+  (agentel-list-test-with-sessions
+    (save-window-excursion
+      (switch-to-buffer (agentel-session-buffer parent))
+      (agentel-list)
+      (agentel-list)
+      (should-not (agentel-list-test-window))
+      (should (eq (window-buffer (selected-window)) (agentel-session-buffer parent))))))
+
+(ert-deftest agentel-list-stays-when-a-session-is-visited ()
+  (agentel-list-test-with-sessions
+    (save-window-excursion
+      (switch-to-buffer (agentel-session-buffer parent))
+      (agentel-list)
+      (goto-char (point-min))
+      (search-forward "two")
+      (agentel-list-visit)
+      (should (eq (window-buffer (selected-window)) (agentel-session-buffer other)))
+      (should (agentel-list-test-window)))))
+
+(ert-deftest agentel-list-stays-when-other-windows-are-deleted ()
+  (agentel-list-test-with-sessions
+    (save-window-excursion
+      (switch-to-buffer (agentel-session-buffer parent))
+      (agentel-list)
+      (other-window -1 t)
+      (delete-other-windows)
+      (should (agentel-list-test-window)))))
+
 (ert-deftest agentel-list-does-not-stop-a-subagent-alone ()
   (agentel-list-test-with-sessions
     (goto-char (point-min))

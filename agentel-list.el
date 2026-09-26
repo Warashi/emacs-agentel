@@ -9,7 +9,8 @@
 ;; it and whether it works or waits for the user, like the session
 ;; sidebar of GUI agent apps.  A session takes two lines, its project
 ;; with its state and then its title, so the list stays readable in a
-;; narrow window.
+;; narrow window.  It stays open in a side window until closed with
+;; the same command, and `other-window' passes over it.
 
 ;;; Code:
 
@@ -19,6 +20,16 @@
 
 (defconst agentel-list-buffer-name "*agentel sessions*"
   "Name of the session list buffer.")
+
+(defcustom agentel-list-side 'left
+  "Side of the frame where `agentel-list' shows the list."
+  :type '(choice (const left) (const right))
+  :group 'agentel)
+
+(defcustom agentel-list-width 40
+  "Width of the window of `agentel-list'."
+  :type 'natnum
+  :group 'agentel)
 
 (defface agentel-list-waiting-face
   '((t :inherit warning :weight bold))
@@ -187,9 +198,22 @@ of the same session, since the lines are drawn again from scratch."
 
 ;;;###autoload
 (defun agentel-list ()
-  "Show the running agent sessions."
+  "Show the running agent sessions in a side window and move to it.
+When point is already in the list, close it instead.  The window
+stays through `delete-other-windows' and `other-window' skips it, so
+this command is the way in and out of it."
   (interactive)
-  (pop-to-buffer (agentel-list-noselect)))
+  (let ((window (get-buffer-window agentel-list-buffer-name)))
+    (cond ((and window (eq window (selected-window)))
+           (delete-window window))
+          (window (select-window window))
+          (t (select-window
+              (display-buffer-in-side-window
+               (agentel-list-noselect)
+               `((side . ,agentel-list-side)
+                 (window-width . ,agentel-list-width)
+                 (window-parameters (no-other-window . t)
+                                    (no-delete-other-windows . t)))))))))
 
 (keymap-set agentel-chat-mode-map "C-c C-l" #'agentel-list)
 (add-hook 'agentel-session-changed-functions #'agentel-list--schedule-refresh)

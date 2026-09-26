@@ -98,7 +98,17 @@ every session this way:
 
 ** Session list
 
-=M-x agentel-list= (or =C-c C-l=). Each session takes two lines: its
+=M-x agentel-list= (or =C-c C-l=) shows the list in a side window and
+moves to it; from inside the list it closes it.  The window stays open
+through =C-x 1= and =C-x o= skips it, so the command is the way in and
+out.  =agentel-list-side= and =agentel-list-width= place it.  To reach it
+from anywhere:
+
+#+begin_src emacs-lisp
+(keymap-global-set "C-c a" #'agentel-list)
+#+end_src
+
+Each session takes two lines: its
 project with its state, then its title.  Subagents follow the session
 that started them.  =RET= visits a session, =a= answers its oldest
 question, =c= cancels its turn and =k= stops it.
