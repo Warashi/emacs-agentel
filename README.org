@@ -72,7 +72,10 @@ other text.
 | =M-p= / =M-n= | previous / next sent prompt                          |
 
 =/resume= lists the earlier sessions of the directory and opens the
-chosen one with its history.
+chosen one with its history.  =/clear= starts a new conversation in the
+same window, directory, model, effort and mode, and stops the old
+agent, even in the middle of a turn; =/resume= still finds the old
+conversation.
 
 Subagents that have not ended and background tasks of the agent, such
 as a shell command left running, are pinned between the transcript and
