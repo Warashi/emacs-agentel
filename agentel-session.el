@@ -153,6 +153,17 @@ subagents, `running' during a turn, and `idle' otherwise."
             (directory-file-name (agentel-session-cwd session))))
       "agent"))
 
+(defun agentel-session-project-name (session)
+  "Return the name of the project SESSION works in.
+A subagent works in the project of its top-level session.  Outside of
+a project, this is the name of the working directory."
+  (while (agentel-session-parent session)
+    (setq session (agentel-session-parent session)))
+  (or (agentel-session-project session)
+      (when-let* ((cwd (agentel-session-cwd session)))
+        (file-name-nondirectory (directory-file-name cwd)))
+      "agent"))
+
 (defun agentel-session-dispatch (params &optional connection)
   "Route the `session/update' notification PARAMS to its session.
 CONNECTION is the connection it arrived on."

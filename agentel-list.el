@@ -121,11 +121,8 @@ has no project of its own and shows only its title."
         (insert (make-string (* 2 depth) ?\s) "└ "
                 (agentel-session-name session) " "
                 (agentel-list--state session) "\n")
-      (insert (or (agentel-session-project session)
-                  (when-let* ((cwd (agentel-session-cwd session)))
-                    (file-name-nondirectory (directory-file-name cwd)))
-                  "agent")
-              " " (agentel-list--state session) "\n")
+      (insert (agentel-session-project-name session) " "
+              (agentel-list--state session) "\n")
       (when (agentel-session-title session)
         (insert "    " (propertize (agentel-session-name session)
                                    'face 'agentel-list-title-face)

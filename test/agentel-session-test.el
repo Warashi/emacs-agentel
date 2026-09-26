@@ -142,5 +142,20 @@
       (setf (agentel-session-title session) "first\nsecond")
       (should (equal (agentel-session-name session) "first second")))))
 
+(ert-deftest agentel-session-project-name-is-the-project-of-the-top-level-session ()
+  (agentel-session-test-with-registry
+    (let* ((parent (agentel-session-create :cwd "/tmp/one/" :project "repo-one"))
+           (child (agentel-session-create :parent parent :cwd "/tmp/one/")))
+      (should (equal (agentel-session-project-name parent) "repo-one"))
+      (should (equal (agentel-session-project-name child) "repo-one")))))
+
+(ert-deftest agentel-session-project-name-is-the-directory-outside-a-project ()
+  (agentel-session-test-with-registry
+    (should (equal (agentel-session-project-name
+                    (agentel-session-create :cwd "/tmp/two/"))
+                   "two"))
+    (should (equal (agentel-session-project-name (agentel-session-create))
+                   "agent"))))
+
 (provide 'agentel-session-test)
 ;;; agentel-session-test.el ends here
