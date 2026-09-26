@@ -113,7 +113,7 @@ again or extended.")
 (cl-defstruct (agentel-chat-entry (:constructor agentel-chat-entry--make)
                                   (:copier nil))
   "A piece of the transcript."
-  key type data render start collapsed)
+  key type data start collapsed)
 
 ;;;; Keymaps
 
@@ -146,6 +146,20 @@ transcript grows above them, so the undo history is dropped."
        (unless (eq buffer-undo-list t)
          (setq buffer-undo-list nil)))))
 
+(defvar agentel-chat--kinds nil
+  "Alist of entry types and the plists defining them.")
+
+(defun agentel-chat-define-entry (type &rest definition)
+  "Define the entry TYPE by the plist DEFINITION.
+:update is a function taking a message and the data alist of an entry
+and returning its new data, :view a function returning the text of an
+entry, and :collapsed non-nil when a new entry starts folded."
+  (setf (alist-get type agentel-chat--kinds) definition))
+
+(defun agentel-chat--kind (type property)
+  "Return PROPERTY of the definition of the entry TYPE."
+  (plist-get (alist-get type agentel-chat--kinds) property))
+
 (defun agentel-chat--entry-end (entry)
   "Return the position after the text of ENTRY."
   (next-single-property-change (agentel-chat-entry-start entry)
@@ -168,27 +182,24 @@ transcript grows above them, so the undo history is dropped."
   (agentel-chat--propertize
    entry
    (concat (if (> at (point-min)) "\n\n" "")
-           (funcall (agentel-chat-entry-render entry) entry))))
+           (funcall (agentel-chat--kind (agentel-chat-entry-type entry) :view)
+                    entry))))
 
 (defun agentel-chat-entry-get (entry key)
   "Return the value ENTRY stores under KEY."
   (alist-get key (agentel-chat-entry-data entry)))
 
-(gv-define-setter agentel-chat-entry-get (value entry key)
-  `(setf (alist-get ,key (agentel-chat-entry-data ,entry)) ,value))
-
 (defun agentel-chat-find (key)
   "Return the entry stored under KEY in this buffer."
   (gethash key agentel-chat--entries))
 
-(defun agentel-chat-add (key type render &optional data collapsed)
-  "Append an entry to the transcript of this buffer and return it.
-KEY identifies the entry for `agentel-chat-find', TYPE is a symbol
-naming its kind, RENDER a function returning its text from the entry,
-DATA its initial alist and COLLAPSED its initial folding."
+(defun agentel-chat--add (key type data)
+  "Append an entry of TYPE with DATA to the transcript and return it.
+KEY identifies the entry for `agentel-chat-find'."
   (agentel-chat-finish-message)
-  (let ((entry (agentel-chat-entry--make :key key :type type :render render
-                                         :data data :collapsed collapsed)))
+  (let ((entry (agentel-chat-entry--make
+                :key key :type type :data data
+                :collapsed (agentel-chat--kind type :collapsed))))
     (agentel-chat--with-transcript
       (save-excursion
         (goto-char agentel-chat--transcript-end)
@@ -202,7 +213,7 @@ DATA its initial alist and COLLAPSED its initial folding."
     (run-hook-with-args 'agentel-chat-entry-changed-functions entry)
     entry))
 
-(defun agentel-chat-refresh (entry)
+(defun agentel-chat--refresh (entry)
   "Render ENTRY again in place."
   (let* ((start (marker-position (agentel-chat-entry-start entry)))
          (end (agentel-chat--entry-end entry))
@@ -220,23 +231,12 @@ DATA its initial alist and COLLAPSED its initial folding."
     (when offset
       (goto-char (min (+ start offset) (agentel-chat--entry-end entry))))))
 
-(defvar agentel-chat--kinds nil
-  "Alist of entry types and the plists defining them.")
-
-(defun agentel-chat-define-entry (type &rest definition)
-  "Define the entry TYPE by the plist DEFINITION.
-:update is a function taking a message and the data alist of an entry
-and returning its new data, :view a function returning the text of an
-entry, and :collapsed non-nil when a new entry starts folded."
-  (setf (alist-get type agentel-chat--kinds) definition))
-
 (defun agentel-chat-update (entry message)
   "Change the data of ENTRY by MESSAGE and render it again."
   (setf (agentel-chat-entry-data entry)
-        (funcall (plist-get (alist-get (agentel-chat-entry-type entry) agentel-chat--kinds)
-                            :update)
+        (funcall (agentel-chat--kind (agentel-chat-entry-type entry) :update)
                  message (agentel-chat-entry-data entry)))
-  (agentel-chat-refresh entry))
+  (agentel-chat--refresh entry))
 
 (defun agentel-chat-dispatch (session key type message)
   "Send MESSAGE to the entry of TYPE stored under KEY in SESSION's buffer.
@@ -248,10 +248,8 @@ has no live buffer."
     (with-current-buffer buffer
       (if-let* ((entry (and key (agentel-chat-find key))))
           (progn (agentel-chat-update entry message) entry)
-        (let ((kind (alist-get type agentel-chat--kinds)))
-          (agentel-chat-add key type (plist-get kind :view)
-                            (funcall (plist-get kind :update) message nil)
-                            (plist-get kind :collapsed)))))))
+        (agentel-chat--add key type
+                           (funcall (agentel-chat--kind type :update) message nil))))))
 
 (defun agentel-chat-entry-at (&optional pos)
   "Return the entry at POS, which defaults to point."
@@ -263,7 +261,7 @@ has no live buffer."
   (when-let* ((entry (agentel-chat-entry-at)))
     (setf (agentel-chat-entry-collapsed entry)
           (not (agentel-chat-entry-collapsed entry)))
-    (agentel-chat-refresh entry)))
+    (agentel-chat--refresh entry)))
 
 (defun agentel-chat-notice (session text &optional type)
   "Add the notice TEXT to the buffer of SESSION.
@@ -614,7 +612,7 @@ and send it with \\[agentel-chat-send]."
         (when (text-property-any pos end 'agentel-ui-fits-width t)
           (push entry entries))
         (setq pos end)))
-    (mapc #'agentel-chat-refresh entries))
+    (mapc #'agentel-chat--refresh entries))
   (when agentel-chat--session
     (agentel-chat-refresh-pin agentel-chat--session)))
 
