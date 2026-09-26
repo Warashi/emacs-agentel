@@ -238,16 +238,20 @@ entry, and :collapsed non-nil when a new entry starts folded."
                  message (agentel-chat-entry-data entry)))
   (agentel-chat-refresh entry))
 
-(defun agentel-chat-dispatch (key type message)
-  "Send MESSAGE to the entry of TYPE stored under KEY and return it.
+(defun agentel-chat-dispatch (session key type message)
+  "Send MESSAGE to the entry of TYPE stored under KEY in SESSION's buffer.
 Without such an entry, one is added to the end of the transcript, so
-a nil KEY adds one every time."
-  (if-let* ((entry (and key (agentel-chat-find key))))
-      (progn (agentel-chat-update entry message) entry)
-    (let ((kind (alist-get type agentel-chat--kinds)))
-      (agentel-chat-add key type (plist-get kind :view)
-                        (funcall (plist-get kind :update) message nil)
-                        (plist-get kind :collapsed)))))
+a nil KEY adds one every time.  Return the entry, or nil when SESSION
+has no live buffer."
+  (when-let* ((buffer (agentel-session-buffer session))
+              ((buffer-live-p buffer)))
+    (with-current-buffer buffer
+      (if-let* ((entry (and key (agentel-chat-find key))))
+          (progn (agentel-chat-update entry message) entry)
+        (let ((kind (alist-get type agentel-chat--kinds)))
+          (agentel-chat-add key type (plist-get kind :view)
+                            (funcall (plist-get kind :update) message nil)
+                            (plist-get kind :collapsed)))))))
 
 (defun agentel-chat-entry-at (&optional pos)
   "Return the entry at POS, which defaults to point."
@@ -423,7 +427,7 @@ tells it; a title cut short there shows in full on top of the output."
       (if (and agentel-chat--last
                (eq (agentel-chat-entry-type agentel-chat--last) type))
           (agentel-chat-update agentel-chat--last `(chunk ,text))
-        (agentel-chat-dispatch nil type `(chunk ,text))))))
+        (agentel-chat-dispatch agentel-chat--session nil type `(chunk ,text))))))
 
 (defun agentel-chat--on-update (session update)
   "Show UPDATE of SESSION in its buffer."
@@ -435,10 +439,10 @@ tells it; a title cut short there shows in full on top of the output."
         ("agent_thought_chunk" (agentel-chat--text-chunk 'thought update))
         ("user_message_chunk" (agentel-chat--text-chunk 'user update))
         ((or "tool_call" "tool_call_update")
-         (agentel-chat-dispatch (cons 'tool (alist-get 'toolCallId update))
+         (agentel-chat-dispatch session (cons 'tool (alist-get 'toolCallId update))
                                 'tool `(update ,update)))
         ;; A plan replaces the previous one.
-        ("plan" (agentel-chat-dispatch 'plan 'plan
+        ("plan" (agentel-chat-dispatch session 'plan 'plan
                                        `(show ,(alist-get 'entries update))))))))
 
 (add-hook 'agentel-session-update-functions #'agentel-chat--on-update)
@@ -520,7 +524,7 @@ tells it; a title cut short there shows in full on top of the output."
       (agentel-chat--set-input "")
       (unless (run-hook-with-args-until-success 'agentel-chat-send-functions
                                                 session text)
-        (agentel-chat-dispatch nil 'user `(chunk ,text))
+        (agentel-chat-dispatch session nil 'user `(chunk ,text))
         (agentel-chat--prompt session text)))))
 
 (defun agentel-chat-cancel ()
