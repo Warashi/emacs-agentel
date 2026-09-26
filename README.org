@@ -108,11 +108,13 @@ from anywhere:
 (keymap-global-set "C-c a" #'agentel-list)
 #+end_src
 
-Each session takes two lines: its
-project with its state, then its title.  Subagents follow the session
-that started them.  Sessions waiting for the user, or for an answer to
-one of their subagents, come first.  =RET= visits a session, =a= answers its oldest
-question, =c= cancels its turn and =k= stops it.
+Each session takes two lines: its project with its state, then its
+title.  Subagents follow the session that started them.  Sessions
+waiting for the user, or for an answer to one of their subagents, come
+first.  Next come the unread sessions, marked with =●=: their turn
+ended while their buffer was not shown, and the mark goes once it is.
+=RET= visits a session, =a= answers its oldest question, =c= cancels
+its turn and =k= stops it.
 
 * Design
 

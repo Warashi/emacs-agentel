@@ -12,7 +12,8 @@
   "Run BODY with a parent `parent', its child `child' and another `other'."
   (declare (indent 0))
   `(let ((agentel-session--registry nil)
-         (agentel-session-changed-functions (list #'agentel-list--schedule-refresh)))
+         (agentel-session-changed-functions (list #'agentel-list--track-unread
+                                                  #'agentel-list--schedule-refresh)))
      (let* ((parent (agentel-session-create :cwd "/tmp/one/" :project "repo-one"))
             (other (agentel-session-create :cwd "/tmp/two/"))
             (child (agentel-session-create :parent parent :cwd "/tmp/one/")))
@@ -39,27 +40,72 @@
 (ert-deftest agentel-list-shows-the-project-then-the-title-of-a-session ()
   (agentel-list-test-with-sessions
     (should (equal (agentel-list-test-lines)
-                   '("repo-one [idle]" "  Fix things"
-                     "  └ Explore [idle]"
-                     "two [idle]")))))
+                   '("  repo-one [idle]" "    Fix things"
+                     "    └ Explore [idle]"
+                     "  two [idle]")))))
 
 (ert-deftest agentel-list-shows-when-a-subagent-waits-for-the-user ()
   (agentel-list-test-with-sessions
     (agentel-session-add-pending child 'question)
     (agentel-list--refresh)
     (should (equal (agentel-list-test-lines)
-                   '("repo-one [waiting]" "  Fix things"
-                     "  └ Explore [waiting]"
-                     "two [idle]")))))
+                   '("  repo-one [waiting]" "    Fix things"
+                     "    └ Explore [waiting]"
+                     "  two [idle]")))))
 
 (ert-deftest agentel-list-puts-sessions-waiting-for-the-user-first ()
   (agentel-list-test-with-sessions
     (agentel-session-add-pending other 'question)
     (agentel-list--refresh)
     (should (equal (agentel-list-test-lines)
-                   '("two [waiting]"
-                     "repo-one [idle]" "  Fix things"
-                     "  └ Explore [idle]")))))
+                   '("  two [waiting]"
+                     "  repo-one [idle]" "    Fix things"
+                     "    └ Explore [idle]")))))
+
+(ert-deftest agentel-list-marks-a-session-whose-turn-ended-out-of-sight ()
+  (agentel-list-test-with-sessions
+    (agentel-session-set-busy other t)
+    (agentel-session-set-busy other nil)
+    (agentel-list--refresh)
+    (should (equal (agentel-list-test-lines)
+                   '("● two [idle]"
+                     "  repo-one [idle]" "    Fix things"
+                     "    └ Explore [idle]")))))
+
+(ert-deftest agentel-list-puts-waiting-sessions-before-unread-ones ()
+  (agentel-list-test-with-sessions
+    (agentel-session-set-busy other t)
+    (agentel-session-set-busy other nil)
+    (agentel-session-add-pending child 'question)
+    (agentel-list--refresh)
+    (should (equal (car (agentel-list-test-lines)) "  repo-one [waiting]"))))
+
+(ert-deftest agentel-list-does-not-mark-a-session-whose-turn-ended-in-sight ()
+  (agentel-list-test-with-sessions
+    (save-window-excursion
+      (switch-to-buffer (agentel-session-buffer other))
+      (agentel-session-set-busy other t)
+      (agentel-session-set-busy other nil))
+    (agentel-list--refresh)
+    (should (equal (car (last (agentel-list-test-lines))) "  two [idle]"))))
+
+(ert-deftest agentel-list-does-not-mark-a-subagent ()
+  (agentel-list-test-with-sessions
+    (agentel-session-set-busy child t)
+    (agentel-session-set-busy child nil)
+    (agentel-list--refresh)
+    (should-not (seq-some (lambda (line) (string-prefix-p "●" line))
+                          (agentel-list-test-lines)))))
+
+(ert-deftest agentel-list-unmarks-a-session-once-shown ()
+  (agentel-list-test-with-sessions
+    (agentel-session-set-busy other t)
+    (agentel-session-set-busy other nil)
+    (save-window-excursion
+      (switch-to-buffer (agentel-session-buffer other))
+      (agentel-list--forget-shown (selected-frame)))
+    (agentel-list--refresh)
+    (should (equal (car (last (agentel-list-test-lines))) "  two [idle]"))))
 
 (ert-deftest agentel-list-fits-a-narrow-window ()
   (agentel-list-test-with-sessions
@@ -86,7 +132,7 @@
       (with-selected-window list-window
         (should (equal (buffer-substring-no-properties
                         (line-beginning-position) (line-end-position))
-                       "  Fix things")))
+                       "    Fix things")))
       (delete-window list-window))))
 
 (ert-deftest agentel-list-follows-changes ()
