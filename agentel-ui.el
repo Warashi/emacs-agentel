@@ -6,7 +6,7 @@
 ;;; Commentary:
 
 ;; Components that decide how things look regardless of what they show,
-;; such as how wide a summary line may be.  Features build their lines
+;; such as how wide a summary line may be or how a state is shown.  Features build their lines
 ;; with them, so the look changes in one place.
 
 ;;; Code:
@@ -76,6 +76,24 @@ FUNCTION makes the text depending on `agentel-ui-line-width' again."
         (unless (eql width agentel-ui--width)
           (setq agentel-ui--width width)
           (funcall agentel-ui--on-width-change))))))
+
+(defcustom agentel-ui-state-icons
+  '((starting . "⏳") (running . "🏃") (waiting . "🙋") (idle . "💤")
+    (paused . "💤") (completed . "✅") (failed . "❌") (cancelled . "🚫")
+    (exited . "🔌"))
+  "Icons shown for the states of sessions and background tasks.
+Each icon should take the same width in every terminal, so an emoji
+that needs a variation selector to be wide does not fit."
+  :type '(alist :key-type symbol :value-type string)
+  :group 'agentel)
+
+(defun agentel-ui-state (state)
+  "Return how the symbol STATE is shown.
+It is the icon of STATE in `agentel-ui-state-icons', naming STATE on
+hover, or STATE in brackets when it has no icon."
+  (if-let* ((icon (alist-get state agentel-ui-state-icons)))
+      (propertize icon 'help-echo (symbol-name state))
+    (format "[%s]" state)))
 
 (provide 'agentel-ui)
 ;;; agentel-ui.el ends here

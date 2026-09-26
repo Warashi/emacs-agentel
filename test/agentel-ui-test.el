@@ -81,5 +81,19 @@
       (agentel-ui--check-widths)
       (should-not agentel-ui--followers))))
 
+(ert-deftest agentel-ui-state-shows-a-known-state-as-its-icon ()
+  (should (equal (agentel-ui-state 'waiting) "🙋")))
+
+(ert-deftest agentel-ui-state-names-the-state-on-hover ()
+  (should (equal (get-text-property 0 'help-echo (agentel-ui-state 'running))
+                 "running")))
+
+(ert-deftest agentel-ui-state-shows-an-unknown-state-by-name ()
+  (should (equal (agentel-ui-state 'interrupted) "[interrupted]")))
+
+(ert-deftest agentel-ui-state-follows-the-icons-set-by-the-user ()
+  (let ((agentel-ui-state-icons '((idle . "-"))))
+    (should (equal (agentel-ui-state 'idle) "-"))))
+
 (provide 'agentel-ui-test)
 ;;; agentel-ui-test.el ends here
