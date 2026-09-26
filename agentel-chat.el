@@ -220,6 +220,35 @@ DATA its initial alist and COLLAPSED its initial folding."
     (when offset
       (goto-char (min (+ start offset) (agentel-chat--entry-end entry))))))
 
+(defvar agentel-chat--kinds nil
+  "Alist of entry types and the plists defining them.")
+
+(defun agentel-chat-define-entry (type &rest definition)
+  "Define the entry TYPE by the plist DEFINITION.
+:update is a function taking a message and the data alist of an entry
+and returning its new data, :view a function returning the text of an
+entry, and :collapsed non-nil when a new entry starts folded."
+  (setf (alist-get type agentel-chat--kinds) definition))
+
+(defun agentel-chat-update (entry message)
+  "Change the data of ENTRY by MESSAGE and render it again."
+  (setf (agentel-chat-entry-data entry)
+        (funcall (plist-get (alist-get (agentel-chat-entry-type entry) agentel-chat--kinds)
+                            :update)
+                 message (agentel-chat-entry-data entry)))
+  (agentel-chat-refresh entry))
+
+(defun agentel-chat-dispatch (key type message)
+  "Send MESSAGE to the entry of TYPE stored under KEY and return it.
+Without such an entry, one is added to the end of the transcript, so
+a nil KEY adds one every time."
+  (if-let* ((entry (and key (agentel-chat-find key))))
+      (progn (agentel-chat-update entry message) entry)
+    (let ((kind (alist-get type agentel-chat--kinds)))
+      (agentel-chat-add key type (plist-get kind :view)
+                        (funcall (plist-get kind :update) message nil)
+                        (plist-get kind :collapsed)))))
+
 (defun agentel-chat--append (entry text)
   "Append TEXT to ENTRY, which must be the last entry."
   (agentel-chat--with-transcript

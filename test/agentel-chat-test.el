@@ -34,6 +34,24 @@
   "Return the transcript of the current chat buffer as plain text."
   (buffer-substring-no-properties (point-min) agentel-chat--transcript-end))
 
+(agentel-chat-define-entry 'agentel-chat-test-counter
+  :update (lambda (msg model)
+            (pcase msg
+              (`(add ,n) `((count . ,(+ n (or (alist-get 'count model) 0)))))))
+  :view (lambda (entry) (format "count %s" (agentel-chat-entry-get entry 'count))))
+
+(ert-deftest agentel-chat-dispatch-keeps-one-entry-per-key ()
+  (agentel-chat-test-with-session
+    (agentel-chat-dispatch 'c 'agentel-chat-test-counter '(add 1))
+    (agentel-chat-dispatch 'c 'agentel-chat-test-counter '(add 2))
+    (should (equal (agentel-chat-test-transcript) "count 3"))))
+
+(ert-deftest agentel-chat-dispatch-without-a-key-adds-an-entry-each-time ()
+  (agentel-chat-test-with-session
+    (agentel-chat-dispatch nil 'agentel-chat-test-counter '(add 1))
+    (agentel-chat-dispatch nil 'agentel-chat-test-counter '(add 2))
+    (should (equal (agentel-chat-test-transcript) "count 1\n\ncount 2"))))
+
 (ert-deftest agentel-chat-open-shows-an-empty-input ()
   (agentel-chat-test-with-session
     (should (equal (agentel-chat-input) ""))
