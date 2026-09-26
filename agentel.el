@@ -82,6 +82,21 @@ Each function is called with the session, the result of
 `session/new' or `session/load', and the keyword arguments given to
 `agentel-start'.")
 
+(defvar agentel-session-restart-options-functions nil
+  "Functions returning start options that recreate a session's settings.
+Each function is called with the session and returns keyword
+arguments of `agentel-start', such as (:model \"opus\"), so a new
+session can start as the current one is now.")
+
+(defun agentel-session-restart-options (session)
+  "Return the keyword arguments of `agentel-start' that recreate SESSION.
+The new session starts empty, in the directory and with the settings
+of SESSION."
+  (apply #'append
+         (list :cwd (agentel-session-cwd session))
+         (mapcar (lambda (function) (funcall function session))
+                 agentel-session-restart-options-functions)))
+
 (defun agentel--fail (session message)
   "End SESSION because it could not start, showing MESSAGE."
   (agentel-chat-notice session message 'error)

@@ -100,5 +100,14 @@
     (should-not (save-excursion (goto-char (point-min))
                                 (search-forward "Replayed subagent" nil t)))))
 
+(ert-deftest agentel-restart-options-recreate-the-session ()
+  (let ((agentel-session--registry nil)
+        (agentel-session-restart-options-functions
+         (list (lambda (_session) '(:model "opus"))
+               (lambda (_session) '(:mode "plan")))))
+    (should (equal (agentel-session-restart-options
+                    (agentel-session-create :cwd "/tmp/project/"))
+                   '(:cwd "/tmp/project/" :model "opus" :mode "plan")))))
+
 (provide 'agentel-test)
 ;;; agentel-test.el ends here
