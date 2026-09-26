@@ -11,12 +11,12 @@
 ;; one tool call whose content is the reply of the subagent.
 ;;
 ;; The tool calls of a subagent carry `_meta."github.com/copilot".agentId',
-;; which the calls of the session itself lack.  Its reply comes as
-;; agent message chunks without any mark, but while a task runs in the
-;; foreground the session waits for it, so every chunk until the task
-;; ends is the subagent's.  A task started in the background ends at
-;; once and the session goes on speaking, so the reply of such a
-;; subagent still shows up in the parent.
+;; which the calls of the session itself lack.  Its reply and thoughts
+;; come as message and thought chunks without any mark, but while a
+;; task runs in the foreground the session waits for it, so every chunk
+;; until the task ends is the subagent's.  A task started in the
+;; background ends at once and the session goes on speaking, so the
+;; chunks of such a subagent still show up in the parent.
 
 ;;; Code:
 
@@ -49,7 +49,7 @@
     ((or "tool_call" "tool_call_update")
      (or (agentel-copilot-subagent--agent-id update)
          (progn (agentel-copilot-subagent--track session update) nil)))
-    ("agent_message_chunk"
+    ((or "agent_message_chunk" "agent_thought_chunk")
      (agentel-session-data session 'copilot-tasks))))
 
 (defun agentel-copilot-subagent--on-changed (session)

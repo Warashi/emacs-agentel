@@ -353,6 +353,7 @@ as soon as the subagent starts and the session goes on meanwhile."
     (agentel-mock--update
      session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,tool)
                   (status . "completed") (_meta . ,meta)))
+    (agentel-mock--say session-id "Summarizing the files." "agent_thought_chunk")
     (agentel-mock--say session-id "The repository has a README.")
     (unless background
       (agentel-mock--update

@@ -41,6 +41,12 @@
       (should (string-match-p "The subagent reported a README\\." text))
       (should-not (string-match-p "The repository has a README\\." text)))))
 
+(ert-deftest agentel-copilot-subagent-thoughts-stay-out-of-the-parent ()
+  (agentel-copilot-subagent-test-with-copilot session
+    (let ((text (agentel-copilot-subagent-test-run session "subagent please")))
+      (should (string-match-p "Thinking about it\\." text))
+      (should-not (string-match-p "Summarizing the files" text)))))
+
 (ert-deftest agentel-copilot-subagent-reply-is-in-the-task-tool-call ()
   (agentel-copilot-subagent-test-with-copilot session
     (agentel-copilot-subagent-test-run session "subagent please")
