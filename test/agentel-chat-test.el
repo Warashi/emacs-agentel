@@ -103,6 +103,24 @@
     (should (string-match-p "notes\\.txt\n +hello\n +EOF\\'"
                             (agentel-chat-test-transcript)))))
 
+(ert-deftest agentel-chat-shows-why-a-tool-is-called-before-its-title ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-update
+     '((sessionUpdate . "tool_call") (toolCallId . "t1")
+       (title . "rm -rf build") (status . "pending")
+       (rawInput . ((command . "rm -rf build")
+                    (description . "Remove the build directory")))))
+    (should (string-match-p "\\`.*Remove the build directory — rm -rf build\\'"
+                            (agentel-chat-test-transcript)))))
+
+(ert-deftest agentel-chat-keeps-a-tool-on-one-line-whatever-the-reason-says ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-update
+     '((sessionUpdate . "tool_call") (toolCallId . "t1")
+       (title . "make") (status . "pending")
+       (rawInput . ((description . "Build\nand test")))))
+    (should (string-match-p "\\`.*Build…\\'" (agentel-chat-test-transcript)))))
+
 (ert-deftest agentel-chat-cannot-fold-a-short-tool-title-without-output ()
   (agentel-chat-test-with-session
     (agentel-chat-test-update
