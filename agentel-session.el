@@ -24,6 +24,7 @@
                                (:copier nil))
   "One ACP session."
   id connection parent cwd title buffer busy ended pending
+  (project nil :documentation "Name of the project the session works in.")
   (alist nil :documentation "Per-feature values, see `agentel-session-data'."))
 
 (defvar agentel-session--registry nil
@@ -36,14 +37,15 @@ Each function is called with the session and the update alist.")
 (defvar agentel-session-changed-functions nil
   "Abnormal hook run with a session whenever its visible state changes.")
 
-(cl-defun agentel-session-create (&key connection parent cwd)
+(cl-defun agentel-session-create (&key connection parent cwd project)
   "Create a session on CONNECTION and add it to the registry.
 PARENT is the session that spawned this one as a subagent.  CWD is
-the working directory.  The session has no id until
-`agentel-session-register' gives it one."
+the working directory and PROJECT the name of its project.  The
+session has no id until `agentel-session-register' gives it one."
   (let ((session (agentel-session--make :connection connection
                                         :parent parent
-                                        :cwd cwd)))
+                                        :cwd cwd
+                                        :project project)))
     (setq agentel-session--registry
           (append agentel-session--registry (list session)))
     (agentel-session-changed session)

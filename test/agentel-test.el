@@ -26,6 +26,12 @@
     (agentel-test-with-started session nil
       (should (equal (buffer-name) "*agentel: repo/worktree*")))))
 
+(ert-deftest agentel-start-records-the-project-of-the-session ()
+  (let ((project-find-functions
+         (list (lambda (dir) (list 'agentel-test-project dir "repo/worktree")))))
+    (agentel-test-with-started session nil
+      (should (equal (agentel-session-project session) "repo/worktree")))))
+
 (ert-deftest agentel-start-outside-a-project-names-the-buffer-after-the-directory ()
   (let ((project-find-functions nil))
     (agentel-test-with-started session nil
