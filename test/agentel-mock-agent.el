@@ -24,6 +24,9 @@
 ;; Anything else is echoed back.  The initialize response carries the
 ;; client capabilities it received under `_meta.receivedCapabilities'
 ;; so tests can inspect them.
+;;
+;; With `agentel-mock-flavor' set to copilot before loading, the session
+;; config options take the shape of Copilot CLI 1.0.88 (`copilot --acp').
 
 ;;; Code:
 
@@ -51,6 +54,11 @@
 (defconst agentel-mock--markdown
   "## Plan\n\nI will **change** `agentel-chat.el` and *then* test it:\n\n* write a test\n* run [make](https://www.gnu.org/software/make/)\n\n```emacs-lisp\n(defun agentel-hello ()\n  \"Say hello.\"\n  (message \"hello\"))\n```\n"
   "Reply to a prompt that asks for markdown.")
+(defvar agentel-mock-flavor 'claude
+  "Agent whose session config options the mock mimics, claude or copilot.")
+(defconst agentel-mock--copilot-mode
+  "https://agentclientprotocol.com/protocol/session-modes#"
+  "Prefix of the mode values of Copilot CLI.")
 (defvar agentel-mock--delay 0.02
   "Seconds between streamed chunks.")
 
@@ -92,8 +100,8 @@ KIND is the session update name and defaults to an agent message."
      session-id `((sessionUpdate . ,(or kind "agent_message_chunk"))
                   (content . ((type . "text") (text . ,chunk)))))))
 
-(defun agentel-mock--config-options (state)
-  "Return the configOptions of session STATE."
+(defun agentel-mock--claude-config-options (state)
+  "Return the configOptions of session STATE as claude-agent-acp does."
   (let* ((model (alist-get 'model state))
          (options
          (list
@@ -122,10 +130,49 @@ KIND is the session update name and defaults to an agent message."
                                         ((value . "max") (name . "Max"))]))))))
     (vconcat options)))
 
+(defun agentel-mock--copilot-config-options (state)
+  "Return the configOptions of session STATE as Copilot CLI does."
+  (let* ((model (alist-get 'model state))
+         (options
+          (list
+           `((id . "mode") (name . "Mode") (category . "mode") (type . "select")
+             (currentValue . ,(alist-get 'mode state))
+             (options . [((value . ,(concat agentel-mock--copilot-mode "agent"))
+                          (name . "Agent"))
+                         ((value . ,(concat agentel-mock--copilot-mode "plan"))
+                          (name . "Plan"))
+                         ((value . ,(concat agentel-mock--copilot-mode "autopilot"))
+                          (name . "Autopilot"))]))
+           `((id . "model") (name . "Model") (category . "model") (type . "select")
+             (currentValue . ,model)
+             (options . [((value . "claude-sonnet-5") (name . "Claude Sonnet 5"))
+                         ((value . "gpt-5.5") (name . "GPT-5.5"))
+                         ((value . "claude-haiku-4.5") (name . "Claude Haiku 4.5"))])))))
+    (unless (equal model "claude-haiku-4.5")
+      (setq options
+            (append options
+                    (list `((id . "reasoning_effort") (name . "Reasoning Effort")
+                            (category . "thought_level") (type . "select")
+                            (currentValue . ,(alist-get 'reasoning_effort state))
+                            (options . [((value . "low") (name . "low"))
+                                        ((value . "medium") (name . "medium"))
+                                        ((value . "high") (name . "high"))]))))))
+    (vconcat options)))
+
+(defun agentel-mock--config-options (state)
+  "Return the configOptions of session STATE."
+  (if (eq agentel-mock-flavor 'copilot)
+      (agentel-mock--copilot-config-options state)
+    (agentel-mock--claude-config-options state)))
+
 (defun agentel-mock--new-session (id)
   "Create session state for ID and announce its commands."
-  (puthash id (list (cons 'mode "default") (cons 'model "sonnet")
-                    (cons 'effort "medium") (cons 'used 0))
+  (puthash id (if (eq agentel-mock-flavor 'copilot)
+                  (list (cons 'mode (concat agentel-mock--copilot-mode "agent"))
+                        (cons 'model "claude-sonnet-5")
+                        (cons 'reasoning_effort "medium") (cons 'used 0))
+                (list (cons 'mode "default") (cons 'model "sonnet")
+                      (cons 'effort "medium") (cons 'used 0)))
            agentel-mock--sessions)
   id)
 

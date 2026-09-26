@@ -13,10 +13,14 @@
                     (file-name-directory (or load-file-name buffer-file-name)))
   "Path of the scripted ACP agent used by the tests.")
 
-(defun agentel-test-mock-command ()
-  "Return the command line that runs the mock agent."
-  (list (expand-file-name invocation-name invocation-directory)
-        "--batch" "-Q" "-l" agentel-test-mock-agent))
+(defun agentel-test-mock-command (&optional flavor)
+  "Return the command line that runs the mock agent.
+FLAVOR is the agent it mimics, see `agentel-mock-flavor'."
+  (append (list (expand-file-name invocation-name invocation-directory)
+                "--batch" "-Q")
+          (when flavor
+            (list "--eval" (format "(setq agentel-mock-flavor '%s)" flavor)))
+          (list "-l" agentel-test-mock-agent)))
 
 (defun agentel-test-wait-until (predicate &optional timeout)
   "Process output until PREDICATE returns non-nil or TIMEOUT seconds pass.

@@ -9,9 +9,19 @@
 (require 'agentel-config)
 (require 'agentel-test-helper)
 
-(defun agentel-config-test-value (session id)
-  "Return the current value of the option ID of SESSION."
-  (alist-get 'currentValue (agentel-config-option session id)))
+(defun agentel-config-test-value (session category)
+  "Return the current value of the option of CATEGORY in SESSION."
+  (alist-get 'currentValue (agentel-config-option session category)))
+
+(defconst agentel-config-test-copilot-mode
+  "https://agentclientprotocol.com/protocol/session-modes#"
+  "Prefix of the mode values of Copilot CLI.")
+
+(defmacro agentel-config-test-with-copilot (var options &rest body)
+  "Start a session on the mock of Copilot with OPTIONS, bind it to VAR, run BODY."
+  (declare (indent 2))
+  `(let ((agentel-agents (list (cons 'copilot (agentel-test-mock-command 'copilot)))))
+     (agentel-test-with-started ,var (append '(:agent copilot) ,options) ,@body)))
 
 (defun agentel-config-test-settled (session)
   "Wait until SESSION finished applying its start options."
@@ -23,13 +33,32 @@
   (agentel-test-with-started session '(:model "opus[1m]" :effort "high" :mode "plan")
     (agentel-config-test-settled session)
     (should (equal (agentel-config-test-value session "model") "opus[1m]"))
-    (should (equal (agentel-config-test-value session "effort") "high"))
+    (should (equal (agentel-config-test-value session "thought_level") "high"))
     (should (equal (agentel-config-test-value session "mode") "plan"))))
+
+(ert-deftest agentel-config-applies-start-options-to-the-options-of-their-category ()
+  (agentel-config-test-with-copilot session '(:model "gpt-5.5" :effort "high")
+    (agentel-config-test-settled session)
+    (should (equal (agentel-config-test-value session "model") "gpt-5.5"))
+    (should (equal (alist-get 'id (agentel-config-option session "thought_level"))
+                   "reasoning_effort"))
+    (should (equal (agentel-config-test-value session "thought_level") "high"))))
+
+(ert-deftest agentel-config-takes-the-name-of-a-value ()
+  (agentel-config-test-with-copilot session '(:mode "plan")
+    (agentel-config-test-settled session)
+    (should (equal (agentel-config-test-value session "mode")
+                   (concat agentel-config-test-copilot-mode "plan")))))
 
 (ert-deftest agentel-config-shows-the-settings-in-the-header ()
   (agentel-test-with-started session '(:model "opus[1m]" :effort "high" :mode "plan")
     (agentel-config-test-settled session)
     (should (string-match-p "Opus 5\\.5 · High · Plan" (agentel-chat--header-line)))))
+
+(ert-deftest agentel-config-shows-the-settings-of-other-agents-in-the-same-order ()
+  (agentel-config-test-with-copilot session '(:model "gpt-5.5" :effort "high" :mode "plan")
+    (agentel-config-test-settled session)
+    (should (string-match-p "GPT-5\\.5 · high · Plan" (agentel-chat--header-line)))))
 
 (ert-deftest agentel-config-names-other-options-in-the-header ()
   (let ((agentel-session--registry nil)
@@ -38,7 +67,7 @@
       (setf (agentel-session-data session 'config-options)
             '(((id . "fast") (name . "Fast mode") (currentValue . "off")
                (options . [((value . "off") (name . "Off"))]))
-              ((id . "model") (name . "Model") (currentValue . "sonnet")
+              ((id . "model") (name . "Model") (category . "model") (currentValue . "sonnet")
                (options . [((value . "sonnet") (name . "Sonnet 5"))]))))
       (should (equal (agentel-config--header session) "Sonnet 5 · Fast mode: Off")))))
 
@@ -85,6 +114,24 @@
      (lambda () (equal (agentel-config-test-value session "mode") "plan")))
     (should (equal (agentel-config--restart-options session)
                    '(:model "sonnet" :effort "medium" :mode "plan")))))
+
+(ert-deftest agentel-config-restarts-other-agents-with-the-current-settings ()
+  (agentel-config-test-with-copilot session '(:model "gpt-5.5" :effort "high" :mode "plan")
+    (agentel-config-test-settled session)
+    (should (equal (agentel-config--restart-options session)
+                   `(:model "gpt-5.5" :effort "high"
+                            :mode ,(concat agentel-config-test-copilot-mode "plan"))))))
+
+(ert-deftest agentel-config-changes-the-effort-of-other-agents-interactively ()
+  (agentel-config-test-with-copilot session nil
+    (agentel-config-test-settled session)
+    (cl-letf (((symbol-function 'completing-read)
+               (lambda (prompt _collection &rest _)
+                 (should (string-match-p "Reasoning Effort" prompt))
+                 "high")))
+      (agentel-config-set-effort))
+    (agentel-test-wait-until
+     (lambda () (equal (agentel-config-test-value session "thought_level") "high")))))
 
 (ert-deftest agentel-config-restarts-without-options-the-model-lacks ()
   (agentel-test-with-started session '(:model "haiku")
