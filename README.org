@@ -112,6 +112,13 @@ with the reason the agent gives for it, such as the description of a
 Bash command, then its title; unfolding it shows the whole title and
 the output.
 
+States of sessions, subagents and background tasks show as one icon
+in the header line, the transcript, the pinned lines and the session
+list: ⏳ starting, 🏃 running, 🙋 waiting for the user, 💤 idle or
+paused, ✅ completed, ❌ failed, 🚫 cancelled and 🔌 exited.  Hovering
+an icon names the state, and a state without an icon shows by name in
+brackets.  =agentel-ui-state-icons= changes them.
+
 =/resume= lists the earlier sessions of the directory and opens the
 chosen one with its history.  =/clear= starts a new conversation in the
 same window, buffer name, directory, model, effort and mode, and stops
