@@ -77,5 +77,19 @@
                   (currentModeId . "acceptEdits")))))
     (should (equal (agentel-config-test-value session "mode") "acceptEdits"))))
 
+(ert-deftest agentel-config-restarts-with-the-current-settings ()
+  (agentel-test-with-started session '(:model "sonnet")
+    (agentel-config-test-settled session)
+    (agentel-config-set session "mode" "plan")
+    (agentel-test-wait-until
+     (lambda () (equal (agentel-config-test-value session "mode") "plan")))
+    (should (equal (agentel-config--restart-options session)
+                   '(:model "sonnet" :effort "medium" :mode "plan")))))
+
+(ert-deftest agentel-config-restarts-without-options-the-model-lacks ()
+  (agentel-test-with-started session '(:model "haiku")
+    (agentel-config-test-settled session)
+    (should-not (plist-member (agentel-config--restart-options session) :effort))))
+
 (provide 'agentel-config-test)
 ;;; agentel-config-test.el ends here

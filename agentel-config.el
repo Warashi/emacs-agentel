@@ -13,6 +13,8 @@
 ;; in that order after the session starts, because the model decides
 ;; which effort levels and modes exist: claude-agent-acp drops the effort
 ;; option for Haiku and replaces the auto mode on models without it.
+;; A session started again in place of another gets its current values
+;; through the same options.
 
 ;;; Code:
 
@@ -23,6 +25,7 @@
 (require 'agentel-chat)
 
 (defvar agentel-session-started-functions)
+(defvar agentel-session-restart-options-functions)
 
 (defconst agentel-config--start-options
   '((:model . "model") (:effort . "effort") (:mode . "mode"))
@@ -109,6 +112,16 @@ that are not among the values it lists."
       (agentel-session-set-busy session t)
       (agentel-config--apply session requests))))
 
+(defun agentel-config--restart-options (session)
+  "Return the start options that give a new session the settings of SESSION.
+Options the current model lacks are left out, so the new session does
+not report them as unavailable."
+  (mapcan (lambda (entry)
+            (when-let* ((value (alist-get 'currentValue
+                                          (agentel-config-option session (cdr entry)))))
+              (list (car entry) value)))
+          agentel-config--start-options))
+
 (defun agentel-config--on-update (session update)
   "Follow config changes the agent reports in UPDATE for SESSION."
   (pcase (alist-get 'sessionUpdate update)
@@ -160,6 +173,7 @@ that are not among the values it lists."
 (keymap-set agentel-chat-mode-map "C-c C-o" #'agentel-config-set-option)
 (keymap-set agentel-chat-mode-map "C-c C-m" #'agentel-config-set-mode)
 (add-hook 'agentel-session-started-functions #'agentel-config--on-started)
+(add-hook 'agentel-session-restart-options-functions #'agentel-config--restart-options)
 (add-hook 'agentel-session-update-functions #'agentel-config--on-update)
 (add-hook 'agentel-chat-header-functions #'agentel-config--header)
 
