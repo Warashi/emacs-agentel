@@ -547,8 +547,8 @@ command that asks the user and replies to the agent."
   "Return the header line of this buffer."
   (let ((session agentel-chat--session))
     (string-join
-     (delq nil (cons (format "%s [%s]" (agentel-session-name session)
-                             (agentel-session-state session))
+     (delq nil (cons (format "[%s] %s" (agentel-session-state session)
+                             (agentel-session-name session))
                      (mapcar (lambda (f) (funcall f session))
                              agentel-chat-header-functions)))
      "  │  ")))

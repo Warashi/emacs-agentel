@@ -210,6 +210,12 @@
            (list (lambda (_s) "model") (lambda (_s) nil) (lambda (_s) "ctx"))))
       (should (string-match-p "model.*ctx" (agentel-chat--header-line))))))
 
+(ert-deftest agentel-chat-header-starts-with-the-state ()
+  (agentel-chat-test-with-session
+    (let ((agentel-chat-header-functions nil))
+      (setf (agentel-session-title session) "Fix things")
+      (should (equal (agentel-chat--header-line) "[idle] Fix things")))))
+
 (ert-deftest agentel-chat-header-line-escapes-percent-signs ()
   ;; `format-mode-line' renders nothing in batch mode, so check the
   ;; mode line format the :eval form produces instead.
