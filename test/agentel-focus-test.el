@@ -292,5 +292,15 @@ CHANGE is called with the session; the fastest of a few runs counts."
 (ert-deftest agentel-focus-is-toggled-from-the-session-buffer ()
   (should (eq (keymap-lookup agentel-chat-mode-map "C-c C-f") #'agentel-focus-mode)))
 
+(ert-deftest agentel-focus-keeps-what-it-shows-when-the-width-changes ()
+  (agentel-focus-test-with-session
+    (agentel-focus-test-a-finished-turn session)
+    (agentel-focus-test-prompt session "third prompt")
+    (agentel-focus-test-tool "t2" "Run the tests")
+    (agentel-focus-test-chunk "agent_thought_chunk" "Checking the result")
+    (let ((before (agentel-focus-test-visible)))
+      (agentel-chat--fit-width)
+      (should (equal (agentel-focus-test-visible) before)))))
+
 (provide 'agentel-focus-test)
 ;;; agentel-focus-test.el ends here
