@@ -48,6 +48,18 @@
       (should (equal (alist-get 'progress task) "line 99"))
       (should (= (length task) 3)))))
 
+(ert-deftest agentel-async-task-shows-the-progress-on-one-line ()
+  (let* ((agentel-session--registry nil)
+         (agentel-session-changed-functions nil)
+         (session (agentel-session-create)))
+    (agentel-async-task--on-update
+     session '((sessionUpdate . "async_task_spawned") (asyncTaskId . "b1") (name . "dev")))
+    (agentel-async-task--on-update
+     session '((sessionUpdate . "async_task_progress") (asyncTaskId . "b1")
+               (summary . "Compiling\nerror: missing semicolon")))
+    (should (equal (mapcar #'substring-no-properties (agentel-async-task--pin session))
+                   '("⚙ dev [running] ↳ Compiling…")))))
+
 (ert-deftest agentel-async-task-is-not-sent-without-the-capability ()
   (let ((agentel-connection-capability-functions
          (remq #'agentel-async-task--capabilities agentel-connection-capability-functions)))

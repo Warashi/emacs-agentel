@@ -20,6 +20,7 @@
 (require 'agentel-session)
 (require 'agentel-connection)
 (require 'agentel-chat)
+(require 'agentel-ui)
 
 (defface agentel-async-task-face
   '((t :inherit font-lock-builtin-face))
@@ -64,10 +65,12 @@ A task that is neither running nor paused is forgotten."
   "Return the pinned lines of the running background tasks of SESSION."
   (mapcar (lambda (item)
             (let-alist (cdr item)
-              (concat "⚙ " (propertize (or .name "Background task")
-                                       'face 'agentel-async-task-face)
-                      (format " [%s]" .state)
-                      (if .progress (concat " ↳ " .progress) ""))))
+              (agentel-ui-one-line
+               (concat "⚙ " (propertize (or .name "Background task")
+                                        'face 'agentel-async-task-face)
+                       (format " [%s]" .state)
+                       (if .progress " ↳ " ""))
+               .progress)))
           (reverse (agentel-session-data session 'async-tasks))))
 
 (add-hook 'agentel-connection-capability-functions #'agentel-async-task--capabilities)

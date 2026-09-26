@@ -51,7 +51,7 @@
              (format " [%s]" (agentel-session-state child))
              "\n"
              (agentel-ui-one-line "    " (agentel-session-data child 'subagent-task))
-             (if activity (concat "\n    ↳ " activity) ""))
+             (if activity (concat "\n" (agentel-ui-one-line "    ↳ " activity)) ""))
      'keymap agentel-subagent-item-map
      'agentel-subagent child)))
 
@@ -85,10 +85,12 @@ subagents of the session read from the minibuffer."
         (map (make-sparse-keymap)))
     (keymap-set map "<mouse-1>" (lambda () (interactive) (agentel-subagent-open child)))
     (propertize
-     (concat "⎇ "
-             (propertize (agentel-session-name child) 'face 'agentel-subagent-face)
-             (format " [%s]" (agentel-session-state child))
-             (if activity (concat " ↳ " activity) ""))
+     (agentel-ui-one-line
+      (concat "⎇ "
+              (propertize (agentel-session-name child) 'face 'agentel-subagent-face)
+              (format " [%s]" (agentel-session-state child))
+              (if activity " ↳ " ""))
+      activity)
      'keymap map
      'mouse-face 'highlight
      'help-echo "mouse-1: visit the subagent")))

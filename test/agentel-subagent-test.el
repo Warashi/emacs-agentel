@@ -103,6 +103,26 @@
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
     (should-not (agentel-subagent-test-pin))))
 
+(defun agentel-subagent-test-busy-child ()
+  "Return a subagent whose latest tool call is a long command."
+  (let ((child (agentel-session-create :cwd "/tmp/project/")))
+    (setf (agentel-session-title child) "Build")
+    (setf (agentel-session-data child 'subagent-task) "Build it")
+    (setf (agentel-session-data child 'subagent-activity)
+          (concat "make all\n" (make-string 100 ?x)))
+    child))
+
+(ert-deftest agentel-subagent-item-shows-the-activity-on-one-line ()
+  (let* ((child (agentel-subagent-test-busy-child))
+         (text (agentel-subagent--render
+                (agentel-chat-entry--make :data `((child . ,child))))))
+    (should (string-suffix-p "\n    ↳ make all…" (substring-no-properties text)))))
+
+(ert-deftest agentel-subagent-pin-shows-the-activity-on-one-line ()
+  (let ((line (substring-no-properties
+               (agentel-subagent--pin-line (agentel-subagent-test-busy-child)))))
+    (should (string-match-p "\\`⎇ Build \\[[a-z]+\\] ↳ make all…\\'" line))))
+
 (ert-deftest agentel-subagent-finished-is-not-pinned ()
   (agentel-test-with-started session nil
     (agentel-subagent-test-run session)
