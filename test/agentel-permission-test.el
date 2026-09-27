@@ -92,6 +92,25 @@
                  (lambda (&rest _) (ert-fail "Answered over an ended connection"))))
         (agentel-permission-choose item 0)))))
 
+(ert-deftest agentel-permission-is-cancelled-when-its-session-ends-while-the-agent-runs ()
+  (agentel-test-with-started session nil
+    (let* ((connection (agentel-session-connection session))
+           (child (agentel-session-create :connection connection :parent session))
+           responses)
+      (agentel-session-register child "child")
+      (cl-letf (((symbol-function 'agentel-connection-respond)
+                 (lambda (_connection id result) (push (cons id result) responses))))
+        (agentel-permission--handle
+         connection 99 '((sessionId . "child")
+                         (toolCall (title . "ls"))
+                         (options . [((optionId . "allow") (name . "Yes"))])))
+        (agentel-session-send child '(end completed)))
+      (should (equal responses '((99 (outcome (outcome . "cancelled"))))))
+      (let ((item (seq-find (lambda (item) (eq (agentel-store-model-type item) 'permission))
+                            (agentel-conversation-items child))))
+        (should (agentel-store-get item 'withdrawn))
+        (should-not (agentel-store-get item 'waiting))))))
+
 (ert-deftest agentel-permission-is-withdrawn-when-the-turn-is-cancelled ()
   (agentel-test-with-started session nil
     (agentel-permission-test-ask)

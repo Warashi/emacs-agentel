@@ -141,7 +141,9 @@ METHOD and PARAMS are those of the notification."
         (remhash item agentel-permission--requests)))))
 
 (defun agentel-permission--end (session)
-  "Withdraw the requests of SESSION once it ended, as none can be answered."
+  "Withdraw the requests of SESSION once it ended, as none can be answered.
+While the agent still runs, it is told each request was cancelled so it
+does not wait for them."
   (when (agentel-session-ended session)
     (let (ended)
       (maphash (lambda (item request)
@@ -151,7 +153,11 @@ METHOD and PARAMS are those of the notification."
       (dolist (item ended)
         ;; Withdrawing one tells the session it changed, which runs this
         ;; again and may withdraw the others first.
-        (when (gethash item agentel-permission--requests)
+        (when-let* ((request (gethash item agentel-permission--requests)))
+          (when (agentel-connection-live-p (plist-get request :connection))
+            (agentel-connection-respond (plist-get request :connection)
+                                        (plist-get request :id)
+                                        '((outcome . ((outcome . "cancelled"))))))
           (agentel-permission--close item '(withdraw)))))))
 
 (setf (alist-get "session/request_permission" agentel-connection-request-handlers
