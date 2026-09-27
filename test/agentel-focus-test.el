@@ -72,6 +72,29 @@
   (agentel-conversation-note session "a notice")
   (agentel-focus-test-chunk "agent_message_chunk" "second answer"))
 
+(defun agentel-focus-test-item (type &optional data)
+  "Return an item of TYPE with DATA."
+  (agentel-store-model--make :type type :data data))
+
+(ert-deftest agentel-focus-items-chooses-from-the-items-alone ()
+  (let* ((old (agentel-focus-test-item 'user))
+         (old-error (agentel-focus-test-item 'error))
+         (prompt (agentel-focus-test-item 'user))
+         (message (agentel-focus-test-item 'agent))
+         (tool (agentel-focus-test-item 'tool))
+         (question (agentel-focus-test-item 'permission '((waiting . t))))
+         (answered (agentel-focus-test-item 'permission '((waiting))))
+         (thought (agentel-focus-test-item 'thought))
+         (stop (agentel-focus-test-item 'stop)))
+    (should (equal (agentel-focus-items
+                    (list old old-error prompt message tool question answered thought stop))
+                   (list prompt message question thought stop)))))
+
+(ert-deftest agentel-focus-items-without-a-prompt-chooses-from-all ()
+  (let ((notice (agentel-focus-test-item 'notice))
+        (message (agentel-focus-test-item 'agent)))
+    (should (equal (agentel-focus-items (list notice message)) (list message)))))
+
 (ert-deftest agentel-focus-shows-the-last-prompt-and-answer-when-idle ()
   (agentel-focus-test-with-session
     (agentel-focus-test-a-finished-turn session)
