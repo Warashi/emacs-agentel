@@ -10,9 +10,12 @@
 ;; Whoever owns the region decides which models it shows and hands
 ;; the whole list to `agentel-ui-region-render' whenever it may have
 ;; changed; the region finds what differs from what it shows and
-;; changes only that text.  A model is drawn again when its revision,
-;; its fold or the line width it fits in changed, or when it became or
-;; stopped being the first one.
+;; changes only that text.  A model is drawn again when its revision or
+;; the line width it fits in changed, or when it became or stopped being
+;; the first one; folding it draws it again at once.  The models kept in
+;; the order they were in are passed over first without looking them up,
+;; so a change to one model or a new one at the end costs little more
+;; than comparing a few numbers for each model.
 ;;
 ;; The text of a model starts at a marker that advances over text
 ;; inserted at it, so a model inserted in front of another one leaves
@@ -40,7 +43,7 @@
 
 (cl-defstruct (agentel-ui-region--drawing (:copier nil))
   "How a model was drawn."
-  model start revision collapsed width fits first)
+  model start revision width fits first)
 
 (defun agentel-ui-region-create (pos property)
   "Return an empty region at POS of the current buffer.
@@ -74,17 +77,14 @@ grows above them, so the undo history is dropped."
         (agentel-ui-view-property (agentel-store-model-type model) :collapsed)
       collapsed)))
 
-(defun agentel-ui-region--stale-p (region drawing first width)
-  "Return non-nil if DRAWING of REGION has to be drawn again.
+(defun agentel-ui-region--stale-p (drawing first width)
+  "Return non-nil if DRAWING has to be drawn again.
 FIRST says whether it is the first model now, WIDTH the line width."
-  (let ((model (agentel-ui-region--drawing-model drawing)))
-    (not (and (= (agentel-ui-region--drawing-revision drawing)
-                 (agentel-store-model-revision model))
-              (eq (agentel-ui-region--drawing-collapsed drawing)
-                  (agentel-ui-region--collapsed-p region model))
-              (eq (agentel-ui-region--drawing-first drawing) first)
-              (or (not (agentel-ui-region--drawing-fits drawing))
-                  (= (agentel-ui-region--drawing-width drawing) width))))))
+  (not (and (= (agentel-ui-region--drawing-revision drawing)
+               (agentel-store-model-revision (agentel-ui-region--drawing-model drawing)))
+            (eq (agentel-ui-region--drawing-first drawing) first)
+            (or (not (agentel-ui-region--drawing-fits drawing))
+                (= (agentel-ui-region--drawing-width drawing) width)))))
 
 (defun agentel-ui-region--text-end (region drawing)
   "Return the position after the text of DRAWING in REGION."
@@ -105,7 +105,6 @@ FIRST says whether it is the first model now, WIDTH the line width."
                                'front-sticky '(read-only))
                          text)
     (setf (agentel-ui-region--drawing-revision drawing) (agentel-store-model-revision model)
-          (agentel-ui-region--drawing-collapsed drawing) collapsed
           (agentel-ui-region--drawing-width drawing) width
           (agentel-ui-region--drawing-fits drawing)
           (text-property-any 0 (length text) 'agentel-ui-fits-width t text)
@@ -134,53 +133,77 @@ Point in its text stays where it was in the text."
     (when offset
       (goto-char (min (+ start offset) (agentel-ui-region--text-end region drawing))))))
 
+(defun agentel-ui-region--rearrange (region drawings models first width)
+  "Show MODELS in REGION in place of DRAWINGS, the rest of what it shows.
+FIRST says whether the first of them is the first model, WIDTH is the
+line width.  Return the drawings of MODELS and the models drawn."
+  (let ((index (agentel-ui-region--index region))
+        (wanted (make-hash-table :test 'eq :size (length models)))
+        kept drawn)
+    (dolist (model models)
+      (puthash model t wanted))
+    (dolist (drawing drawings)
+      (if (gethash (agentel-ui-region--drawing-model drawing) wanted)
+          (push drawing kept)
+        (agentel-ui-region--delete region drawing)
+        (set-marker (agentel-ui-region--drawing-start drawing) nil)
+        (remhash (agentel-ui-region--drawing-model drawing) index)))
+    (setq kept (nreverse kept))
+    (cons
+     (mapcar
+      (lambda (model)
+        (let ((drawing (gethash model index)))
+          (cond
+           ((and drawing (eq drawing (car kept)))
+            (pop kept)
+            (when (agentel-ui-region--stale-p drawing first width)
+              (agentel-ui-region--redraw region drawing first width)
+              (push model drawn)))
+           (t
+            (when drawing
+              ;; Drawn out of order, so it moves here.
+              (agentel-ui-region--delete region drawing)
+              (setq kept (delq drawing kept)))
+            (setq drawing (or drawing (make-agentel-ui-region--drawing :model model)))
+            (puthash model drawing index)
+            (agentel-ui-region--insert
+             region drawing
+             (if kept
+                 (marker-position (agentel-ui-region--drawing-start (car kept)))
+               (marker-position (agentel-ui-region--end region)))
+             first width)
+            (push model drawn)))
+          (setq first nil)
+          drawing))
+      models)
+     (nreverse drawn))))
+
 (defun agentel-ui-region-render (region models)
   "Show MODELS, a list in order, in REGION, and return those drawn.
 Only the models that are new to REGION or changed are drawn, and the
 text of the models left out is removed."
-  (let ((index (agentel-ui-region--index region))
-        (wanted (make-hash-table :test 'eq :size (length models)))
+  (let ((drawings (agentel-ui-region--drawn region))
         (width (agentel-ui-line-width))
         (first t)
-        kept drawn)
-    (dolist (model models)
-      (puthash model t wanted))
+        same drawn)
     (agentel-ui-region--changing
-      (dolist (drawing (agentel-ui-region--drawn region))
-        (if (gethash (agentel-ui-region--drawing-model drawing) wanted)
-            (push drawing kept)
-          (agentel-ui-region--delete region drawing)
-          (set-marker (agentel-ui-region--drawing-start drawing) nil)
-          (remhash (agentel-ui-region--drawing-model drawing) index)))
-      (setq kept (nreverse kept))
-      (setf (agentel-ui-region--drawn region)
-            (mapcar
-             (lambda (model)
-               (let ((drawing (gethash model index)))
-                 (cond
-                  ((and drawing (eq drawing (car kept)))
-                   (pop kept)
-                   (when (agentel-ui-region--stale-p region drawing first width)
-                     (agentel-ui-region--redraw region drawing first width)
-                     (push model drawn)))
-                  (t
-                   (when drawing
-                     ;; Drawn out of order, so it moves here.
-                     (agentel-ui-region--delete region drawing)
-                     (setq kept (delq drawing kept)))
-                   (setq drawing (or drawing (make-agentel-ui-region--drawing :model model)))
-                   (puthash model drawing index)
-                   (agentel-ui-region--insert
-                    region drawing
-                    (if kept
-                        (marker-position (agentel-ui-region--drawing-start (car kept)))
-                      (marker-position (agentel-ui-region--end region)))
-                    first width)
-                   (push model drawn)))
-                 (setq first nil)
-                 drawing))
-             models)))
-    (nreverse drawn)))
+      (while (and drawings models
+                  (eq (agentel-ui-region--drawing-model (car drawings)) (car models)))
+        (when (agentel-ui-region--stale-p (car drawings) first width)
+          (agentel-ui-region--redraw region (car drawings) first width)
+          (push (car models) drawn))
+        (setq first nil
+              same drawings
+              drawings (cdr drawings)
+              models (cdr models)))
+      (setq drawn (nreverse drawn))
+      (when (or drawings models)
+        (let ((rest (agentel-ui-region--rearrange region drawings models first width)))
+          (if same
+              (setcdr same (car rest))
+            (setf (agentel-ui-region--drawn region) (car rest)))
+          (setq drawn (nconc drawn (cdr rest))))))
+    drawn))
 
 (defun agentel-ui-region-toggle (region model)
   "Fold or unfold MODEL in REGION."
