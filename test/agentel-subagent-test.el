@@ -176,19 +176,32 @@
           (concat "make all\n" (make-string 100 ?x)))
     child))
 
+(defun agentel-subagent-test-item (seen &optional width)
+  "Return the text of a subagent item sent SEEN, shown WIDTH wide."
+  (substring-no-properties
+   (agentel-ui-view (agentel-store-model--make
+                     :type 'subagent
+                     :data (agentel-subagent--update `(show child ,seen) nil))
+                    :width width)))
+
+(defconst agentel-subagent-test-busy
+  `((name . "Build") (state . running) (task . "Build it")
+    (activity . ,(concat "make all\n" (make-string 100 ?x))))
+  "What is seen of a subagent whose latest tool call is a long command.")
+
+(ert-deftest agentel-subagent-item-shows-what-it-was-sent ()
+  (should (equal (agentel-subagent-test-item
+                  '((name . "Build") (state . running) (task . "Build it")
+                    (activity . "make")))
+                 "⎇ Build 🏃\n    Build it\n    ↳ make")))
+
 (ert-deftest agentel-subagent-item-shows-the-activity-on-one-line ()
-  (let* ((child (agentel-subagent-test-busy-child))
-         (text (agentel-subagent--render
-                (agentel-store-model--make :data `((child . ,child)))
-                nil)))
-    (should (string-suffix-p "\n    ↳ make all…" (substring-no-properties text)))))
+  (should (string-suffix-p "\n    ↳ make all…"
+                           (agentel-subagent-test-item agentel-subagent-test-busy))))
 
 (ert-deftest agentel-subagent-item-fits-the-width-it-is-shown-in ()
-  (let* ((child (agentel-subagent-test-busy-child))
-         (text (agentel-subagent--render
-                (agentel-store-model--make :data `((child . ,child)))
-                '(:width 11))))
-    (should (string-suffix-p "\n    ↳ make…" (substring-no-properties text)))))
+  (should (string-suffix-p "\n    ↳ make…"
+                           (agentel-subagent-test-item agentel-subagent-test-busy 11))))
 
 (ert-deftest agentel-subagent-pin-shows-the-activity-on-one-line ()
   (let ((line (substring-no-properties

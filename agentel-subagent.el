@@ -47,20 +47,19 @@
 (defun agentel-subagent--render (entry options)
   "Render the subagent item ENTRY of a parent transcript.
 Its lines fit in the :width of OPTIONS."
-  (let* ((child (agentel-store-get entry 'child))
-         (activity (agentel-session-data child 'subagent-activity))
-         (width (plist-get options :width)))
-    (propertize
-     (concat "⎇ "
-             (propertize (agentel-session-name child) 'face 'agentel-subagent-face)
-             " " (agentel-ui-state (agentel-session-state child))
-             "\n"
-             (agentel-ui-one-line "    " (agentel-session-data child 'subagent-task) width)
-             (if activity
-                 (concat "\n" (agentel-ui-one-line "    ↳ " activity width))
-               ""))
-     'keymap agentel-subagent-item-map
-     'agentel-subagent child)))
+  (let-alist (agentel-store-model-data entry)
+    (let ((width (plist-get options :width)))
+      (propertize
+       (concat "⎇ "
+               (propertize .name 'face 'agentel-subagent-face)
+               " " (agentel-ui-state .state)
+               "\n"
+               (agentel-ui-one-line "    " .task width)
+               (if .activity
+                   (concat "\n" (agentel-ui-one-line "    ↳ " .activity width))
+                 ""))
+       'keymap agentel-subagent-item-map
+       'agentel-subagent .child))))
 
 (defun agentel-subagent--running (session)
   "Return the subagents of SESSION that have not ended, oldest first."
@@ -106,17 +105,27 @@ subagents of the session read from the minibuffer."
   "Return the pinned lines of the running subagents of SESSION."
   (mapcar #'agentel-subagent--pin-line (agentel-subagent--running session)))
 
-(agentel-conversation-define 'subagent
-  (lambda (message _data)
-    (pcase message
-      (`(show ,child ,waiting) `((child . ,child) (waiting . ,waiting))))))
+(defun agentel-subagent--update (message _data)
+  "Return the data of a subagent item changed by MESSAGE.
+MESSAGE is (show CHILD SEEN), where SEEN is an alist of what is shown
+of CHILD.  CHILD is kept only to open its buffer."
+  (pcase message
+    (`(show ,child ,seen) `((child . ,child) ,@seen))))
+
+(agentel-conversation-define 'subagent #'agentel-subagent--update)
 (agentel-ui-define-view 'subagent #'agentel-subagent--render)
 
 (defun agentel-subagent--show (child)
   "Show the state of CHILD as an item of its parent's transcript."
   (agentel-conversation-send
    (agentel-session-parent child) (cons 'subagent (agentel-session-id child))
-   'subagent `(show ,child ,(and (agentel-session-pending-items child) t))))
+   'subagent
+   `(show ,child
+          ((name . ,(agentel-session-name child))
+           (state . ,(agentel-session-state child))
+           (task . ,(agentel-session-data child 'subagent-task))
+           (activity . ,(agentel-session-data child 'subagent-activity))
+           (waiting . ,(and (agentel-session-pending-items child) t))))))
 
 (defun agentel-subagent--spawn (parent update)
   "Create the subagent announced by UPDATE under PARENT."
