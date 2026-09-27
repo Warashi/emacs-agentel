@@ -51,14 +51,15 @@
 (agentel-conversation-define 'permission
   (lambda (message _data)
     (pcase message
-      (`(show ,item) `((item . ,item))))))
+      (`(show ,item ,waiting) `((item . ,item) (waiting . ,waiting))))))
 (agentel-ui-define-view 'permission #'agentel-permission--render)
 
 (defun agentel-permission--show (item)
   "Show the state of the permission request ITEM in its session buffer."
-  (agentel-conversation-send (plist-get item :session)
-                             (cons 'permission (plist-get item :id))
-                             'permission `(show ,item)))
+  (let ((session (plist-get item :session)))
+    (agentel-conversation-send
+     session (cons 'permission (plist-get item :id)) 'permission
+     `(show ,item ,(and (memq item (agentel-session-pending session)) t)))))
 
 (defun agentel-permission--close (item outcome)
   "Stop waiting for ITEM, recording OUTCOME as its answer."

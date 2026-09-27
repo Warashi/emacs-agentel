@@ -41,6 +41,15 @@
       (agentel-chat-answer))
     (agentel-test-wait-for-text "Permission outcome: allow-once")))
 
+(ert-deftest agentel-permission-item-waits-until-it-is-answered ()
+  (agentel-test-with-started session nil
+    (agentel-permission-test-ask)
+    (let ((item (seq-find (lambda (item) (eq (agentel-store-model-type item) 'permission))
+                          (agentel-conversation-items session))))
+      (should (agentel-store-get item 'waiting))
+      (agentel-chat-cancel)
+      (agentel-test-wait-until (lambda () (not (agentel-store-get item 'waiting)))))))
+
 (ert-deftest agentel-permission-is-withdrawn-when-the-turn-is-cancelled ()
   (agentel-test-with-started session nil
     (agentel-permission-test-ask)

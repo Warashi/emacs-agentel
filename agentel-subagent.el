@@ -109,14 +109,14 @@ subagents of the session read from the minibuffer."
 (agentel-conversation-define 'subagent
   (lambda (message _data)
     (pcase message
-      (`(show ,child) `((child . ,child))))))
+      (`(show ,child ,waiting) `((child . ,child) (waiting . ,waiting))))))
 (agentel-ui-define-view 'subagent #'agentel-subagent--render)
 
 (defun agentel-subagent--show (child)
   "Show the state of CHILD as an item of its parent's transcript."
-  (agentel-conversation-send (agentel-session-parent child)
-                             (cons 'subagent (agentel-session-id child))
-                             'subagent `(show ,child)))
+  (agentel-conversation-send
+   (agentel-session-parent child) (cons 'subagent (agentel-session-id child))
+   'subagent `(show ,child ,(and (agentel-session-pending-items child) t))))
 
 (defun agentel-subagent--spawn (parent update)
   "Create the subagent announced by UPDATE under PARENT."

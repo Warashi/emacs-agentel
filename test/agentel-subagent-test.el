@@ -95,6 +95,22 @@
     (agentel-test-wait-for-text "⎇ Explore the repository ✅")
     (agentel-test-wait-for-text "Read README\\.org")))
 
+(ert-deftest agentel-subagent-item-waits-while-the-child-does ()
+  (let* ((agentel-session--registry nil)
+         (parent (agentel-session-create))
+         (child (agentel-session-create :parent parent))
+         (grandchild (agentel-session-create :parent child))
+         (question (list :kind 'test)))
+    (agentel-session-register parent "p1")
+    (agentel-session-register child "c1")
+    (agentel-session-register grandchild "g1")
+    (let ((item (agentel-conversation-find parent '(subagent . "c1"))))
+      (should-not (agentel-store-get item 'waiting))
+      (agentel-session-add-pending grandchild question)
+      (should (agentel-store-get item 'waiting))
+      (agentel-session-remove-pending grandchild question)
+      (should-not (agentel-store-get item 'waiting)))))
+
 (ert-deftest agentel-subagent-item-opens-the-child-buffer ()
   (agentel-test-with-started session nil
     (let ((child (agentel-subagent-test-run session)))

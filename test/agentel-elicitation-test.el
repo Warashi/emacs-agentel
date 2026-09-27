@@ -63,6 +63,15 @@
     (agentel-test-wait-for-text (regexp-quote "{\"action\":\"decline\"}"))
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))))
 
+(ert-deftest agentel-elicitation-item-waits-until-it-is-answered ()
+  (agentel-test-with-started session nil
+    (agentel-elicitation-test-ask)
+    (let ((item (seq-find (lambda (item) (eq (agentel-store-model-type item) 'elicitation))
+                          (agentel-conversation-items session))))
+      (should (agentel-store-get item 'waiting))
+      (agentel-chat-cancel)
+      (agentel-test-wait-until (lambda () (not (agentel-store-get item 'waiting)))))))
+
 (ert-deftest agentel-elicitation-is-withdrawn-when-the-turn-is-cancelled ()
   (agentel-test-with-started session nil
     (agentel-elicitation-test-ask)
