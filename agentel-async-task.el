@@ -32,34 +32,55 @@
   '((_meta . ((jetbrains . ((air . ((version . 1)
                                     (capabilities . ["asyncTasks"])))))))))
 
-(defun agentel-async-task--update (session id fields)
-  "Merge the alist FIELDS into the task ID of SESSION.
-A task that is neither running nor paused is forgotten."
-  (let* ((tasks (copy-alist (agentel-session-data session 'async-tasks)))
-         (task (copy-alist (alist-get id tasks nil nil #'equal))))
+(defun agentel-async-task--merge (tasks id fields)
+  "Return TASKS with the alist FIELDS merged into the task ID.
+A task that is neither running nor paused is left out."
+  (let ((tasks (copy-alist tasks))
+        (task (copy-alist (alist-get id tasks nil nil #'equal))))
     (pcase-dolist (`(,key . ,value) fields)
       (setf (alist-get key task) value))
     (setf (alist-get id tasks nil t #'equal)
-          (and (member (alist-get 'state task) '("running" "paused")) task))
-    (setf (agentel-session-data session 'async-tasks) tasks)))
+          (and (memq (alist-get 'state task) '(running paused)) task))
+    tasks))
+
+(defun agentel-async-task--update (message data)
+  "Return the background tasks DATA of a session changed by MESSAGE.
+DATA has the `tasks' still running or paused, newest first, as (ID
+. TASK) where TASK is an alist of its `name', its `state' and its
+latest `progress'.  MESSAGE is one of (spawn ID NAME), (progress ID
+TEXT) and (change-state ID STATE); news of an unknown task is
+ignored."
+  (let ((tasks (alist-get 'tasks data)))
+    `((tasks
+       . ,(pcase message
+            (`(spawn ,id ,name)
+             (agentel-async-task--merge tasks id `((state . running) (name . ,name))))
+            ((guard (not (assoc (cadr message) tasks))) tasks)
+            (`(progress ,id ,text)
+             (agentel-async-task--merge tasks id `((progress . ,text))))
+            (`(change-state ,id ,state)
+             (agentel-async-task--merge tasks id `((state . ,state)))))))))
+
+(agentel-store-define 'agentel-async-tasks #'agentel-async-task--update)
+
+(defun agentel-async-task--tasks (session)
+  "Return the background tasks of SESSION still running or paused, newest first."
+  (when-let* ((model (agentel-store-find (agentel-session-store session) 'async-tasks)))
+    (agentel-store-get model 'tasks)))
 
 (defun agentel-async-task--on-update (session update)
-  "Record the background task reported in UPDATE for SESSION."
-  (let-alist update
-    (let ((known (assoc .asyncTaskId (agentel-session-data session 'async-tasks))))
-      (pcase .sessionUpdate
-        ("async_task_spawned"
-         (agentel-async-task--update session .asyncTaskId
-                                     `((state . "running") (name . ,.name))))
-        ("async_task_progress"
-         (when-let* ((progress (or .summary .lastToolName .description))
-                     (known))
-           (agentel-async-task--update session .asyncTaskId
-                                       `((progress . ,progress)))))
-        ("async_task_state_update"
-         (when known
-           (agentel-async-task--update session .asyncTaskId
-                                       `((state . ,.state)))))))))
+  "Tell SESSION of the background task reported in UPDATE."
+  (when-let* ((message
+               (let-alist update
+                 (pcase .sessionUpdate
+                   ("async_task_spawned" `(spawn ,.asyncTaskId ,.name))
+                   ("async_task_progress"
+                    (when-let* ((progress (or .summary .lastToolName .description)))
+                      `(progress ,.asyncTaskId ,progress)))
+                   ("async_task_state_update"
+                    `(change-state ,.asyncTaskId ,(and .state (intern .state))))))))
+    (agentel-store-dispatch (agentel-session-store session) 'async-tasks
+                            'agentel-async-tasks message)))
 
 (defun agentel-async-task--pin (session)
   "Return the pinned lines of the running background tasks of SESSION."
@@ -68,10 +89,10 @@ A task that is neither running nor paused is forgotten."
               (agentel-ui-one-line
                (concat "⚙ " (propertize (or .name "Background task")
                                         'face 'agentel-async-task-face)
-                       " " (agentel-ui-state (intern .state))
+                       " " (agentel-ui-state .state)
                        (if .progress " ↳ " ""))
                .progress)))
-          (reverse (agentel-session-data session 'async-tasks))))
+          (reverse (agentel-async-task--tasks session))))
 
 (add-hook 'agentel-connection-capability-functions #'agentel-async-task--capabilities)
 (add-hook 'agentel-session-update-functions #'agentel-async-task--on-update)

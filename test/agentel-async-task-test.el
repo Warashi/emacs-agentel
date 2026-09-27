@@ -44,9 +44,27 @@
       (agentel-async-task--on-update
        session `((sessionUpdate . "async_task_progress") (asyncTaskId . "b1")
                  (summary . ,(format "line %d" i)))))
-    (let ((task (cdr (assoc "b1" (agentel-session-data session 'async-tasks)))))
+    (let ((task (cdr (assoc "b1" (agentel-async-task--tasks session)))))
       (should (equal (alist-get 'progress task) "line 99"))
       (should (= (length task) 3)))))
+
+(defun agentel-async-task-test-tasks (&rest messages)
+  "Return the tasks after MESSAGES."
+  (let (data)
+    (dolist (message messages)
+      (setq data (agentel-async-task--update message data)))
+    (alist-get 'tasks data)))
+
+(ert-deftest agentel-async-task-is-forgotten-once-it-stops ()
+  (should (equal (mapcar (lambda (task) (list (car task) (alist-get 'state (cdr task))))
+                         (agentel-async-task-test-tasks
+                          '(spawn "b1" "dev") '(spawn "b2" "test")
+                          '(change-state "b2" paused) '(change-state "b1" completed)))
+                 '(("b2" paused)))))
+
+(ert-deftest agentel-async-task-ignores-news-of-an-unknown-task ()
+  (should-not (agentel-async-task-test-tasks
+               '(progress "b1" "Compiling") '(change-state "b1" running))))
 
 (ert-deftest agentel-async-task-shows-the-progress-on-one-line ()
   (let* ((agentel-session--registry nil)
