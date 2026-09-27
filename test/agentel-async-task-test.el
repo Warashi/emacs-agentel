@@ -21,7 +21,7 @@
                                                    (agentel-session-connection session)))))
            (air (alist-get 'air (alist-get 'jetbrains (alist-get '_meta received)))))
       (should (equal (alist-get 'version air) 1))
-      (should (equal (alist-get 'capabilities air) ["asyncTasks"])))))
+      (should (seq-contains-p (alist-get 'capabilities air) "asyncTasks")))))
 
 (ert-deftest agentel-async-task-running-is-pinned-above-the-prompt ()
   (agentel-test-with-started session nil

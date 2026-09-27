@@ -35,7 +35,9 @@
 
 (defun agentel-subagent--capabilities ()
   "Return the client capability of hosting subagent sessions."
-  '((subagents . nil)))
+  '((subagents . nil)
+    (_meta . ((jetbrains . ((air . ((version . 1)
+                                     (capabilities . ["nativeSubagentSessions"])))))))))
 
 (defvar-keymap agentel-subagent-item-map
   :doc "Keymap on subagent items of a parent transcript."
@@ -146,6 +148,15 @@ subagents of the session read from the minibuffer."
   (when-let* ((title (alist-get 'title update)))
     (setf (agentel-session-data child 'subagent-activity) title)))
 
+(defun agentel-subagent--withhold-p (session update)
+  "Withhold an orphan Agent/Task control UPDATE from the parent SESSION."
+  (and (not (agentel-session-parent session))
+       (equal (alist-get 'sessionUpdate update) "tool_call_update")
+       (member (alist-get 'toolName (alist-get 'claudeCode (alist-get '_meta update)))
+               '("Agent" "Task"))
+       (not (agentel-conversation-find
+             session (cons 'tool (alist-get 'toolCallId update))))))
+
 (defun agentel-subagent--on-update (session update)
   "Handle subagent related UPDATE of SESSION."
   (pcase (alist-get 'sessionUpdate update)
@@ -162,6 +173,7 @@ subagents of the session read from the minibuffer."
     (agentel-chat-refresh-pin parent)))
 
 (add-hook 'agentel-connection-capability-functions #'agentel-subagent--capabilities)
+(add-hook 'agentel-session-withhold-functions #'agentel-subagent--withhold-p)
 (add-hook 'agentel-session-update-functions #'agentel-subagent--on-update)
 (add-hook 'agentel-session-changed-functions #'agentel-subagent--on-changed)
 (add-hook 'agentel-chat-pin-functions #'agentel-subagent--pin)

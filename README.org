@@ -21,6 +21,12 @@ GUI agent apps:
 agentel does not offer file system or terminal capabilities; the agent
 uses its own tools.
 
+For Claude subagent sessions, agentel advertises both the draft ACP
+=subagents= capability and the =nativeSubagentSessions= capability of
+the JetBrains AIR extension.  The latter is needed when the ACP SDK
+does not preserve the draft field; without negotiation the adapter
+puts child output in the parent's session instead.
+
 [[https://docs.github.com/copilot/how-tos/copilot-cli][Copilot CLI]] (=copilot --acp=) runs too, with the same model, effort
 and mode options.  A subagent of Copilot CLI shows in the transcript of
 the parent as one tool call, whose content is the reply of the

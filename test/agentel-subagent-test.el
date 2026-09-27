@@ -21,7 +21,23 @@
     (buffer-substring-no-properties (point-min) (point-max))))
 
 (ert-deftest agentel-subagent-is-advertised ()
-  (should (equal (agentel-subagent--capabilities) '((subagents . nil)))))
+  (should (equal (agentel-subagent--capabilities)
+                 '((subagents . nil)
+                   (_meta . ((jetbrains . ((air . ((version . 1)
+                                                    (capabilities . ["nativeSubagentSessions"])))))))))))
+
+(ert-deftest agentel-subagent-and-async-task-capabilities-share-the-wire ()
+  (agentel-test-with-started session nil
+    (let* ((received (alist-get 'receivedCapabilities
+                                (alist-get '_meta
+                                           (agentel-connection-info
+                                            (agentel-session-connection session)))))
+           (air (alist-get 'air (alist-get 'jetbrains (alist-get '_meta received))))
+           (capabilities (alist-get 'capabilities air)))
+      (should (assq 'subagents received))
+      (should (= (cl-count '_meta received :key #'car) 1))
+      (should (equal (sort (append capabilities nil) #'string<)
+                     '("asyncTasks" "nativeSubagentSessions"))))))
 
 (ert-deftest agentel-subagent-gets-its-own-session-and-buffer ()
   (agentel-test-with-started session nil
@@ -41,6 +57,37 @@
       (should-not (string-match-p "I will look at the files" text))
       (should (string-match-p "Delegating to a subagent\\." text))
       (should (string-match-p "The subagent reported a README\\." text)))))
+
+(ert-deftest agentel-subagent-hides-orphan-agent-tool-update ()
+  (agentel-test-with-started session nil
+    (agentel-subagent-test-run session)
+    (should-not (agentel-conversation-find
+                 session '(tool . "toolu_agent_orphan")))
+    (should-not (string-match-p "… Tool"
+                                (agentel-subagent-test-text (current-buffer))))))
+
+(ert-deftest agentel-subagent-keeps-an-existing-agent-tool-update ()
+  (let* ((agentel-session--registry nil)
+         (session (agentel-session-create))
+         (update '((sessionUpdate . "tool_call_update")
+                   (toolCallId . "failed-agent")
+                   (status . "failed")
+                   (_meta . ((claudeCode . ((toolName . "Agent"))))))))
+    (should (agentel-subagent--withhold-p session update))
+    (agentel-conversation-send session '(tool . "failed-agent") 'tool
+                               '(update ((title . "Agent failed"))))
+    (should-not (agentel-subagent--withhold-p session update))))
+
+(ert-deftest agentel-subagent-without-negotiation-stays-in-parent ()
+  (let ((agentel-connection-capability-functions
+         (remq #'agentel-subagent--capabilities
+               agentel-connection-capability-functions)))
+    (agentel-test-with-started session nil
+      (agentel-test-send "subagent please")
+      (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
+      (should-not (agentel-session-children session))
+      (should (string-match-p "I will look at the files"
+                              (agentel-subagent-test-text (current-buffer)))))))
 
 (ert-deftest agentel-subagent-is-one-item-in-the-parent ()
   (agentel-test-with-started session nil

@@ -12,7 +12,8 @@
 ;;   tool        a finished Read tool call
 ;;   permission  a Bash tool call that asks for permission first
 ;;   ask         an AskUserQuestion form elicitation
-;;   subagent    a subagent that works in its own session
+;;   subagent    a subagent that works in its own session when negotiated,
+;;               otherwise its output stays in the parent
 ;;   background  a subagent that keeps working until the client cancels
 ;;   async       a background shell command, announced like the adapter
 ;;               only to a client with the AIR asyncTasks capability; it
@@ -302,21 +303,33 @@ KIND is the session update name and defaults to an agent message."
 
 (defun agentel-mock--subagent (id session-id)
   "Run a subagent under SESSION-ID, then end prompt ID."
-  (let ((child (format "task-%d" (cl-incf agentel-mock--counter))))
+  (let* ((air (alist-get 'air (alist-get 'jetbrains
+                                        (alist-get '_meta agentel-mock--client-capabilities))))
+         (native (and (vectorp (alist-get 'capabilities air))
+                      (seq-contains-p (alist-get 'capabilities air)
+                                      "nativeSubagentSessions")))
+         (child (and native (format "task-%d" (cl-incf agentel-mock--counter))))
+         (target (or child session-id)))
     (agentel-mock--say session-id "Delegating to a subagent.")
-    (agentel-mock--update
-     session-id `((sessionUpdate . "subagent_spawned")
-                  (subagentSessionId . ,child)
-                  (name . "Explore the repository")
-                  (task . "List the files and summarize them.")
-                  (capabilities . ,(make-hash-table))))
-    (agentel-mock--say child "I will look at the files." )
-    (agentel-mock--tool child)
-    (agentel-mock--say child "The repository has a README.")
-    (agentel-mock--update
-     session-id `((sessionUpdate . "subagent_state_update")
-                  (subagentSessionId . ,child)
-                  (state . "completed")))
+    (when child
+      (agentel-mock--update
+       session-id `((sessionUpdate . "subagent_spawned")
+                    (subagentSessionId . ,child)
+                    (name . "Explore the repository")
+                    (task . "List the files and summarize them.")
+                    (capabilities . ,(make-hash-table)))))
+    (agentel-mock--say target "I will look at the files.")
+    (agentel-mock--tool target)
+    (agentel-mock--say target "The repository has a README.")
+    (when child
+      (agentel-mock--update
+       session-id `((sessionUpdate . "subagent_state_update")
+                    (subagentSessionId . ,child)
+                    (state . "completed")))
+      (agentel-mock--update
+       session-id '((sessionUpdate . "tool_call_update")
+                    (toolCallId . "toolu_agent_orphan")
+                    (_meta . ((claudeCode . ((toolName . "Agent"))))))))
     (agentel-mock--say session-id "The subagent reported a README.")
     (agentel-mock--finish id session-id)))
 

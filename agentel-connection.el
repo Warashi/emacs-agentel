@@ -55,12 +55,36 @@ params, for example to withdraw a question on `$/cancel_request'.")
     (setf (agentel-connection-stderr connection)
           (last lines agentel-connection--stderr-lines))))
 
+(defun agentel-connection--merge-capability (key left right)
+  "Merge two values of client capability KEY, LEFT and RIGHT."
+  (cond
+   ((equal left right) left)
+   ((and (consp left) (consp right)
+         (consp (car left)) (consp (car right)))
+    (let ((merged (copy-tree left)))
+      (dolist (entry right merged)
+        (if-let* ((existing (assq (car entry) merged)))
+            (setcdr existing
+                    (agentel-connection--merge-capability
+                     (car entry) (cdr existing) (cdr entry)))
+          (setq merged (append merged (list (copy-tree entry))))))))
+   ((and (eq key 'capabilities) (vectorp left) (vectorp right))
+    (vconcat (delete-dups (append (append left nil) (append right nil)))))
+   (t (error "Conflicting client capability %s: %S and %S" key left right))))
+
 (defun agentel-connection--capabilities ()
-  "Return the client capabilities declared by the loaded features."
-  (or (apply #'append
-             (mapcar #'funcall agentel-connection-capability-functions))
-      ;; An empty alist would be serialized as null instead of {}.
-      (make-hash-table)))
+  "Return the merged client capabilities declared by the loaded features."
+  (let (merged)
+    (dolist (feature agentel-connection-capability-functions)
+      (dolist (entry (funcall feature))
+        (if-let* ((existing (assq (car entry) merged)))
+            (setcdr existing
+                    (agentel-connection--merge-capability
+                     (car entry) (cdr existing) (cdr entry)))
+          (setq merged (append merged (list (copy-tree entry)))))))
+    (or merged
+        ;; An empty alist would be serialized as null instead of {}.
+        (make-hash-table))))
 
 (defun agentel-connection--version ()
   "Return the version of agentel from its package header."
