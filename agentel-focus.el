@@ -17,9 +17,9 @@
 ;; everything again.
 ;;
 ;; Whether an entry is shown depends on the entry itself and on the
-;; entries that came after it, so a changed entry and a new entry are
-;; the only ones looked at again; the cost does not grow with the
-;; session or the turn.  Everything before the last prompt is covered by a
+;; entries that came after it, so only a changed or new entry and the
+;; last message and activity it takes the place of are looked at again;
+;; the cost does not grow with the session or the turn.  Everything before the last prompt is covered by a
 ;; single overlay.  An overlay of a hidden entry follows text inserted
 ;; in front of it and not behind it, so it keeps covering its entry when
 ;; the neighbours are rendered again.
