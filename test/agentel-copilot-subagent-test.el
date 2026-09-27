@@ -69,12 +69,12 @@
         (chunk '((sessionUpdate . "agent_message_chunk")
                  (content . ((type . "text") (text . "Hi"))))))
     (let ((session (agentel-session-create)))
-      (agentel-session-set-busy session t)
+      (agentel-session-start-turn session)
       (agentel-copilot-subagent--withhold-p
        session '((sessionUpdate . "tool_call") (toolCallId . "toolu_1")
                  (rawInput . ((agent_type . "explore") (prompt . "Look.")))))
       (should (agentel-copilot-subagent--withhold-p session chunk))
-      (agentel-session-set-busy session nil)
+      (agentel-session-finish-turn session)
       (should-not (agentel-copilot-subagent--withhold-p session chunk)))))
 
 (provide 'agentel-copilot-subagent-test)

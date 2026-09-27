@@ -27,7 +27,8 @@
 (cl-defstruct (agentel-session (:constructor agentel-session--make)
                                (:copier nil))
   "One ACP session."
-  id connection parent cwd title buffer busy ended
+  id connection parent cwd title buffer ended
+  (in-turn nil :documentation "Non-nil while the agent works on a prompt.")
   (project nil :documentation "Name of the project the session works in.")
   (agent nil :documentation "Name of the agent in `agentel-agents' that runs it.")
   (alist nil :documentation "Per-feature values, see `agentel-session-data'."))
@@ -121,15 +122,19 @@ chosen by each agent, so two agents may use the same one."
   `(prog1 (setf (alist-get ,key (agentel-session-alist ,session)) ,value)
      (agentel-session-changed ,session)))
 
-(defun agentel-session-set-busy (session busy)
-  "Record whether SESSION is working on a turn, according to BUSY."
-  (setf (agentel-session-busy session) busy)
+(defun agentel-session-start-turn (session)
+  "Record that the agent started working on a prompt of SESSION."
+  (setf (agentel-session-in-turn session) t)
+  (agentel-session-changed session))
+
+(defun agentel-session-finish-turn (session)
+  "Record that the agent finished working on the prompt of SESSION."
+  (setf (agentel-session-in-turn session) nil)
   (agentel-session-changed session))
 
 (defun agentel-session-set-ended (session reason)
   "Record that SESSION ended for REASON, a symbol shown as its state."
-  (setf (agentel-session-ended session) reason
-        (agentel-session-busy session) nil)
+  (setf (agentel-session-ended session) reason)
   (agentel-session-changed session))
 
 (defun agentel-session-waiting-p (session)
@@ -150,7 +155,7 @@ The sessions above it are told too, as they wait while it does."
 It is at work during a turn or while a feature of
 `agentel-session-running-functions' says so."
   (and (not (agentel-session-ended session))
-       (or (agentel-session-busy session)
+       (or (agentel-session-in-turn session)
            (run-hook-with-args-until-success 'agentel-session-running-functions
                                              session))))
 

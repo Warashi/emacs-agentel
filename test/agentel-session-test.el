@@ -122,7 +122,7 @@
       (should (eq (agentel-session-state session) 'starting))
       (agentel-session-register session "s1")
       (should (eq (agentel-session-state session) 'idle))
-      (agentel-session-set-busy session t)
+      (agentel-session-start-turn session)
       (should (eq (agentel-session-state session) 'running))
       (let ((waiting t))
         (add-hook 'agentel-session-waiting-functions (lambda (_session) waiting))
