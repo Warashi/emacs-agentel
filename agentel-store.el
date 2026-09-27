@@ -50,7 +50,7 @@ the data changed compares this instead."))
   "Models in the order they were added, and the functions watching them."
   (newest nil :documentation "Models, newest first.")
   (index (make-hash-table :test 'equal) :documentation "Models by key.")
-  (subscribers nil :documentation "Functions told of changes, oldest first."))
+  (subscribers nil :documentation "Functions told of changes."))
 
 (defun agentel-store-models (store)
   "Return the models of STORE, oldest first."

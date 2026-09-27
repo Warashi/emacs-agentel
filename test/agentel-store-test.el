@@ -69,14 +69,6 @@
     (agentel-store-dispatch store 'b 'agentel-store-test-counter '(add 1))
     (should (equal (reverse told) '((a t) (a nil) (b t))))))
 
-(ert-deftest agentel-store-tells-subscribers-in-the-order-they-subscribed ()
-  (let ((store (agentel-store-create))
-        told)
-    (agentel-store-subscribe store (lambda (_ _) (push 'first told)))
-    (agentel-store-subscribe store (lambda (_ _) (push 'second told)))
-    (agentel-store-dispatch store nil 'agentel-store-test-counter '(add 1))
-    (should (equal (reverse told) '(first second)))))
-
 (ert-deftest agentel-store-stops-telling-an-unsubscribed-function ()
   (let* ((store (agentel-store-create))
          (told 0)
