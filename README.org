@@ -192,14 +192,13 @@ in one place for all, so a feature still goes with its file.  What goes
 to the agent is made where it is sent in the same way: the session
 buffer asks the turn (=agentel-turn.el=) to send a prompt or to stop
 it, and the config feature changes a setting itself, so the buffer
-knows no message of the protocol.  When the
-agent asks a question, its item holds the question and its choices,
-and the feature keeps what it needs to reply keyed by the item, as the
-ids of requests are only unique in their connection.  The view hands the
-item to the feature when the user answers, as does
-=agentel-chat-answer= through the function the feature defines for the
-type of the item, and the feature replies to the agent and tells the
-item the answer.  A session waits for the user while an item of its
+knows no message of the protocol.  When the agent asks a question, its
+item holds the question and its choices, and the feature keeps what it
+needs to reply keyed by the item, as the ids of requests are only
+unique in their connection.  The view hands the item to the feature
+when the user answers, as does =agentel-chat-answer= through the
+function the feature defines for the type of the item, and the feature
+replies to the agent and tells the item the answer.  A session waits for the user while an item of its
 conversation, or of the conversation of a subagent, waits for an
 answer; nothing else keeps that.  In the same way a session runs during
 a turn or while a feature says it works for it, such as applying the
