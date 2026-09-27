@@ -312,11 +312,23 @@ METHOD and PARAMS are those of the notification."
       (dolist (item withdrawn)
         (agentel-elicitation--close item '(withdraw))))))
 
+(defun agentel-elicitation--forget (session)
+  "Forget the forms of SESSION once it is removed from the registry."
+  (unless (memq session (agentel-session-list))
+    (let (gone)
+      (maphash (lambda (item request)
+                 (when (eq (plist-get request :session) session)
+                   (push item gone)))
+               agentel-elicitation--requests)
+      (dolist (item gone)
+        (remhash item agentel-elicitation--requests)))))
+
 (add-hook 'agentel-connection-capability-functions #'agentel-elicitation--capabilities)
 (setf (alist-get "elicitation/create" agentel-connection-request-handlers
                  nil nil #'equal)
       #'agentel-elicitation--handle)
 (add-hook 'agentel-connection-notification-functions #'agentel-elicitation--withdraw)
+(add-hook 'agentel-session-changed-functions #'agentel-elicitation--forget)
 
 (provide 'agentel-elicitation)
 ;;; agentel-elicitation.el ends here

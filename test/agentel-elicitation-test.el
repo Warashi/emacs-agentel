@@ -92,6 +92,14 @@
       (agentel-chat-cancel)
       (agentel-test-wait-until (lambda () (not (agentel-store-get item 'waiting)))))))
 
+(ert-deftest agentel-elicitation-is-forgotten-with-its-session ()
+  (agentel-test-with-started session nil
+    (agentel-elicitation-test-ask)
+    (let ((item (seq-find (lambda (item) (eq (agentel-store-model-type item) 'elicitation))
+                          (agentel-conversation-items session))))
+      (agentel-session-remove session)
+      (should-not (gethash item agentel-elicitation--requests)))))
+
 (ert-deftest agentel-elicitation-is-withdrawn-when-the-turn-is-cancelled ()
   (agentel-test-with-started session nil
     (agentel-elicitation-test-ask)
