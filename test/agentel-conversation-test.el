@@ -68,7 +68,23 @@
                                         (toolCallId . "t1")
                                         (status . "completed")))
     (should (equal (agentel-conversation-test-items session)
-                   '((tool (status . "completed") (title . "Read")))))))
+                   '((tool (status . done) (title . "Read")))))))
+
+(ert-deftest agentel-conversation-tells-why-a-tool-is-called-and-its-output ()
+  (agentel-conversation-test-with-session
+    (agentel-conversation-test-update
+     '((sessionUpdate . "tool_call") (toolCallId . "t1") (title . "ls")
+       (status . "in_progress") (rawInput . ((description . "List files")))
+       (content . [((type . "content")
+                    (content . ((type . "text") (text . "README.org"))))
+                   ((type . "diff") (path . "/tmp/a") (oldText . "x") (newText . "y"))
+                   ((type . "diff") (path . "/tmp/b") (newText . "y"))
+                   ((type . "terminal") (terminalId . "term1"))])))
+    (let ((data (cdar (agentel-conversation-test-items session))))
+      (should (equal (alist-get 'why data) "List files"))
+      (should (eq (alist-get 'status data) 'running))
+      (should (equal (alist-get 'output data)
+                     "README.org\nEdit /tmp/a\nWrite /tmp/b")))))
 
 (ert-deftest agentel-conversation-replaces-the-plan ()
   (agentel-conversation-test-with-session

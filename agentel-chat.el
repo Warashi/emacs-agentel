@@ -225,22 +225,8 @@ The folded line fits in the :width of OPTIONS."
   (agentel-ui-define-view type #'agentel-chat--render-notice))
 
 (defconst agentel-chat--status-icons
-  '(("pending" . "…") ("in_progress" . "⟳") ("completed" . "✓") ("failed" . "✗"))
+  '((pending . "…") (running . "⟳") (done . "✓") (failed . "✗"))
   "Icons of tool call statuses.")
-
-(defun agentel-chat--content-text (content)
-  "Return the displayable text of the tool call CONTENT list."
-  (string-join
-   (delq nil
-         (mapcar
-          (lambda (item)
-            (pcase (alist-get 'type item)
-              ("content" (alist-get 'text (alist-get 'content item)))
-              ("diff" (format "%s %s" (if (alist-get 'oldText item) "Edit" "Write")
-                              (alist-get 'path item)))
-              ("terminal" nil)))
-          content))
-   "\n"))
 
 (defun agentel-chat--indent (text)
   "Return TEXT with every line indented."
@@ -253,11 +239,11 @@ is called when the agent tells it; a title cut short there shows in
 full on top of the output."
   (let* ((status (agentel-store-get entry 'status))
          (collapsed (plist-get options :collapsed))
-         (icon (or (cdr (assoc status agentel-chat--status-icons)) "…"))
+         (icon (or (alist-get status agentel-chat--status-icons) "…"))
          (title (propertize (or (agentel-store-get entry 'title) "Tool")
                             'face 'agentel-chat-tool-face))
-         (why (alist-get 'description (agentel-store-get entry 'rawInput)))
-         (summary (if (and (stringp why) (not (equal why title)))
+         (why (agentel-store-get entry 'why))
+         (summary (if (and why (not (equal why title)))
                       (concat (propertize (concat why " — ") 'face 'agentel-chat-tool-face)
                               title)
                     title))
@@ -266,7 +252,7 @@ full on top of the output."
                                       (plist-get options :width))))
          (cut (not (equal (funcall line "  ")
                           (concat "  " icon " " (string-trim summary)))))
-         (output (agentel-chat--content-text (agentel-store-get entry 'content)))
+         (output (or (agentel-store-get entry 'output) ""))
          (body (string-join (delete "" (list (if cut title "") output)) "\n"))
          (foldable (not (string-empty-p body)))
          (header (funcall line (cond ((not foldable) "  ")

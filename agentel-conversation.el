@@ -89,12 +89,14 @@ More text makes a finished message unfinished until it ends again."
         (`(show ,text) `((text . ,text)))))))
 
 (defun agentel-conversation--update-tool (message data)
-  "Return the DATA of a tool call changed by MESSAGE."
+  "Return the DATA of a tool call changed by MESSAGE.
+The message carries the fields it changes: `title', `why' the agent
+calls it, `status', one of `pending', `running', `done' and `failed',
+and `output' as text."
   (pcase message
-    (`(update ,update)
-     (dolist (field '(title kind status content rawInput locations) data)
-       (when-let* ((value (alist-get field update)))
-         (setf (alist-get field data) value))))))
+    (`(update ,fields)
+     (dolist (field fields data)
+       (setf (alist-get (car field) data) (cdr field))))))
 
 (agentel-conversation-define 'tool #'agentel-conversation--update-tool)
 
@@ -132,6 +134,37 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
           (agentel-store-update store last `(chunk ,text))
         (agentel-store-dispatch store nil type `(chunk ,text))))))
 
+(defconst agentel-conversation--tool-statuses
+  '(("pending" . pending) ("in_progress" . running)
+    ("completed" . done) ("failed" . failed))
+  "Statuses of tool calls by their names in the protocol.")
+
+(defun agentel-conversation--tool-output (content)
+  "Return the tool call CONTENT list as text."
+  (string-join
+   (delq nil
+         (mapcar
+          (lambda (item)
+            (pcase (alist-get 'type item)
+              ("content" (alist-get 'text (alist-get 'content item)))
+              ("diff" (format "%s %s" (if (alist-get 'oldText item) "Edit" "Write")
+                              (alist-get 'path item)))
+              ("terminal" nil)))
+          content))
+   "\n"))
+
+(defun agentel-conversation--tool-fields (update)
+  "Return the fields of a tool call told by UPDATE."
+  (let ((why (alist-get 'description (alist-get 'rawInput update)))
+        (content (alist-get 'content update)))
+    (seq-filter
+     #'cdr
+     `((title . ,(alist-get 'title update))
+       (why . ,(and (stringp why) why))
+       (status . ,(cdr (assoc (alist-get 'status update)
+                              agentel-conversation--tool-statuses)))
+       (output . ,(and content (agentel-conversation--tool-output content)))))))
+
 (defun agentel-conversation--on-update (session update)
   "Record UPDATE of SESSION in its conversation."
   (pcase (alist-get 'sessionUpdate update)
@@ -140,7 +173,8 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
     ("user_message_chunk" (agentel-conversation--text-chunk session 'user update))
     ((or "tool_call" "tool_call_update")
      (agentel-conversation-send session (cons 'tool (alist-get 'toolCallId update))
-                                'tool `(update ,update)))
+                                'tool
+                                `(update ,(agentel-conversation--tool-fields update))))
     ;; A plan replaces the previous one.
     ("plan" (agentel-conversation-send session 'plan 'plan
                                        `(show ,(alist-get 'entries update))))))

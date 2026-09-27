@@ -225,7 +225,7 @@
 (ert-deftest agentel-chat-fits-a-tool-in-the-width-it-is-shown-in ()
   (let ((tool (agentel-store-model--make
                :type 'tool
-               :data `((title . ,(make-string 100 ?t)) (status . "completed")))))
+               :data `((title . ,(make-string 100 ?t)) (status . done)))))
     (should (= (string-width (agentel-ui-view tool :width 20 :collapsed t)) 20))
     (should (= (string-width (agentel-ui-view tool :width 30 :collapsed t)) 30))))
 
