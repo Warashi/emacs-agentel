@@ -8,17 +8,17 @@
 ;; `agentel-focus-mode' hides the transcript except what the user
 ;; answers next: the last prompt, the questions still waiting for an
 ;; answer, errors and why the turn ended, the last agent message, and
-;; the latest thought or tool call while the turn runs.  A subagent is shown while it waits for an answer;
-;; while it runs it is pinned above the prompt instead.
+;; the latest thought or tool call when it came after that message.  A
+;; subagent is shown while it waits for an answer; while it runs it is
+;; pinned above the prompt instead.
 ;;
 ;; Hidden entries are covered by overlays, so the transcript text and
 ;; its rendering stay as they are, and turning the mode off shows
 ;; everything again.
 ;;
 ;; A streamed chunk changes one entry and a change of the session can
-;; only move the answer, the activity or the questions, so only those
-;; entries are looked at again; the cost does not grow with the session
-;; or the turn.  Everything before the last prompt is covered by a
+;; only move the questions, so only those entries are looked at again;
+;; the cost does not grow with the session or the turn.  Everything before the last prompt is covered by a
 ;; single overlay.  An overlay of a hidden entry follows text inserted
 ;; in front of it and not behind it, so it keeps covering its entry when
 ;; the neighbours are rendered again.
@@ -43,7 +43,7 @@ The overlay is nil while the entry is shown.")
   "Newest agent message of the current turn.")
 
 (defvar-local agentel-focus--last-activity nil
-  "Newest thought or tool call of the current turn.")
+  "Newest thought or tool call of the current turn after its last message.")
 
 (defvar-local agentel-focus--askers nil
   "Entries of the current turn that may wait for an answer.")
@@ -53,10 +53,7 @@ The overlay is nil while the entry is shown.")
 
 (defun agentel-focus--current-latest ()
   "Return the entries that show the state of the turn."
-  (let ((session agentel-chat--session))
-    (delq nil (list agentel-focus--last-message
-                    (and session (agentel-session-busy session)
-                         agentel-focus--last-activity)))))
+  (delq nil (list agentel-focus--last-message agentel-focus--last-activity)))
 
 (defun agentel-focus--waits-p (entry)
   "Return non-nil if ENTRY shows something owing an answer."
@@ -100,7 +97,8 @@ MOVED means its text changed, so a hidden entry is covered again."
   "Record ENTRY as the newest of the current turn."
   (puthash entry nil agentel-focus--overlays)
   (pcase (agentel-store-model-type entry)
-    ('agent (setq agentel-focus--last-message entry))
+    ('agent (setq agentel-focus--last-message entry
+                  agentel-focus--last-activity nil))
     ((or 'thought 'tool) (setq agentel-focus--last-activity entry)))
   (when (or (agentel-store-get entry 'item)
             (agentel-store-get entry 'child))
@@ -177,7 +175,7 @@ The first of them is the last prompt, unless there is none."
   "Show only what the next input to the session needs.
 The last prompt stays visible, with the questions waiting for an
 answer, errors and why the turn ended, the last agent message, and
-the latest thought or tool call while the turn runs."
+the latest thought or tool call when it came after that message."
   :lighter " Focus"
   (if agentel-focus-mode
       (progn

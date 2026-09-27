@@ -39,8 +39,7 @@
 
 (defun agentel-focus-test-prompt (session text)
   "Show TEXT as a prompt sent to SESSION, which starts a turn."
-  (agentel-conversation-send session nil 'user `(chunk ,text))
-  (agentel-session-set-busy session t))
+  (agentel-conversation-send session nil 'user `(chunk ,text)))
 
 (agentel-conversation-define 'agentel-focus-test-question
   (lambda (message _data)
@@ -77,7 +76,6 @@
   "Play a turn of SESSION that ends with an answer."
   (agentel-focus-test-prompt session "first prompt")
   (agentel-focus-test-chunk "agent_message_chunk" "first answer")
-  (agentel-session-set-busy session nil)
   (agentel-focus-test-prompt session "second prompt")
   (agentel-focus-test-chunk "agent_thought_chunk" "pondering")
   (agentel-focus-test-chunk "agent_message_chunk" "Let me look.")
@@ -88,7 +86,6 @@
 (ert-deftest agentel-focus-shows-the-last-prompt-and-answer-when-idle ()
   (agentel-focus-test-with-session
     (agentel-focus-test-a-finished-turn session)
-    (agentel-session-set-busy session nil)
     (let ((text (agentel-focus-test-visible)))
       (should (string-match-p "second prompt" text))
       (should (string-match-p "second answer" text))
@@ -142,7 +139,6 @@
 (ert-deftest agentel-focus-shows-errors-of-the-last-turn ()
   (agentel-focus-test-with-session
     (agentel-focus-test-prompt session "do it")
-    (agentel-session-set-busy session nil)
     (agentel-conversation-note session "Prompt failed: boom" 'error)
     (should (string-match-p "Prompt failed: boom" (agentel-focus-test-visible)))))
 
@@ -150,7 +146,6 @@
   (agentel-focus-test-with-session
     (agentel-focus-test-prompt session "do it")
     (agentel-focus-test-chunk "agent_message_chunk" "Half an answer")
-    (agentel-session-set-busy session nil)
     (agentel-conversation-note session "Turn ended: max_tokens" 'stop)
     (let ((text (agentel-focus-test-visible)))
       (should (string-match-p "Half an answer" text))
@@ -187,7 +182,6 @@
   (agentel-focus-test-with-session
     (agentel-focus-mode -1)
     (agentel-focus-test-a-finished-turn session)
-    (agentel-session-set-busy session nil)
     (agentel-focus-mode)
     (let ((text (agentel-focus-test-visible)))
       (should (string-prefix-p "❯ second prompt" text))
@@ -213,7 +207,6 @@
   (agentel-focus-test-with-session
     (agentel-focus-test-prompt session "first")
     (agentel-focus-test-tool "t1" "Read a.el")
-    (agentel-session-set-busy session nil)
     (agentel-focus-test-prompt session "second")
     (agentel-focus-test-tool "t1" "Read a.el later")
     (should-not (string-match-p "Read a\\.el" (agentel-focus-test-visible)))))
@@ -227,10 +220,16 @@
                             (agentel-focus-test-visible)))
     (agentel-focus-test-chunk "agent_message_chunk" "Some ")
     (agentel-focus-test-chunk "agent_message_chunk" "text")
-    (should (string-match-p "\\`❯ do it\n\n.*Read a\\.el\n\nSome text\n\n❯ \\'"
-                            (agentel-focus-test-visible)))
-    (agentel-session-set-busy session nil)
     (should (string-match-p "\\`❯ do it\n\nSome text\n\n❯ \\'"
+                            (agentel-focus-test-visible)))))
+
+(ert-deftest agentel-focus-shows-a-tool-call-that-ended-the-turn ()
+  (agentel-focus-test-with-session
+    (agentel-focus-test-prompt session "do it")
+    (agentel-focus-test-chunk "agent_message_chunk" "Let me look.")
+    (agentel-focus-test-tool "t1" "Read a.el")
+    (agentel-chat--finish-turn session)
+    (should (string-match-p "\\`❯ do it\n\nLet me look\\.\n\n.*Read a\\.el\n\n❯ \\'"
                             (agentel-focus-test-visible)))))
 
 (defun agentel-focus-test-random-step (session state)
@@ -238,7 +237,7 @@
 STATE is a plist of the tool calls made and the questions open."
   (let ((tools (or (plist-get state :tools) 0))
         (items (plist-get state :items)))
-    (pcase (random 9)
+    (pcase (random 8)
       (0 (agentel-focus-test-prompt session "p"))
       (1 (agentel-focus-test-chunk "agent_message_chunk" "m"))
       (2 (agentel-focus-test-chunk "agent_thought_chunk" "t"))
@@ -246,10 +245,9 @@ STATE is a plist of the tool calls made and the questions open."
       (4 (when (> tools 0)
            (agentel-focus-test-tool (format "t%d" (1+ (random tools)))
                                     (make-string (1+ (random 5)) ?u))))
-      (5 (agentel-session-set-busy session (zerop (random 2))))
-      (6 (push (agentel-focus-test-question session "Q?") items))
-      (7 (when items (agentel-session-remove-pending session (pop items))))
-      (8 (agentel-conversation-note session "n" (seq-random-elt '(error stop notice)))))
+      (5 (push (agentel-focus-test-question session "Q?") items))
+      (6 (when items (agentel-session-remove-pending session (pop items))))
+      (7 (agentel-conversation-note session "n" (seq-random-elt '(error stop notice)))))
     (list :tools tools :items items)))
 
 (ert-deftest agentel-focus-follows-changes-like-it-was-turned-on-afresh ()
@@ -272,8 +270,7 @@ CHANGE is called with the session; the fastest of a few runs counts."
     (dotimes (i turns)
       (agentel-focus-test-prompt session (format "prompt %d" i))
       (agentel-focus-test-tool (format "t%d" i) "Read x")
-      (agentel-focus-test-chunk "agent_message_chunk" "answer")
-      (agentel-session-set-busy session nil))
+      (agentel-focus-test-chunk "agent_message_chunk" "answer"))
     (agentel-focus-test-prompt session "now")
     (dotimes (i tools)
       (agentel-focus-test-tool (format "now%d" i) "Read x"))
