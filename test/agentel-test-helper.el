@@ -67,7 +67,8 @@ Return the value of PREDICATE, failing the test on timeout."
   (lambda (message _data)
     (pcase message
       ('(ask) '((waiting . t)))
-      ('(answer) '((answered . t))))))
+      ('(answer) '((answered . t)))
+      (_ (agentel-store-reject message)))))
 
 (agentel-ui-define-view 'agentel-test-question
   (lambda (_item _options) "Question"))

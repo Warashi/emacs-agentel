@@ -93,7 +93,8 @@ It is called with the item and non-nil when the item was added."
 More text makes a finished message unfinished until it ends again."
   (pcase message
     (`(chunk ,text) `((text . ,(concat (alist-get 'text data) text))))
-    ('(finish) `((text . ,(alist-get 'text data)) (finished . t)))))
+    ('(finish) `((text . ,(alist-get 'text data)) (finished . t)))
+    (_ (agentel-store-reject message))))
 
 (dolist (type '(user agent thought))
   (agentel-conversation-define type #'agentel-conversation--update-text))
@@ -102,7 +103,8 @@ More text makes a finished message unfinished until it ends again."
   (agentel-conversation-define type
     (lambda (message _data)
       (pcase message
-        (`(show ,text) `((text . ,text)))))))
+        (`(show ,text) `((text . ,text)))
+        (_ (agentel-store-reject message))))))
 
 (defun agentel-conversation--update-tool (message data)
   "Return the DATA of a tool call changed by MESSAGE.
@@ -112,7 +114,8 @@ and `output' as text."
   (pcase message
     (`(update ,fields)
      (dolist (field fields data)
-       (setf (alist-get (car field) data) (cdr field))))))
+       (setf (alist-get (car field) data) (cdr field))))
+    (_ (agentel-store-reject message))))
 
 (agentel-conversation-define 'tool #'agentel-conversation--update-tool)
 
@@ -121,7 +124,8 @@ and `output' as text."
 The message carries the list of steps, each with its `content' as text
 and its `status', one of `pending', `running' and `done'."
   (pcase message
-    (`(show ,steps) `((steps . ,steps)))))
+    (`(show ,steps) `((steps . ,steps)))
+    (_ (agentel-store-reject message))))
 
 (agentel-conversation-define 'plan #'agentel-conversation--update-plan)
 

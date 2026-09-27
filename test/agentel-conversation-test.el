@@ -156,5 +156,10 @@
       (agentel-conversation-send session 'q 'agentel-conversation-test-question '(answer))
       (should (equal changed (list session session))))))
 
+(ert-deftest agentel-conversation-items-reject-an-unknown-message ()
+  (dolist (type '(user agent thought notice error stop tool plan))
+    (should-error (funcall (alist-get type agentel-store--updates) '(forget) nil)
+                  :type 'agentel-store-unknown-message)))
+
 (provide 'agentel-conversation-test)
 ;;; agentel-conversation-test.el ends here
