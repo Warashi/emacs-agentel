@@ -9,9 +9,9 @@
 (require 'agentel-store)
 
 (agentel-store-define 'agentel-store-test-counter
-                      (lambda (message data)
-                        (pcase message
-                          (`(add ,n) `((count . ,(+ n (or (alist-get 'count data) 0))))))))
+  (lambda (message data)
+    (pcase message
+      (`(add ,n) `((count . ,(+ n (or (alist-get 'count data) 0))))))))
 
 (defun agentel-store-test-counts (store)
   "Return the counts of the models of STORE, oldest first."

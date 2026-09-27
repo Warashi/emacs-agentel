@@ -27,6 +27,7 @@
   "Define the model TYPE whose data is changed by UPDATE.
 UPDATE is a function taking a message and the data alist of a model,
 nil for a new one, and returning its new data."
+  (declare (indent 1))
   (setf (alist-get type agentel-store--updates) update))
 
 (cl-defstruct (agentel-store-model (:constructor agentel-store-model--make)
