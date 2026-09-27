@@ -62,7 +62,8 @@ options, (select CATEGORY VALUE), (start-applying) and
                                    option))
                                (alist-get 'options data))))
                  ('(start-applying) '(applying . t))
-                 ('(finish-applying) '(applying)))))
+                 ('(finish-applying) '(applying))
+                 (_ (agentel-store-reject message)))))
     (cons (cons field value) (assq-delete-all field (copy-alist data)))))
 
 (agentel-store-define 'agentel-config #'agentel-config--update)

@@ -168,5 +168,9 @@
     (agentel-config-test-settled session)
     (should-not (plist-member (agentel-config--restart-options session) :effort))))
 
+(ert-deftest agentel-config-rejects-an-unknown-message ()
+  (should-error (agentel-config--update '(forget) nil)
+                :type 'agentel-store-unknown-message))
+
 (provide 'agentel-config-test)
 ;;; agentel-config-test.el ends here
