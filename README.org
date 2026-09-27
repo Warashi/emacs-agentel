@@ -120,7 +120,8 @@ an icon names the state, and a state without an icon shows by name in
 brackets.  =agentel-ui-state-icons= changes them.
 
 =/resume= lists the earlier sessions of the directory and opens the
-chosen one with its history.  =/clear= starts a new conversation in the
+chosen one with its history, in the model, effort and mode of the
+session it was run in.  =/clear= starts a new conversation in the
 same window, buffer name, directory, model, effort and mode, and stops
 the old agent, even in the middle of a turn; =/resume= still finds the
 old conversation.

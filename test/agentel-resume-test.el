@@ -38,5 +38,30 @@
                 (agentel-test-wait-for-text "The plan was to write tests first.")))
           (kill-buffer (agentel-session-buffer resumed)))))))
 
+(ert-deftest agentel-resume-keeps-the-settings ()
+  (agentel-test-with-started session '(:model "haiku" :mode "plan")
+    (agentel-test-wait-until
+     (lambda () (equal (alist-get 'currentValue (agentel-config-option session "mode"))
+                       "plan")))
+    (let (resumed)
+      (cl-letf (((symbol-function 'completing-read)
+                 (lambda (_prompt collection &rest _)
+                   (seq-find (lambda (c) (string-match-p "Write the parser" c))
+                             (all-completions "" collection)))))
+        (agentel-commands--run session "/resume")
+        (setq resumed (agentel-test-wait-until
+                       (lambda () (agentel-session-get "old-1")))))
+      (unwind-protect
+          (progn
+            (agentel-test-wait-until
+             (lambda () (and (eq (agentel-session-state resumed) 'idle)
+                             (equal (alist-get 'currentValue
+                                               (agentel-config-option resumed "mode"))
+                                    "plan"))))
+            (should (equal (alist-get 'currentValue
+                                      (agentel-config-option resumed "model"))
+                           "haiku")))
+        (kill-buffer (agentel-session-buffer resumed))))))
+
 (provide 'agentel-resume-test)
 ;;; agentel-resume-test.el ends here

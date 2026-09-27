@@ -7,8 +7,10 @@
 
 ;; The /resume command lists the earlier sessions of the working
 ;; directory with `session/list' and opens the chosen one in a new
-;; buffer, replaying its history with `session/load'.  The agent does
-;; not offer /resume itself because its own picker is terminal only.
+;; buffer, replaying its history with `session/load'.  The resumed
+;; session takes over the settings of the session /resume was run in,
+;; as /clear does.  The agent does not offer /resume itself because
+;; its own picker is terminal only.
 
 ;;; Code:
 
@@ -19,6 +21,7 @@
 (require 'agentel-commands)
 
 (declare-function agentel-start "agentel")
+(declare-function agentel-session-restart-options "agentel")
 
 (defun agentel-resume--describe (session)
   "Return the completion candidate of the listed SESSION."
@@ -30,8 +33,8 @@
             "  "
             (or .title .sessionId))))
 
-(defun agentel-resume--choose (sessions agent cwd)
-  "Let the user choose one of SESSIONS and open it with AGENT in CWD."
+(defun agentel-resume--choose (sessions current)
+  "Let the user choose one of SESSIONS and open it as CURRENT is set."
   (let* ((candidates (mapcar (lambda (s) (cons (agentel-resume--describe s) s))
                              sessions))
          (choice (completing-read "Resume session: "
@@ -39,17 +42,18 @@
                                    (mapcar #'car candidates))
                                   nil t))
          (session (cdr (assoc choice candidates))))
-    (let ((resumed (agentel-start :cwd (or (alist-get 'cwd session) cwd)
-                                  :agent agent
-                                  :session-id (alist-get 'sessionId session))))
+    (let ((resumed (apply #'agentel-start
+                          :session-id (alist-get 'sessionId session)
+                          (append (when-let* ((cwd (alist-get 'cwd session)))
+                                    (list :cwd cwd))
+                                  (agentel-session-restart-options current)))))
       (setf (agentel-session-title resumed) (alist-get 'title session))
       (agentel-session-changed resumed)
       resumed)))
 
 (defun agentel-resume (session _args)
   "Choose an earlier session in the directory of SESSION and open it."
-  (let ((agent (agentel-session-agent session))
-        (cwd (agentel-session-cwd session)))
+  (let ((cwd (agentel-session-cwd session)))
     (agentel-connection-request
      (agentel-session-connection session) "session/list" `((cwd . ,cwd))
      :on-success
@@ -59,7 +63,7 @@
                         (alist-get 'sessions result))))
          (if sessions
              ;; Leave the process filter before reading from the minibuffer.
-             (run-at-time 0 nil #'agentel-resume--choose sessions agent cwd)
+             (run-at-time 0 nil #'agentel-resume--choose sessions session)
            (message "No other session to resume in %s" cwd))))
      :on-failure
      (lambda (error)
