@@ -58,7 +58,7 @@ into it, and `ended' with the reason once it ended.  MESSAGE is one of
                  ('(start-loading) '(loading . t))
                  ('(finish-loading) '(loading))
                  (`(end ,reason) `(ended . ,reason))
-                 (_ (error "Unknown message to a session: %S" message)))))
+                 (_ (agentel-store-reject message)))))
     (cons (cons field value) (assq-delete-all field (copy-alist data)))))
 
 (agentel-store-define 'agentel-session #'agentel-session--update)
