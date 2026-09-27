@@ -117,7 +117,8 @@ that matches no option."
     ('(decline)
      (let-alist data `((question . ,.question) (fields . ,.fields) (declined . t))))
     ('(withdraw)
-     (let-alist data `((question . ,.question) (fields . ,.fields) (withdrawn . t))))))
+     (let-alist data `((question . ,.question) (fields . ,.fields) (withdrawn . t))))
+    (_ (agentel-store-reject message))))
 
 (agentel-conversation-define 'elicitation #'agentel-elicitation--update)
 (agentel-ui-define-view 'elicitation #'agentel-elicitation--render)

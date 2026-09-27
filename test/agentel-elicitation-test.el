@@ -175,5 +175,9 @@
                                                 '(withdraw))
                  "? Pick one → withdrawn")))
 
+(ert-deftest agentel-elicitation-rejects-an-unknown-message ()
+  (should-error (agentel-elicitation--update '(forget) nil)
+                :type 'agentel-store-unknown-message))
+
 (provide 'agentel-elicitation-test)
 ;;; agentel-elicitation-test.el ends here
