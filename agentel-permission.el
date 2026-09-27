@@ -140,11 +140,26 @@ METHOD and PARAMS are those of the notification."
       (dolist (item gone)
         (remhash item agentel-permission--requests)))))
 
+(defun agentel-permission--end (session)
+  "Withdraw the requests of SESSION once it ended, as none can be answered."
+  (when (agentel-session-ended session)
+    (let (ended)
+      (maphash (lambda (item request)
+                 (when (eq (plist-get request :session) session)
+                   (push item ended)))
+               agentel-permission--requests)
+      (dolist (item ended)
+        ;; Withdrawing one tells the session it changed, which runs this
+        ;; again and may withdraw the others first.
+        (when (gethash item agentel-permission--requests)
+          (agentel-permission--close item '(withdraw)))))))
+
 (setf (alist-get "session/request_permission" agentel-connection-request-handlers
                  nil nil #'equal)
       #'agentel-permission--handle)
 (add-hook 'agentel-connection-notification-functions #'agentel-permission--withdraw)
 (add-hook 'agentel-session-changed-functions #'agentel-permission--forget)
+(add-hook 'agentel-session-changed-functions #'agentel-permission--end)
 
 (provide 'agentel-permission)
 ;;; agentel-permission.el ends here

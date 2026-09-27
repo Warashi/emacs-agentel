@@ -79,6 +79,19 @@
       (agentel-session-remove session)
       (should-not (gethash item agentel-permission--requests)))))
 
+(ert-deftest agentel-permission-is-withdrawn-when-the-agent-exits ()
+  (agentel-test-with-started session nil
+    (agentel-permission-test-ask)
+    (let ((item (seq-find (lambda (item) (eq (agentel-store-model-type item) 'permission))
+                          (agentel-conversation-items session))))
+      (delete-process (agentel-connection-process (agentel-session-connection session)))
+      (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'exited)))
+      (agentel-test-wait-for-text "Allow rm -rf build\\? → withdrawn")
+      (should-not (agentel-session-waiting-p session))
+      (cl-letf (((symbol-function 'agentel-connection-respond)
+                 (lambda (&rest _) (ert-fail "Answered over an ended connection"))))
+        (agentel-permission-choose item 0)))))
+
 (ert-deftest agentel-permission-is-withdrawn-when-the-turn-is-cancelled ()
   (agentel-test-with-started session nil
     (agentel-permission-test-ask)
