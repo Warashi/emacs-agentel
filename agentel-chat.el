@@ -147,20 +147,6 @@ transcript grows above them, so the undo history is dropped."
 
 ;;;; Transcript
 
-(defun agentel-chat-define-entry (type &rest definition)
-  "Define the entry TYPE by the plist DEFINITION.
-:update is a function taking a message and the data alist of an entry
-and returning its new data, :view a function returning the text of an
-entry, and :collapsed non-nil when a new entry starts folded."
-  (let ((view (plist-get definition :view)))
-    (apply #'agentel-ui-define type
-           :view (lambda (entry _options) (funcall view entry))
-           definition)))
-
-(defun agentel-chat-entry-get (entry key)
-  "Return the value ENTRY stores under KEY."
-  (agentel-ui-get entry key))
-
 (defun agentel-chat--finish-previous (store entry)
   "Mark the agent message before ENTRY, the last one of STORE, as complete."
   (let ((previous (cadr (agentel-ui-store-models store))))
@@ -179,12 +165,6 @@ entry, and :collapsed non-nil when a new entry starts folded."
         ;; Making the store changes nothing shown, so listeners are not told.
         (setf (alist-get 'transcript (agentel-session-alist session)) store))))
 
-(defun agentel-chat-dispatch (session key type message)
-  "Send MESSAGE to the entry of TYPE stored under KEY in SESSION's transcript.
-Without such an entry, one is added to the end of the transcript, so
-a nil KEY adds one every time.  Return the entry."
-  (agentel-ui-dispatch (agentel-chat-transcript session) key type message))
-
 (defun agentel-chat-finish-message (session)
   "Mark the agent message at the end of the transcript of SESSION as complete."
   (let* ((store (agentel-chat-transcript session))
@@ -196,7 +176,8 @@ a nil KEY adds one every time.  Return the entry."
 (defun agentel-chat-notice (session text &optional type)
   "Add the notice TEXT to the transcript of SESSION.
 TYPE is `error' for errors and `stop' for why a turn ended early."
-  (agentel-chat-dispatch session nil (or type 'notice) `(show ,text)))
+  (agentel-ui-dispatch (agentel-chat-transcript session)
+                       nil (or type 'notice) `(show ,text)))
 
 ;;;; Entries
 
@@ -450,16 +431,17 @@ tells it; a title cut short there shows in full on top of the output."
 
 (defun agentel-chat--on-update (session update)
   "Show UPDATE of SESSION in its transcript."
-  (pcase (alist-get 'sessionUpdate update)
-    ("agent_message_chunk" (agentel-chat--text-chunk session 'agent update))
-    ("agent_thought_chunk" (agentel-chat--text-chunk session 'thought update))
-    ("user_message_chunk" (agentel-chat--text-chunk session 'user update))
-    ((or "tool_call" "tool_call_update")
-     (agentel-chat-dispatch session (cons 'tool (alist-get 'toolCallId update))
+  (let ((store (agentel-chat-transcript session)))
+    (pcase (alist-get 'sessionUpdate update)
+      ("agent_message_chunk" (agentel-chat--text-chunk session 'agent update))
+      ("agent_thought_chunk" (agentel-chat--text-chunk session 'thought update))
+      ("user_message_chunk" (agentel-chat--text-chunk session 'user update))
+      ((or "tool_call" "tool_call_update")
+       (agentel-ui-dispatch store (cons 'tool (alist-get 'toolCallId update))
                             'tool `(update ,update)))
-    ;; A plan replaces the previous one.
-    ("plan" (agentel-chat-dispatch session 'plan 'plan
-                                   `(show ,(alist-get 'entries update))))))
+      ;; A plan replaces the previous one.
+      ("plan" (agentel-ui-dispatch store 'plan 'plan
+                                   `(show ,(alist-get 'entries update)))))))
 
 (add-hook 'agentel-session-update-functions #'agentel-chat--on-update)
 
@@ -537,7 +519,7 @@ tells it; a title cut short there shows in full on top of the output."
       (agentel-chat--set-input "")
       (unless (run-hook-with-args-until-success 'agentel-chat-send-functions
                                                 session text)
-        (agentel-chat-dispatch session nil 'user `(chunk ,text))
+        (agentel-ui-dispatch (agentel-chat-transcript session) nil 'user `(chunk ,text))
         (agentel-chat--prompt session text)))))
 
 (defun agentel-chat-cancel ()

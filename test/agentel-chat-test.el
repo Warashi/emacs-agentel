@@ -34,28 +34,28 @@
   "Return the transcript of the current chat buffer as plain text."
   (buffer-substring-no-properties (point-min) agentel-chat--transcript-end))
 
-(agentel-chat-define-entry 'agentel-chat-test-counter
+(agentel-ui-define 'agentel-chat-test-counter
   :update (lambda (msg model)
             (pcase msg
               (`(add ,n) `((count . ,(+ n (or (alist-get 'count model) 0)))))))
-  :view (lambda (entry) (format "count %s" (agentel-chat-entry-get entry 'count))))
+  :view (lambda (entry _options) (format "count %s" (agentel-ui-get entry 'count))))
 
-(ert-deftest agentel-chat-dispatch-keeps-one-entry-per-key ()
+(defun agentel-chat-test-count (session key n)
+  "Send the counter under KEY in the transcript of SESSION the message to add N."
+  (agentel-ui-dispatch (agentel-chat-transcript session) key 'agentel-chat-test-counter
+                       `(add ,n)))
+
+(ert-deftest agentel-chat-shows-a-changed-entry-in-place ()
   (agentel-chat-test-with-session
-    (agentel-chat-dispatch session 'c 'agentel-chat-test-counter '(add 1))
-    (agentel-chat-dispatch session 'c 'agentel-chat-test-counter '(add 2))
-    (should (equal (agentel-chat-test-transcript) "count 3"))))
+    (agentel-chat-test-count session 'c 1)
+    (agentel-chat-test-count session 'd 1)
+    (agentel-chat-test-count session 'c 2)
+    (should (equal (agentel-chat-test-transcript) "count 3\n\ncount 1"))))
 
-(ert-deftest agentel-chat-dispatch-without-a-key-adds-an-entry-each-time ()
-  (agentel-chat-test-with-session
-    (agentel-chat-dispatch session nil 'agentel-chat-test-counter '(add 1))
-    (agentel-chat-dispatch session nil 'agentel-chat-test-counter '(add 2))
-    (should (equal (agentel-chat-test-transcript) "count 1\n\ncount 2"))))
-
-(ert-deftest agentel-chat-dispatch-goes-to-the-buffer-of-the-session ()
+(ert-deftest agentel-chat-shows-the-transcript-in-the-buffer-of-the-session ()
   (agentel-chat-test-with-session
     (with-temp-buffer
-      (agentel-chat-dispatch session 'c 'agentel-chat-test-counter '(add 1)))
+      (agentel-chat-test-count session 'c 1))
     (should (equal (agentel-chat-test-transcript) "count 1"))))
 
 (ert-deftest agentel-chat-keeps-the-transcript-while-the-session-has-no-buffer ()

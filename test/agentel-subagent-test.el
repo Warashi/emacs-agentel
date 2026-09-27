@@ -116,7 +116,8 @@
 (ert-deftest agentel-subagent-item-shows-the-activity-on-one-line ()
   (let* ((child (agentel-subagent-test-busy-child))
          (text (agentel-subagent--render
-                (agentel-ui-model--make :data `((child . ,child))))))
+                (agentel-ui-model--make :data `((child . ,child)))
+                nil)))
     (should (string-suffix-p "\n    ↳ make all…" (substring-no-properties text)))))
 
 (ert-deftest agentel-subagent-pin-shows-the-activity-on-one-line ()

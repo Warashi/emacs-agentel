@@ -143,7 +143,7 @@
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
     (goto-char (point-min))
     (search-forward "The plan was")
-    (should (agentel-chat-entry-get (agentel-chat-entry-at) 'finished))
+    (should (agentel-ui-get (agentel-chat-entry-at) 'finished))
     (should-not (save-excursion (goto-char (point-min))
                                 (search-forward "Replayed subagent" nil t)))))
 

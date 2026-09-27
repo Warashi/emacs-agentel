@@ -105,9 +105,9 @@
                    value))))
      content "; ")))
 
-(defun agentel-elicitation--render (entry)
+(defun agentel-elicitation--render (entry _options)
   "Render the form ENTRY."
-  (let* ((item (agentel-chat-entry-get entry 'item))
+  (let* ((item (agentel-ui-get entry 'item))
          (message (or (alist-get 'message (plist-get item :params)) "Question"))
          (outcome (plist-get item :outcome)))
     (if outcome
@@ -127,7 +127,7 @@
        " "
        (buttonize "[Decline]" (lambda (_) (agentel-elicitation-decline item)))))))
 
-(agentel-chat-define-entry 'elicitation
+(agentel-ui-define 'elicitation
   :update (lambda (message _data)
             (pcase message
               (`(show ,item) `((item . ,item)))))
@@ -135,9 +135,9 @@
 
 (defun agentel-elicitation--show (item)
   "Show the state of the form ITEM in its session buffer."
-  (agentel-chat-dispatch (plist-get item :session)
-                         (cons 'elicitation (plist-get item :id))
-                         'elicitation `(show ,item)))
+  (agentel-ui-dispatch (agentel-chat-transcript (plist-get item :session))
+                       (cons 'elicitation (plist-get item :id))
+                       'elicitation `(show ,item)))
 
 ;;;; Answering
 

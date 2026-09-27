@@ -41,9 +41,9 @@
   "RET" #'agentel-subagent-open
   "<mouse-1>" #'agentel-subagent-open)
 
-(defun agentel-subagent--render (entry)
+(defun agentel-subagent--render (entry _options)
   "Render the subagent item ENTRY of a parent transcript."
-  (let* ((child (agentel-chat-entry-get entry 'child))
+  (let* ((child (agentel-ui-get entry 'child))
          (activity (agentel-session-data child 'subagent-activity)))
     (propertize
      (concat "⎇ "
@@ -99,7 +99,7 @@ subagents of the session read from the minibuffer."
   "Return the pinned lines of the running subagents of SESSION."
   (mapcar #'agentel-subagent--pin-line (agentel-subagent--running session)))
 
-(agentel-chat-define-entry 'subagent
+(agentel-ui-define 'subagent
   :update (lambda (message _data)
             (pcase message
               (`(show ,child) `((child . ,child)))))
@@ -107,9 +107,9 @@ subagents of the session read from the minibuffer."
 
 (defun agentel-subagent--show (child)
   "Show the state of CHILD as an item of its parent's transcript."
-  (agentel-chat-dispatch (agentel-session-parent child)
-                         (cons 'subagent (agentel-session-id child))
-                         'subagent `(show ,child)))
+  (agentel-ui-dispatch (agentel-chat-transcript (agentel-session-parent child))
+                       (cons 'subagent (agentel-session-id child))
+                       'subagent `(show ,child)))
 
 (defun agentel-subagent--spawn (parent update)
   "Create the subagent announced by UPDATE under PARENT."

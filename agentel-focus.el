@@ -60,8 +60,8 @@ The overlay is nil while the entry is shown.")
 
 (defun agentel-focus--waits-p (entry)
   "Return non-nil if ENTRY shows something owing an answer."
-  (let ((item (agentel-chat-entry-get entry 'item))
-        (child (agentel-chat-entry-get entry 'child)))
+  (let ((item (agentel-ui-get entry 'item))
+        (child (agentel-ui-get entry 'child)))
     (or (and item agentel-chat--session
              (memq item (agentel-session-pending agentel-chat--session)))
         (and child (agentel-session-pending-items child)))))
@@ -102,8 +102,8 @@ MOVED means its text changed, so a hidden entry is covered again."
   (pcase (agentel-ui-model-type entry)
     ('agent (setq agentel-focus--last-message entry))
     ((or 'thought 'tool) (setq agentel-focus--last-activity entry)))
-  (when (or (agentel-chat-entry-get entry 'item)
-            (agentel-chat-entry-get entry 'child))
+  (when (or (agentel-ui-get entry 'item)
+            (agentel-ui-get entry 'child))
     (push entry agentel-focus--askers)))
 
 (defun agentel-focus--refresh ()
