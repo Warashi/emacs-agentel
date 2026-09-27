@@ -191,8 +191,10 @@ in one place for all, so a feature still goes with its file.  When the
 agent asks a question, its item holds the question and its choices,
 and the feature keeps what it needs to reply keyed by the item, as the
 ids of requests are only unique in their connection.  The view hands the
-item to the feature when the user answers, and the feature replies to
-the agent and tells the item the answer.
+item to the feature when the user answers, as does
+=agentel-chat-answer= through the function the feature defines for the
+type of the item, and the feature replies to the agent and tells the
+item the answer.
 
 The conversation of a session (=agentel-conversation.el=) is such a
 store, built from the updates of the agent and kept by the session.

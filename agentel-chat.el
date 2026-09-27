@@ -397,15 +397,33 @@ full on top of the output."
                    (cycle-sort-function . identity))
       (complete-with-action action candidates string predicate))))
 
+(defvar agentel-chat--answers nil
+  "Alist of item types and the functions that answer them.")
+
+(defun agentel-chat-define-answer (type function)
+  "Answer the items of TYPE with FUNCTION when the user asks to.
+FUNCTION is called with the item and asks the user how to answer it."
+  (declare (indent 1))
+  (setf (alist-get type agentel-chat--answers) function))
+
+(defun agentel-chat--questions (session)
+  "Return the questions of SESSION and of its subagents, oldest session first.
+They are the items waiting for an answer that can be answered."
+  (append (seq-filter (lambda (item)
+                        (and (agentel-store-get item 'waiting)
+                             (alist-get (agentel-store-model-type item)
+                                        agentel-chat--answers)))
+                      (agentel-conversation-items session))
+          (mapcan #'agentel-chat--questions (agentel-session-children session))))
+
 (defun agentel-chat-answer ()
-  "Answer the oldest question of this session or of its subagents.
-Questions are the pending items of sessions, plists whose :answer is a
-command that asks the user and replies to the agent."
+  "Answer the oldest question of this session or of its subagents."
   (interactive)
-  (let ((pending (agentel-session-pending-items agentel-chat--session)))
-    (unless pending
+  (let ((question (car (agentel-chat--questions agentel-chat--session))))
+    (unless question
       (user-error "No question is waiting for an answer"))
-    (funcall (plist-get (cdar pending) :answer))))
+    (funcall (alist-get (agentel-store-model-type question) agentel-chat--answers)
+             question)))
 
 (defun agentel-chat-goto-input ()
   "Move point to the end of the input area."

@@ -401,15 +401,58 @@
       (should (string-match-p "ctx 12%%\\'"
                               (eval (cadr header-line-format) t))))))
 
-(ert-deftest agentel-chat-answer-runs-the-oldest-question ()
+(agentel-conversation-define 'agentel-chat-test-question
+  (lambda (msg _data)
+    (pcase msg
+      (`(ask ,text) `((text . ,text) (waiting . t)))
+      ('(answer) nil))))
+
+(agentel-ui-define-view 'agentel-chat-test-question
+  (lambda (item _options) (agentel-store-get item 'text)))
+
+(defvar agentel-chat-test-answered nil
+  "Texts of the questions answered, last first.")
+
+(agentel-chat-define-answer 'agentel-chat-test-question
+  (lambda (item) (push (agentel-store-get item 'text) agentel-chat-test-answered)))
+
+(defun agentel-chat-test-ask (session text)
+  "Ask the question TEXT in SESSION."
+  (agentel-conversation-send session text 'agentel-chat-test-question `(ask ,text)))
+
+(ert-deftest agentel-chat-answer-answers-the-oldest-question ()
   (agentel-chat-test-with-session
-    (let (answered)
-      (agentel-session-add-pending
-       session (list :answer (lambda () (push 'first answered))))
-      (agentel-session-add-pending
-       session (list :answer (lambda () (push 'second answered))))
+    (let ((agentel-chat-test-answered nil))
+      (agentel-chat-test-ask session "first")
+      (agentel-chat-test-ask session "second")
       (agentel-chat-answer)
-      (should (equal answered '(first))))))
+      (should (equal agentel-chat-test-answered '("first"))))))
+
+(ert-deftest agentel-chat-answer-skips-answered-questions ()
+  (agentel-chat-test-with-session
+    (let ((agentel-chat-test-answered nil))
+      (agentel-chat-test-ask session "first")
+      (agentel-conversation-send session "first" 'agentel-chat-test-question '(answer))
+      (agentel-chat-test-ask session "second")
+      (agentel-chat-answer)
+      (should (equal agentel-chat-test-answered '("second"))))))
+
+(ert-deftest agentel-chat-answer-answers-the-session-before-its-subagents ()
+  (agentel-chat-test-with-session
+    (let ((agentel-chat-test-answered nil)
+          (child (agentel-session-create :parent session)))
+      (agentel-chat-test-ask child "child")
+      (agentel-chat-test-ask session "parent")
+      (agentel-chat-answer)
+      (should (equal agentel-chat-test-answered '("parent"))))))
+
+(ert-deftest agentel-chat-answer-answers-a-subagent ()
+  (agentel-chat-test-with-session
+    (let ((agentel-chat-test-answered nil)
+          (child (agentel-session-create :parent session)))
+      (agentel-chat-test-ask child "child")
+      (agentel-chat-answer)
+      (should (equal agentel-chat-test-answered '("child"))))))
 
 (ert-deftest agentel-chat-answer-without-questions-is-a-user-error ()
   (agentel-chat-test-with-session

@@ -87,6 +87,8 @@ when the agent no longer asks."
     (when-let* ((n (seq-position choices choice)))
       (agentel-permission-choose item n))))
 
+(agentel-chat-define-answer 'permission #'agentel-permission--ask)
+
 (defun agentel-permission--close (item message)
   "Stop waiting for an answer to ITEM and send MESSAGE to it."
   (let ((request (gethash item agentel-permission--requests)))
@@ -110,8 +112,7 @@ when the agent no longer asks."
                                    options))))
              (request (list :connection connection :id id :session session
                             :options (mapcar (lambda (o) (alist-get 'optionId o))
-                                             options)
-                            :answer (lambda () (agentel-permission--ask item)))))
+                                             options))))
         (puthash item request agentel-permission--requests)
         (agentel-session-add-pending session request))
     (agentel-connection-respond connection id '((outcome . ((outcome . "cancelled")))))))

@@ -182,6 +182,8 @@ VALUES and OTHERS are as in `agentel-elicitation--update'."
   (let ((answers (agentel-elicitation--read (agentel-store-get item 'fields))))
     (agentel-elicitation-answer item (car answers) (cdr answers))))
 
+(agentel-chat-define-answer 'elicitation #'agentel-elicitation--ask)
+
 ;;;; Protocol
 
 (defun agentel-elicitation--custom-for (property)
@@ -293,8 +295,7 @@ They are as in `agentel-elicitation--update'."
                                      (seq-remove #'agentel-elicitation--custom-for
                                                  properties)))))
                (request (list :connection connection :id id :session session
-                              :custom custom
-                              :answer (lambda () (agentel-elicitation--ask item)))))
+                              :custom custom)))
           (puthash item request agentel-elicitation--requests)
           (agentel-session-add-pending session request))
       (agentel-connection-respond connection id '((action . "decline"))))))
