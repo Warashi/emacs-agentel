@@ -171,6 +171,16 @@ Each feature is one file that hooks into the session registry
 session buffer (=agentel-chat.el=), so it can be removed by deleting
 the file and its =require= in =agentel.el=.
 
+What is shown is written in the way of Elm (=agentel-ui.el=).  A type
+of model defines how a message changes its data (=:update=) and how
+the data looks (=:view=), and both depend on nothing else: values from
+outside, such as the state of a session or the width of the window,
+come in messages or in the options of the view.  A store keeps the
+models of one thing, such as the transcript of a session or the
+session list, and presentations subscribe to it and put the views in a
+buffer.  The transcript is kept by its session, so a subagent buffer
+opened again after it was killed shows its earlier output.
+
 * Development
 
 =nix develop= provides an Emacs with the dependencies listed in the
