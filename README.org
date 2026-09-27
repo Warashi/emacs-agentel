@@ -196,7 +196,10 @@ item to the feature when the user answers, as does
 type of the item, and the feature replies to the agent and tells the
 item the answer.  A session waits for the user while an item of its
 conversation, or of the conversation of a subagent, waits for an
-answer; nothing else keeps that.
+answer; nothing else keeps that.  In the same way a session runs during
+a turn or while a feature says it works for it, such as loading an
+earlier session, applying the start options or a subagent at work; each
+keeps that itself and answers =agentel-session-running-functions=.
 
 The conversation of a session (=agentel-conversation.el=) is such a
 store, built from the updates of the agent and kept by the session.
