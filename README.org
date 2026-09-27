@@ -141,9 +141,9 @@ extension, which agentel advertises.
 
 =agentel-focus-mode= hides everything the next input does not need.
 It leaves the last prompt, the questions still open, errors and why
-the turn ended, together with the last agent message and, while the
-turn runs, the latest thought or tool call.  To open
-every session this way:
+the turn ended, together with the last agent message and the latest
+thought or tool call when it came after that message.  To open every
+session this way:
 
 #+begin_src emacs-lisp
 (add-hook 'agentel-chat-mode-hook #'agentel-focus-mode)
