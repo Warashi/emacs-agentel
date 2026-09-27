@@ -48,40 +48,87 @@
 (defvar agentel-list--refresh-timer nil
   "Timer that refreshes the list after sessions changed.")
 
-(defvar agentel-list--busy (make-hash-table :test 'eq :weakness 'key)
-  "Whether each session was working on a turn when it last changed.")
-
-(defvar agentel-list--unread (make-hash-table :test 'eq :weakness 'key)
-  "Sessions whose turn ended while their buffer was out of sight.")
-
 (defun agentel-list--shown-p (session)
   "Return non-nil when the buffer of SESSION is in a visible window."
   (when-let* ((buffer (agentel-session-buffer session)))
     (get-buffer-window buffer 'visible)))
 
-(defun agentel-list--track-unread (session)
-  "Mark SESSION unread when its turn ended out of sight.
-The previous busy value is kept here rather than with
-`agentel-session-data', whose setter would run this hook again."
-  (let ((busy (agentel-session-busy session)))
-    (when (and (gethash session agentel-list--busy)
-               (not busy)
-               (not (agentel-session-parent session))
-               (not (agentel-list--shown-p session)))
-      (puthash session t agentel-list--unread))
-    (puthash session busy agentel-list--busy)))
+;;;; Model
+
+(defun agentel-list--see (sessions seen)
+  "Return SESSIONS with SEEN in place of what was seen of its session.
+A session no longer live is left out, and a new one goes last."
+  (let ((session (plist-get seen :session)))
+    (cond ((not (plist-get seen :live))
+           (seq-remove (lambda (entry) (eq (car entry) session)) sessions))
+          ((assq session sessions)
+           (mapcar (lambda (entry)
+                     (if (eq (car entry) session) (cons session seen) entry))
+                   sessions))
+          (t (append sessions (list (cons session seen)))))))
+
+(defun agentel-list--ended-out-of-sight-p (before seen)
+  "Return non-nil if the turn of a top-level session ended out of sight.
+BEFORE and SEEN are what was seen of it before and now."
+  (and (plist-get seen :live)
+       (plist-get before :busy)
+       (not (plist-get seen :busy))
+       (not (plist-get seen :parent))
+       (not (plist-get seen :shown))))
+
+(defun agentel-list--update (message data)
+  "Return the DATA of the list changed by MESSAGE.
+DATA has the sessions, each with what was seen of it last, oldest
+first, and the unread sessions: top-level ones whose turn ended while
+their buffer was out of sight, until they are shown again."
+  (let-alist data
+    (pcase message
+      (`(changed ,seen)
+       (let ((session (plist-get seen :session)))
+         `((sessions . ,(agentel-list--see .sessions seen))
+           (unread . ,(cond ((not (plist-get seen :live)) (remq session .unread))
+                            ((and (agentel-list--ended-out-of-sight-p
+                                   (alist-get session .sessions) seen)
+                                  (not (memq session .unread)))
+                             (cons session .unread))
+                            (t .unread))))))
+      (`(shown ,sessions)
+       `((sessions . ,.sessions)
+         (unread . ,(seq-remove (lambda (session) (memq session sessions))
+                                .unread)))))))
+
+(agentel-ui-define 'agentel-list
+  :update #'agentel-list--update)
+
+(defvar agentel-list--store (agentel-ui-store-create)
+  "Store of the list, whose one model is under the key `sessions'.")
+
+(defun agentel-list--data (key)
+  "Return the value the data of the list has under KEY."
+  (when-let* ((model (agentel-ui-find agentel-list--store 'sessions)))
+    (agentel-ui-get model key)))
+
+(defun agentel-list--send (message)
+  "Send MESSAGE to the model of the list."
+  (agentel-ui-dispatch agentel-list--store 'sessions 'agentel-list message))
+
+(defun agentel-list--on-changed (session)
+  "Tell the list what is seen of SESSION now that it changed."
+  (agentel-list--send
+   `(changed (:session ,session
+                       :live ,(and (memq session (agentel-session-list)) t)
+                       :parent ,(agentel-session-parent session)
+                       :busy ,(agentel-session-busy session)
+                       :shown ,(and (agentel-list--shown-p session) t)))))
 
 (defun agentel-list--forget-shown (_frame)
-  "Unmark the unread sessions whose buffer is now shown."
-  (let (seen)
-    (maphash (lambda (session _)
-               (when (agentel-list--shown-p session)
-                 (push session seen)))
-             agentel-list--unread)
-    (when seen
-      (dolist (session seen)
-        (remhash session agentel-list--unread))
-      (agentel-list--schedule-refresh))))
+  "Tell the list which of the unread sessions are now shown."
+  (when-let* ((seen (seq-filter #'agentel-list--shown-p
+                                (agentel-list--data 'unread))))
+    (agentel-list--send `(shown ,seen))
+    (agentel-list--schedule-refresh)))
+
+;;;; Buffer
 
 (defun agentel-list--insert-session (session depth)
   "Insert the lines of SESSION and its subagents indented by DEPTH.
@@ -90,7 +137,7 @@ at the end of a long line in a narrow window.  A top-level session
 shows its project, or its directory outside of one, and then its
 title; a subagent has no project of its own and shows only its title."
   (let ((start (point)))
-    (insert (if (gethash session agentel-list--unread)
+    (insert (if (memq session (agentel-list--data 'unread))
                 (propertize "●" 'face 'agentel-list-unread-face)
               " ")
             " ")
@@ -111,7 +158,7 @@ title; a subagent has no project of its own and shows only its title."
 (defun agentel-list--rank (session)
   "Return where SESSION goes in the list, lower first."
   (cond ((eq (agentel-session-state session) 'waiting) 0)
-        ((gethash session agentel-list--unread) 1)
+        ((memq session (agentel-list--data 'unread)) 1)
         (t 2)))
 
 (defun agentel-list--roots ()
@@ -283,7 +330,7 @@ this command is the way in and out of it."
                                     (no-delete-other-windows . t)))))))))
 
 (keymap-set agentel-chat-mode-map "C-c C-l" #'agentel-list)
-(add-hook 'agentel-session-changed-functions #'agentel-list--track-unread)
+(add-hook 'agentel-session-changed-functions #'agentel-list--on-changed)
 (add-hook 'agentel-session-changed-functions #'agentel-list--schedule-refresh)
 (add-hook 'window-buffer-change-functions #'agentel-list--forget-shown)
 

@@ -12,7 +12,8 @@
   "Run BODY with a parent `parent', its child `child' and another `other'."
   (declare (indent 0))
   `(let ((agentel-session--registry nil)
-         (agentel-session-changed-functions (list #'agentel-list--track-unread
+         (agentel-list--store (agentel-ui-store-create))
+         (agentel-session-changed-functions (list #'agentel-list--on-changed
                                                   #'agentel-list--schedule-refresh)))
      (let* ((parent (agentel-session-create :cwd "/tmp/one/" :project "repo-one"))
             (other (agentel-session-create :cwd "/tmp/two/"))
@@ -31,6 +32,67 @@
          (dolist (s (list parent child other))
            (kill-buffer (agentel-session-buffer s)))
          (kill-buffer agentel-list-buffer-name)))))
+
+(defun agentel-list-test-after (&rest messages)
+  "Return the data of the list after MESSAGES, starting with no session."
+  (let (data)
+    (dolist (message messages data)
+      (setq data (agentel-list--update message data)))))
+
+(defun agentel-list-test-seen (session &rest properties)
+  "Return the message that SESSION was seen as PROPERTIES say."
+  `(changed ,(append (list :session session :live t) properties)))
+
+(ert-deftest agentel-list-update-marks-a-turn-that-ended-out-of-sight ()
+  (should (equal (alist-get 'unread (agentel-list-test-after
+                                     (agentel-list-test-seen 'a :busy t)
+                                     (agentel-list-test-seen 'a :busy nil)))
+                 '(a))))
+
+(ert-deftest agentel-list-update-does-not-mark-a-turn-that-ended-in-sight ()
+  (should-not (alist-get 'unread (agentel-list-test-after
+                                  (agentel-list-test-seen 'a :busy t)
+                                  (agentel-list-test-seen 'a :busy nil :shown t)))))
+
+(ert-deftest agentel-list-update-does-not-mark-a-subagent ()
+  (should-not (alist-get 'unread (agentel-list-test-after
+                                  (agentel-list-test-seen 'c :busy t :parent 'p)
+                                  (agentel-list-test-seen 'c :busy nil :parent 'p)))))
+
+(ert-deftest agentel-list-update-does-not-mark-a-session-that-was-not-busy ()
+  (should-not (alist-get 'unread (agentel-list-test-after
+                                  (agentel-list-test-seen 'a :busy nil)
+                                  (agentel-list-test-seen 'a :busy nil)))))
+
+(ert-deftest agentel-list-update-unmarks-sessions-once-shown ()
+  (should (equal (alist-get 'unread (agentel-list-test-after
+                                     (agentel-list-test-seen 'a :busy t)
+                                     (agentel-list-test-seen 'b :busy t)
+                                     (agentel-list-test-seen 'a :busy nil)
+                                     (agentel-list-test-seen 'b :busy nil)
+                                     '(shown (a))))
+                 '(b))))
+
+(ert-deftest agentel-list-update-keeps-sessions-in-the-order-they-appeared ()
+  (let ((data (agentel-list-test-after (agentel-list-test-seen 'a)
+                                       (agentel-list-test-seen 'b)
+                                       (agentel-list-test-seen 'a :busy t))))
+    (should (equal (mapcar #'car (alist-get 'sessions data)) '(a b)))))
+
+(ert-deftest agentel-list-update-forgets-a-removed-session ()
+  (let ((data (agentel-list-test-after
+               (agentel-list-test-seen 'a :busy t)
+               (agentel-list-test-seen 'a :busy nil)
+               '(changed (:session a :live nil)))))
+    (should-not (alist-get 'sessions data))
+    (should-not (alist-get 'unread data))))
+
+(ert-deftest agentel-list-update-leaves-the-data-it-was-given-alone ()
+  (let* ((before (agentel-list-test-after (agentel-list-test-seen 'a :busy t)))
+         (copy (copy-tree before)))
+    (agentel-list--update (agentel-list-test-seen 'a :busy nil) before)
+    (agentel-list--update '(shown (a)) before)
+    (should (equal before copy))))
 
 (defun agentel-list-test-lines ()
   "Return the lines of the list."
