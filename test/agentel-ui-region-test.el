@@ -110,6 +110,33 @@ The buffer ends with the text \"END\" after the region."
       (agentel-ui-region-render region (list a b c))
       (should (equal (agentel-ui-region-test-text) "one\n\ntwo\n\nfourEND")))))
 
+(defun agentel-ui-region-test-edits (function)
+  "Return how many times FUNCTION changes the text of the current buffer."
+  (let ((edits 0))
+    (let ((after-change-functions (list (lambda (&rest _) (setq edits (1+ edits))))))
+      (funcall function))
+    edits))
+
+(ert-deftest agentel-ui-region-leaves-out-and-puts-back-models-in-runs ()
+  (agentel-ui-region-test-with-region
+    (let* ((models (mapcar (lambda (i) (agentel-ui-region-test-note store i (format "n%d" i)))
+                           (number-sequence 1 100)))
+           (few (list (nth 0 models) (nth 50 models) (nth 99 models))))
+      (agentel-ui-region-render region models)
+      (let ((all (agentel-ui-region-test-text)))
+        (should (<= (agentel-ui-region-test-edits
+                     (lambda () (agentel-ui-region-render region few)))
+                    2))
+        (should (equal (agentel-ui-region-test-text) "n1\n\nn51\n\nn100END"))
+        (should (<= (agentel-ui-region-test-edits
+                     (lambda () (agentel-ui-region-render region models)))
+                    2))
+        (should (equal (agentel-ui-region-test-text) all))
+        (agentel-store-update store (nth 49 models) '(show "changed"))
+        (agentel-ui-region-render region models)
+        (should (string-match-p "\n\nn49\n\nchanged\n\nn51\n\n"
+                                (agentel-ui-region-test-text)))))))
+
 (ert-deftest agentel-ui-region-moves-a-model-drawn-out-of-order ()
   (agentel-ui-region-test-with-region
     (let ((a (agentel-ui-region-test-note store 'a "one"))

@@ -92,12 +92,14 @@ FIRST says whether it is the first model now, WIDTH the line width."
                                (agentel-ui-region--property region) nil
                                (marker-position (agentel-ui-region--end region))))
 
-(defun agentel-ui-region--insert (region drawing pos first width)
-  "Draw DRAWING of REGION at POS, as the first model if FIRST, in WIDTH."
+(defun agentel-ui-region--text (region drawing first width)
+  "Return the text of DRAWING of REGION, as the first model if FIRST, in WIDTH.
+DRAWING records how it is drawn."
   (let* ((model (agentel-ui-region--drawing-model drawing))
-         (collapsed (agentel-ui-region--collapsed-p region model))
          (text (concat (if first "" "\n\n")
-                       (agentel-ui-view model :collapsed collapsed :width width))))
+                       (agentel-ui-view model
+                                        :collapsed (agentel-ui-region--collapsed-p region model)
+                                        :width width))))
     (add-text-properties 0 (length text)
                          (list (agentel-ui-region--property region) model
                                'read-only t
@@ -109,13 +111,21 @@ FIRST says whether it is the first model now, WIDTH the line width."
           (agentel-ui-region--drawing-fits drawing)
           (text-property-any 0 (length text) 'agentel-ui-fits-width t text)
           (agentel-ui-region--drawing-first drawing) first)
-    (save-excursion
-      (goto-char pos)
-      (insert text))
-    ;; The start advances over the text inserted at it.
-    (if-let* ((start (agentel-ui-region--drawing-start drawing)))
-        (set-marker start pos)
-      (setf (agentel-ui-region--drawing-start drawing) (copy-marker pos t)))))
+    text))
+
+(defun agentel-ui-region--insert (drawings texts pos)
+  "Insert TEXTS, the texts of DRAWINGS in order, at POS."
+  (save-excursion
+    (goto-char pos)
+    (insert (apply #'concat texts)))
+  ;; The starts advance over the text inserted at them.
+  (let ((at pos))
+    (cl-mapc (lambda (drawing text)
+               (if-let* ((start (agentel-ui-region--drawing-start drawing)))
+                   (set-marker start at)
+                 (setf (agentel-ui-region--drawing-start drawing) (copy-marker at t)))
+               (setq at (+ at (length text))))
+             drawings texts)))
 
 (defun agentel-ui-region--delete (region drawing)
   "Remove the text of DRAWING from REGION."
@@ -127,52 +137,74 @@ FIRST says whether it is the first model now, WIDTH the line width."
 Point in its text stays where it was in the text."
   (let* ((start (marker-position (agentel-ui-region--drawing-start drawing)))
          (end (agentel-ui-region--text-end region drawing))
-         (offset (and (<= start (point)) (< (point) end) (- (point) start))))
+         (offset (and (<= start (point)) (< (point) end) (- (point) start)))
+         (text (agentel-ui-region--text region drawing first width)))
     (agentel-ui-region--delete region drawing)
-    (agentel-ui-region--insert region drawing start first width)
+    (agentel-ui-region--insert (list drawing) (list text) start)
     (when offset
       (goto-char (min (+ start offset) (agentel-ui-region--text-end region drawing))))))
 
 (defun agentel-ui-region--rearrange (region drawings models first width)
   "Show MODELS in REGION in place of DRAWINGS, the rest of what it shows.
 FIRST says whether the first of them is the first model, WIDTH is the
-line width.  Return the drawings of MODELS."
+line width.  Return the drawings of MODELS.
+
+Every change of the buffer moves all its markers, so the models left
+out next to each other are removed at once, and so are the new models
+next to each other inserted."
   (let ((index (agentel-ui-region--index region))
+        (end (agentel-ui-region--end region))
         (wanted (make-hash-table :test 'eq :size (length models)))
-        kept)
+        kept gone pending texts)
     (dolist (model models)
       (puthash model t wanted))
+    ;; The markers of the drawings left out are not detached, which
+    ;; would walk all the markers of the buffer for each of them.
     (dolist (drawing drawings)
-      (if (gethash (agentel-ui-region--drawing-model drawing) wanted)
-          (push drawing kept)
-        (agentel-ui-region--delete region drawing)
-        (set-marker (agentel-ui-region--drawing-start drawing) nil)
-        (remhash (agentel-ui-region--drawing-model drawing) index)))
+      (let ((model (agentel-ui-region--drawing-model drawing)))
+        (cond ((gethash model wanted)
+               (when gone
+                 (delete-region gone (agentel-ui-region--drawing-start drawing))
+                 (setq gone nil))
+               (push drawing kept))
+              (t
+               (unless gone
+                 (setq gone (marker-position (agentel-ui-region--drawing-start drawing))))
+               (remhash model index)))))
+    (when gone
+      (delete-region gone end))
     (setq kept (nreverse kept))
-    (mapcar
-      (lambda (model)
-        (let ((drawing (gethash model index)))
-          (cond
-           ((and drawing (eq drawing (car kept)))
-            (pop kept)
-            (when (agentel-ui-region--stale-p drawing first width)
-              (agentel-ui-region--redraw region drawing first width)))
-           (t
-            (when drawing
-              ;; Drawn out of order, so it moves here.
-              (agentel-ui-region--delete region drawing)
-              (setq kept (delq drawing kept)))
-            (setq drawing (or drawing (make-agentel-ui-region--drawing :model model)))
-            (puthash model drawing index)
-            (agentel-ui-region--insert
-             region drawing
-             (if kept
-                 (marker-position (agentel-ui-region--drawing-start (car kept)))
-               (marker-position (agentel-ui-region--end region)))
-             first width)))
-          (setq first nil)
-          drawing))
-      models)))
+    (let ((flush (lambda ()
+                   (when pending
+                     (agentel-ui-region--insert
+                      (nreverse pending) (nreverse texts)
+                      (if kept
+                          (marker-position (agentel-ui-region--drawing-start (car kept)))
+                        (marker-position end)))
+                     (setq pending nil texts nil)))))
+      (prog1
+          (mapcar
+           (lambda (model)
+             (let ((drawing (gethash model index)))
+               (cond
+                ((and drawing (eq drawing (car kept)))
+                 (funcall flush)
+                 (pop kept)
+                 (when (agentel-ui-region--stale-p drawing first width)
+                   (agentel-ui-region--redraw region drawing first width)))
+                (t
+                 (when drawing
+                   ;; Drawn out of order, so it moves here.
+                   (agentel-ui-region--delete region drawing)
+                   (setq kept (delq drawing kept)))
+                 (setq drawing (or drawing (make-agentel-ui-region--drawing :model model)))
+                 (puthash model drawing index)
+                 (push drawing pending)
+                 (push (agentel-ui-region--text region drawing first width) texts)))
+               (setq first nil)
+               drawing))
+           models)
+        (funcall flush)))))
 
 (defun agentel-ui-region-render (region models)
   "Show MODELS, a list in order, in REGION.
