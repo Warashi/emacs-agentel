@@ -13,7 +13,7 @@
 ;;; Code:
 
 (require 'agentel-session)
-(require 'agentel-chat)
+(require 'agentel-ui)
 
 (defcustom agentel-usage-warning-ratio 0.8
   "Share of the context window above which the usage is highlighted."
@@ -62,23 +62,23 @@ COST); a report without COST keeps the last one."
         (format "$%.2f" amount)
       (format "%.2f %s" amount currency))))
 
-(defun agentel-usage-summary (session)
-  "Return the context usage and cost of SESSION as text, or nil."
-  (when-let* ((usage (agentel-store-find (agentel-session-store session) 'usage)))
-    (let* ((used (or (agentel-store-get usage 'used) 0))
-           (size (agentel-store-get usage 'size))
-           (ratio (if (and size (> size 0)) (/ (float used) size) 0))
-           (context (format "ctx %d%% (%s/%s)" (round (* 100 ratio))
-                            (agentel-usage--tokens used)
-                            (if size (agentel-usage--tokens size) "?")))
-           (cost (agentel-store-get usage 'cost)))
-      (concat (if (>= ratio agentel-usage-warning-ratio)
-                  (propertize context 'face 'agentel-usage-full-face)
-                context)
-              (if cost (concat " · " (agentel-usage--cost cost)) "")))))
+(defun agentel-usage--view (usage _options)
+  "Return the context usage and cost of the model USAGE as text."
+  (let* ((used (or (agentel-store-get usage 'used) 0))
+         (size (agentel-store-get usage 'size))
+         (ratio (if (and size (> size 0)) (/ (float used) size) 0))
+         (context (format "ctx %d%% (%s/%s)" (round (* 100 ratio))
+                          (agentel-usage--tokens used)
+                          (if size (agentel-usage--tokens size) "?")))
+         (cost (agentel-store-get usage 'cost)))
+    (concat (if (>= ratio agentel-usage-warning-ratio)
+                (propertize context 'face 'agentel-usage-full-face)
+              context)
+            (if cost (concat " · " (agentel-usage--cost cost)) ""))))
+
+(agentel-ui-define-view 'agentel-usage #'agentel-usage--view :header 90)
 
 (add-hook 'agentel-session-update-functions #'agentel-usage--on-update)
-(add-hook 'agentel-chat-header-functions #'agentel-usage-summary 90)
 
 (provide 'agentel-usage)
 ;;; agentel-usage.el ends here

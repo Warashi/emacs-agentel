@@ -23,18 +23,23 @@
   (agentel-session-dispatch
    `((sessionId . "s1") (update . ((sessionUpdate . "usage_update") ,@update)))))
 
+(defun agentel-usage-test-shown (session)
+  "Return how the usage of SESSION is shown, or nil without one."
+  (when-let* ((usage (agentel-store-find (agentel-session-store session) 'usage)))
+    (agentel-ui-view usage)))
+
 (ert-deftest agentel-usage-shows-context-and-cost ()
   (agentel-usage-test-with-session
     (agentel-usage-test-update '((used . 24500) (size . 200000)
                                  (cost . ((amount . 0.1234) (currency . "USD")))))
-    (should (equal (agentel-usage-summary session) "ctx 12% (24.5k/200k) · $0.12"))))
+    (should (equal (agentel-usage-test-shown session) "ctx 12% (24.5k/200k) · $0.12"))))
 
 (ert-deftest agentel-usage-keeps-the-cost-when-an-update-has-none ()
   (agentel-usage-test-with-session
     (agentel-usage-test-update '((used . 1000) (size . 200000)
                                  (cost . ((amount . 0.5) (currency . "USD")))))
     (agentel-usage-test-update '((used . 190000) (size . 200000)))
-    (should (equal (agentel-usage-summary session) "ctx 95% (190k/200k) · $0.50"))))
+    (should (equal (agentel-usage-test-shown session) "ctx 95% (190k/200k) · $0.50"))))
 
 (ert-deftest agentel-usage-report-without-cost-keeps-the-last-cost ()
   (should (equal (agentel-usage--update '(report 190000 200000 nil)
@@ -46,16 +51,12 @@
   (agentel-usage-test-with-session
     (agentel-usage-test-update '((used . 0) (size . 1000000)
                                  (cost . ((amount . 3) (currency . "EUR")))))
-    (should (equal (agentel-usage-summary session) "ctx 0% (0/1M) · 3.00 EUR"))))
-
-(ert-deftest agentel-usage-is-empty-before-any-report ()
-  (agentel-usage-test-with-session
-    (should-not (agentel-usage-summary session))))
+    (should (equal (agentel-usage-test-shown session) "ctx 0% (0/1M) · 3.00 EUR"))))
 
 (ert-deftest agentel-usage-warns-when-the-context-is-almost-full ()
   (agentel-usage-test-with-session
     (agentel-usage-test-update '((used . 180000) (size . 200000)))
-    (should (eq (get-text-property 4 'face (agentel-usage-summary session))
+    (should (eq (get-text-property 4 'face (agentel-usage-test-shown session))
                 'agentel-usage-full-face))))
 
 (provide 'agentel-usage-test)

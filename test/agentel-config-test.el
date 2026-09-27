@@ -64,12 +64,12 @@
 (ert-deftest agentel-config-shows-the-settings-in-the-header ()
   (agentel-test-with-started session '(:model "opus[1m]" :effort "high" :mode "plan")
     (agentel-config-test-settled session)
-    (should (string-match-p "Opus 5\\.5 · High · Plan" (agentel-chat--header-line)))))
+    (should (string-match-p "Opus 5\\.5 · High · Plan" agentel-chat--header-line))))
 
 (ert-deftest agentel-config-shows-the-settings-of-other-agents-in-the-same-order ()
   (agentel-config-test-with-copilot session '(:model "gpt-5.5" :effort "high" :mode "plan")
     (agentel-config-test-settled session)
-    (should (string-match-p "GPT-5\\.5 · high · Plan" (agentel-chat--header-line)))))
+    (should (string-match-p "GPT-5\\.5 · high · Plan" agentel-chat--header-line))))
 
 (ert-deftest agentel-config-names-other-options-in-the-header ()
   (let ((agentel-session--registry nil)
@@ -83,7 +83,9 @@
                      ((id . "model") (name . "Model") (category . "model")
                       (currentValue . "sonnet")
                       (options . [((value . "sonnet") (name . "Sonnet 5"))]))])))
-      (should (equal (agentel-config--header session) "Sonnet 5 · Fast mode: Off")))))
+      (should (equal (agentel-ui-view
+                      (agentel-store-find (agentel-session-store session) 'config))
+                     "Sonnet 5 · Fast mode: Off")))))
 
 (ert-deftest agentel-config-applies-start-options-until-told-it-finished ()
   (let ((data (agentel-config--update '(start-applying) '((options)))))

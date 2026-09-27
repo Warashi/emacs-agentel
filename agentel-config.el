@@ -29,6 +29,7 @@
 (require 'agentel-connection)
 (require 'agentel-conversation)
 (require 'agentel-chat)
+(require 'agentel-ui)
 
 (defvar agentel-session-started-functions)
 (defvar agentel-session-restart-options-functions)
@@ -112,9 +113,9 @@ options, (select CATEGORY VALUE), (start-applying) and
                                    (alist-get 'choices option)))
         (format "%s" value))))
 
-(defun agentel-config--header (session)
-  "Return the header line segment of SESSION's settings."
-  (when-let* ((options (agentel-config--options session)))
+(defun agentel-config--view (model _options)
+  "Return the settings of the config MODEL of a session as text, or nil."
+  (when-let* ((options (agentel-store-get model 'options)))
     (string-join
      (mapcar (lambda (option)
                (if (member (alist-get 'category option) agentel-config--header-order)
@@ -127,6 +128,8 @@ options, (select CATEGORY VALUE), (start-applying) and
                                 (length agentel-config--header-order)))
                           #'< options))
      " · ")))
+
+(agentel-ui-define-view 'agentel-config #'agentel-config--view :header 10)
 
 ;;;; Changing options
 
@@ -259,7 +262,6 @@ not report them as unavailable."
 (add-hook 'agentel-session-running-functions #'agentel-config--applying-p)
 (add-hook 'agentel-session-restart-options-functions #'agentel-config--restart-options)
 (add-hook 'agentel-session-update-functions #'agentel-config--on-update)
-(add-hook 'agentel-chat-header-functions #'agentel-config--header)
 
 (provide 'agentel-config)
 ;;; agentel-config.el ends here

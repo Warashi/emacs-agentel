@@ -362,44 +362,83 @@
       (agentel-chat-refresh-pin session)
       (should (equal (agentel-chat-test-shown) "Hello\n\n❯ ")))))
 
-(ert-deftest agentel-chat-header-joins-feature-segments ()
+(defun agentel-chat-test-segment (message _data)
+  "Return the data of a test header segment changed by MESSAGE, its text."
+  message)
+
+(agentel-store-define 'agentel-chat-test-late #'agentel-chat-test-segment)
+(agentel-ui-define-view 'agentel-chat-test-late
+  (lambda (model _options) (agentel-store-model-data model))
+  :header 20)
+
+(agentel-store-define 'agentel-chat-test-early #'agentel-chat-test-segment)
+(agentel-ui-define-view 'agentel-chat-test-early
+  (lambda (model _options) (agentel-store-model-data model))
+  :header 10)
+
+(ert-deftest agentel-chat-header-shows-the-models-of-the-session-in-order ()
   (agentel-chat-test-with-session
-    (let ((agentel-chat-header-functions
-           (list (lambda (_s) "model") (lambda (_s) nil) (lambda (_s) "ctx"))))
-      (should (string-match-p "model.*ctx" (agentel-chat--header-line))))))
+    (let ((store (agentel-session-store session)))
+      (agentel-store-dispatch store 'late 'agentel-chat-test-late "ctx")
+      (agentel-store-dispatch store 'early 'agentel-chat-test-early nil)
+      (should (equal agentel-chat--header-line "💤 project  │  project  │  ctx"))
+      (agentel-store-dispatch store 'early 'agentel-chat-test-early "model")
+      (should (equal agentel-chat--header-line
+                     "💤 project  │  project  │  model  │  ctx")))))
+
+(ert-deftest agentel-chat-header-shows-a-session-before-it-starts ()
+  (let* ((agentel-session--registry nil)
+         (session (agentel-session-create :cwd "/tmp/project/"))
+         (buffer (agentel-chat-open session :input t)))
+    (unwind-protect
+        (with-current-buffer buffer
+          (should (equal agentel-chat--header-line "⏳ project  │  project")))
+      (kill-buffer buffer))))
 
 (ert-deftest agentel-chat-header-starts-with-the-state ()
   (agentel-chat-test-with-session
-    (let ((agentel-chat-header-functions nil))
-      (agentel-session-send session '(retitle "Fix things"))
-      (should (string-prefix-p "💤 " (agentel-chat--header-line))))))
+    (agentel-session-send session '(retitle "Fix things"))
+    (should (string-prefix-p "💤 " agentel-chat--header-line))))
+
+(ert-deftest agentel-chat-header-shows-that-the-session-waits ()
+  (agentel-chat-test-with-session
+    (let ((agentel-session-changed-functions (list #'agentel-chat--on-changed)))
+      (agentel-chat-test-ask session "Allow?")
+      (should (string-prefix-p "🙋 " agentel-chat--header-line))
+      (agentel-conversation-send session "Allow?" 'agentel-chat-test-question '(answer))
+      (should (string-prefix-p "💤 " agentel-chat--header-line)))))
+
+(ert-deftest agentel-chat-header-shows-that-a-subagent-waits ()
+  (agentel-chat-test-with-session
+    (let ((agentel-session-changed-functions (list #'agentel-chat--on-changed))
+          (child (agentel-session-create :parent session)))
+      (agentel-chat-test-ask child "Allow?")
+      (should (string-prefix-p "🙋 " agentel-chat--header-line)))))
 
 (ert-deftest agentel-chat-header-shows-the-project-before-the-title ()
   (agentel-chat-test-with-session
-    (let ((agentel-chat-header-functions nil))
-      (agentel-session-send session '(retitle "Fix things"))
-      (should (equal (agentel-chat--header-line) "💤 project  │  Fix things")))))
+    (agentel-session-send session '(retitle "Fix things"))
+    (should (equal agentel-chat--header-line "💤 project  │  Fix things"))))
 
 (ert-deftest agentel-chat-header-of-a-subagent-shows-the-project-of-its-parent ()
   (agentel-chat-test-with-session
-    (let* ((agentel-chat-header-functions nil)
-           (child (agentel-session-create :parent session :cwd "/tmp/project/"))
+    (setf (agentel-session-project session) "repo")
+    (let* ((child (agentel-session-create :parent session :cwd "/tmp/project/"))
            (buffer (agentel-chat-open child)))
       (agentel-session-register child "c1")
-      (setf (agentel-session-project session) "repo")
       (agentel-session-send child '(retitle "Explore"))
       (unwind-protect
           (with-current-buffer buffer
-            (should (equal (agentel-chat--header-line) "💤 repo  │  Explore")))
+            (should (equal agentel-chat--header-line "💤 repo  │  Explore")))
         (kill-buffer buffer)))))
 
 (ert-deftest agentel-chat-header-line-escapes-percent-signs ()
   ;; `format-mode-line' renders nothing in batch mode, so check the
   ;; mode line format the :eval form produces instead.
   (agentel-chat-test-with-session
-    (let ((agentel-chat-header-functions (list (lambda (_s) "ctx 12%"))))
-      (should (string-match-p "ctx 12%%\\'"
-                              (eval (cadr header-line-format) t))))))
+    (agentel-store-dispatch (agentel-session-store session) 'late
+                            'agentel-chat-test-late "ctx 12%")
+    (should (string-match-p "ctx 12%%\\'" (eval (cadr header-line-format) t)))))
 
 (agentel-conversation-define 'agentel-chat-test-question
   (lambda (msg _data)

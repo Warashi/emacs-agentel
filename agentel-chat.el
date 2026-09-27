@@ -16,6 +16,12 @@
 ;; region of `agentel-ui-region' in front of the prompt, which changes
 ;; only the text of the entries that changed.  The text of an entry
 ;; carries its item in the `agentel-chat-entry' property.
+;;
+;; The header line shows the models of the session store whose views
+;; (`agentel-ui-define-view') have the :header property, a number
+;; ordering them, after the state, project and name of the session.  It
+;; is made again when the store changes, and the views are shown with
+;; the options of `agentel-chat--view-options' for what no model keeps.
 
 ;;; Code:
 
@@ -61,10 +67,6 @@
   '((t :inherit minibuffer-prompt))
   "Face of the prompt in front of the input area.")
 
-(defvar agentel-chat-header-functions nil
-  "Functions returning segments of the header line.
-Each is called with the session and returns a string or nil.")
-
 (defvar agentel-chat-pin-functions nil
   "Functions returning lines pinned above the prompt.
 Each is called with the session and returns a list of strings.  The
@@ -101,6 +103,9 @@ call `agentel-chat-render'.")
 
 (defvar-local agentel-chat--input-start nil
   "Marker at the start of the input area, or nil without one.")
+
+(defvar-local agentel-chat--header-line ""
+  "Header line of this buffer, with the % signs of the mode line escaped.")
 
 (defvar-local agentel-chat--pin nil
   "Overlay on the prompt that shows the pinned lines, or nil without one.")
@@ -162,14 +167,23 @@ Before the buffer shows a session, nothing is shown."
     (agentel-chat--fit-gap)))
 
 (defun agentel-chat--show (session)
-  "Show the conversation of SESSION in this buffer and follow its changes."
+  "Show SESSION in this buffer and follow its changes.
+The transcript follows its conversation and the header line its models."
   (agentel-chat-render)
+  (agentel-chat--draw-header)
   (let* ((buffer (current-buffer))
+         (store (agentel-session-store session))
          (subscriber (lambda (_entry _added)
                        (with-current-buffer buffer
                          (agentel-chat-render))))
-         (unsubscribe (lambda () (agentel-conversation-unsubscribe session subscriber))))
+         (header (lambda (_model _added)
+                   (with-current-buffer buffer
+                     (agentel-chat--draw-header))))
+         (unsubscribe (lambda ()
+                        (agentel-conversation-unsubscribe session subscriber)
+                        (agentel-store-unsubscribe store header))))
     (agentel-conversation-subscribe session subscriber)
+    (agentel-store-subscribe store header)
     ;; Changing the major mode forgets the entries of the buffer.
     (add-hook 'change-major-mode-hook unsubscribe nil t)
     (add-hook 'kill-buffer-hook unsubscribe nil t)))
@@ -432,17 +446,52 @@ They are the items waiting for an answer that can be answered."
 
 ;;;; Mode
 
-(defun agentel-chat--header-line ()
-  "Return the header line of this buffer."
-  (let ((session agentel-chat--session))
-    (string-join
-     (delq nil (cons (format "%s %s  │  %s"
-                             (agentel-ui-state (agentel-session-state session))
-                             (agentel-session-project-name session)
-                             (agentel-session-name session))
-                     (mapcar (lambda (f) (funcall f session))
-                             agentel-chat-header-functions)))
-     "  │  ")))
+(defun agentel-chat--view-options (session)
+  "Return the options the models of SESSION are shown with in its buffer.
+They carry what no model keeps: the :state of SESSION, the :project it
+works in and its directory :cwd."
+  (list :state (agentel-session-state session)
+        :project (agentel-session-project-name session)
+        :cwd (agentel-session-cwd session)))
+
+(defun agentel-chat--header-lead (model options)
+  "Return the start of the header line of a session whose model is MODEL.
+It shows the :state and :project of OPTIONS and the name of the
+session from the title of MODEL, which is nil before the session has
+one, or from the :cwd of OPTIONS."
+  (format "%s %s  │  %s"
+          (agentel-ui-state (plist-get options :state))
+          (plist-get options :project)
+          (agentel-session-name-from (and model (agentel-store-get model 'title))
+                                     (plist-get options :cwd))))
+
+(defun agentel-chat--placed (store property)
+  "Return the models of STORE whose views have PROPERTY, ordered by it."
+  (let ((place (lambda (model)
+                 (agentel-ui-view-property (agentel-store-model-type model) property))))
+    (seq-sort-by place #'< (seq-filter place (agentel-store-models store)))))
+
+(defun agentel-chat--header (store options)
+  "Return the header line of a session with the models of STORE.
+It leads with the state, project and name of the session, followed by
+the models whose views have the :header property, lowest first, shown
+with OPTIONS.  A view returning nil is left out."
+  (string-join
+   (delq nil (cons (agentel-chat--header-lead (agentel-store-find store 'state) options)
+                   (mapcar (lambda (model) (apply #'agentel-ui-view model options))
+                           (agentel-chat--placed store :header))))
+   "  │  "))
+
+(defun agentel-chat--draw-header ()
+  "Make the header line of this buffer again from the models of its session."
+  (when-let* ((session agentel-chat--session)
+              (line (string-replace "%" "%%"
+                                    (agentel-chat--header
+                                     (agentel-session-store session)
+                                     (agentel-chat--view-options session)))))
+    (unless (equal-including-properties line agentel-chat--header-line)
+      (setq agentel-chat--header-line line)
+      (force-mode-line-update))))
 
 (define-derived-mode agentel-chat-mode text-mode "agentel"
   "Major mode of agentel session buffers.
@@ -450,9 +499,10 @@ The transcript is read-only; type the prompt at the end of the buffer
 and send it with \\[agentel-chat-send]."
   (setq-local agentel-chat--region (agentel-ui-region-create (point-min) 'agentel-chat-entry))
   (setq-local agentel-chat--transcript-end (agentel-ui-region-end agentel-chat--region))
-  ;; The result of :eval is itself a mode line format, where % is special.
-  (setq-local header-line-format
-              '(:eval (string-replace "%" "%%" (agentel-chat--header-line))))
+  ;; The header line is made when the session changes, not on every
+  ;; redisplay.  The result of :eval is itself a mode line format, where
+  ;; % is special.
+  (setq-local header-line-format '(:eval agentel-chat--header-line))
   (agentel-ui-follow-width #'agentel-chat--fit-width))
 
 (defun agentel-chat--fit-width ()
@@ -475,11 +525,13 @@ and send it with \\[agentel-chat-send]."
             (overlay-put agentel-chat--pin 'before-string string)))))))
 
 (defun agentel-chat--on-changed (session)
-  "Redisplay the header line and the pinned lines of SESSION's buffer."
+  "Show SESSION again in its header line and pinned lines.
+The state in the header line also changes when the session starts or
+stops waiting, which no model keeps."
   (when-let* ((buffer (agentel-session-buffer session))
               ((buffer-live-p buffer)))
     (with-current-buffer buffer
-      (force-mode-line-update))
+      (agentel-chat--draw-header))
     (agentel-chat-refresh-pin session)))
 
 (add-hook 'agentel-session-changed-functions #'agentel-chat--on-changed)
