@@ -96,16 +96,6 @@
          (update . ((sessionUpdate . "agent_message_chunk")))))
       (should-not seen))))
 
-(ert-deftest agentel-session-info-update-sets-title ()
-  (agentel-session-test-with-registry
-    (let ((session (agentel-session-create)))
-      (agentel-session-register session "s1")
-      (agentel-session-dispatch
-       '((sessionId . "s1")
-         (update . ((sessionUpdate . "session_info_update")
-                    (title . "Fix the bug")))))
-      (should (equal (agentel-session-title session) "Fix the bug")))))
-
 (ert-deftest agentel-session-data-change-notifies ()
   (agentel-session-test-with-registry
     (let ((session (agentel-session-create))

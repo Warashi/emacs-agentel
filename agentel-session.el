@@ -235,9 +235,6 @@ a project, this is the name of the working directory."
 CONNECTION is the connection it arrived on."
   (let-alist params
     (when-let* ((session (agentel-session-get .sessionId connection)))
-      (when (equal (alist-get 'sessionUpdate .update) "session_info_update")
-        (when-let* ((title (alist-get 'title .update)))
-          (agentel-session-send session `(retitle ,title))))
       (unless (run-hook-with-args-until-success
                'agentel-session-withhold-functions session .update)
         (run-hook-with-args 'agentel-session-update-functions
