@@ -139,11 +139,10 @@ subagent there, or =C-c C-j=, visits its buffer.  Background tasks are
 reported through the =asyncTasks= capability of the JetBrains AIR
 extension, which agentel advertises.
 
-=agentel-focus-mode= hides everything the next input does not need.
-It leaves the last prompt, the questions still open, errors and why
-the turn ended, together with the last agent message and the latest
-thought or tool call when it came after that message.  To open every
-session this way:
+=agentel-focus-mode= shows only what the next input needs: the last
+prompt, the questions still open, errors and why the turn ended,
+together with the last agent message and the latest thought or tool
+call when it came after that message.  To open every session this way:
 
 #+begin_src emacs-lisp
 (add-hook 'agentel-chat-mode-hook #'agentel-focus-mode)
@@ -194,6 +193,15 @@ Features add their own items to it, such as permission requests, and
 the session buffer subscribes to it and only draws it, so a subagent
 buffer opened again after it was killed shows its earlier output.  The
 session list keeps its own model the same way.
+
+The transcript is drawn like a view of React: after every change of
+the conversation the session buffer chooses the items to show and hands
+the whole list to a region (=agentel-ui-region.el=), which changes only
+the text of the items that are new, left out or changed.  Which items
+are shown is a function of the items alone, so focus
+(=agentel-focus.el=) replaces that function and knows nothing of how
+the transcript is drawn.  Each change compares every item shown once,
+which a long session pays for on every chunk of a message.
 
 * Development
 
