@@ -13,7 +13,7 @@
   "Run BODY in a focused chat buffer of a session bound to `session'."
   (declare (indent 0))
   `(let ((agentel-session--registry nil)
-         (agentel-session-changed-functions (list #'agentel-focus--on-changed))
+         (agentel-session-changed-functions nil)
          (agentel-session-update-functions (list #'agentel-conversation--on-update)))
      (let* ((session (agentel-session-create :cwd "/tmp/project/"))
             (buffer (agentel-chat-open session :input t)))
@@ -44,24 +44,14 @@
 (agentel-conversation-define 'agentel-focus-test-question
   (lambda (message _data)
     (pcase message
-      (`(show ,item ,text) `((item . ,item) (text . ,text))))))
+      (`(show ,text ,waiting) `((text . ,text) (waiting . ,waiting))))))
 (agentel-ui-define-view 'agentel-focus-test-question
   (lambda (entry _options) (agentel-store-get entry 'text)))
 
-(defun agentel-focus-test-question (session text)
-  "Add a pending question of SESSION shown as TEXT and return it."
-  (let ((item (list :kind 'test)))
-    (agentel-conversation-send session
-                               nil 'agentel-focus-test-question `(show ,item ,text))
-    (agentel-session-add-pending session item)
-    item))
-
-(agentel-conversation-define 'agentel-focus-test-subagent
-  (lambda (message _data)
-    (pcase message
-      (`(show ,child) `((child . ,child))))))
-(agentel-ui-define-view 'agentel-focus-test-subagent
-  (lambda (_entry _options) "the subagent"))
+(defun agentel-focus-test-question (session key text waiting)
+  "Show TEXT as the question KEY of SESSION, WAITING for an answer or not."
+  (agentel-conversation-send session key 'agentel-focus-test-question
+                             `(show ,text ,waiting)))
 
 (defun agentel-focus-test-visible ()
   "Return the text of the current buffer that is shown."
@@ -115,26 +105,23 @@
       (should (string-match-p "Thinking: What next" text))
       (should-not (string-match-p "Read a\\.el\\|Where to start" text)))))
 
-(ert-deftest agentel-focus-leaves-running-subagents-to-the-pin ()
-  (agentel-focus-test-with-session
-    (let ((child (agentel-session-create :parent session)))
-      (agentel-session-register child "c1")
-      (agentel-focus-test-prompt session "delegate")
-      (agentel-focus-test-tool "t1" "Read a.el")
-      (agentel-conversation-send session
-                                 nil 'agentel-focus-test-subagent `(show ,child))
-      (let ((text (agentel-focus-test-visible)))
-        (should (string-match-p "Read a\\.el" text))
-        (should-not (string-match-p "the subagent" text))))))
-
 (ert-deftest agentel-focus-shows-questions-until-they-are-answered ()
   (agentel-focus-test-with-session
     (agentel-focus-test-prompt session "do it")
-    (let ((item (agentel-focus-test-question session "Allow this?")))
-      (agentel-focus-test-tool "t1" "Read a.el")
-      (should (string-match-p "Allow this\\?" (agentel-focus-test-visible)))
-      (agentel-session-remove-pending session item)
-      (should-not (string-match-p "Allow this\\?" (agentel-focus-test-visible))))))
+    (agentel-focus-test-question session 'q1 "Allow this?" t)
+    (agentel-focus-test-tool "t1" "Read a.el")
+    (should (string-match-p "Allow this\\?" (agentel-focus-test-visible)))
+    (agentel-focus-test-question session 'q1 "Allow this?" nil)
+    (should-not (string-match-p "Allow this\\?" (agentel-focus-test-visible)))))
+
+(ert-deftest agentel-focus-shows-an-item-once-it-waits ()
+  (agentel-focus-test-with-session
+    (agentel-focus-test-prompt session "delegate")
+    (agentel-focus-test-question session 'sub "the subagent" nil)
+    (agentel-focus-test-tool "t1" "Read a.el")
+    (should-not (string-match-p "the subagent" (agentel-focus-test-visible)))
+    (agentel-focus-test-question session 'sub "the subagent" t)
+    (should (string-match-p "the subagent" (agentel-focus-test-visible)))))
 
 (ert-deftest agentel-focus-shows-errors-of-the-last-turn ()
   (agentel-focus-test-with-session
@@ -150,18 +137,6 @@
     (let ((text (agentel-focus-test-visible)))
       (should (string-match-p "Half an answer" text))
       (should (string-match-p "Turn ended: max_tokens" text)))))
-
-(ert-deftest agentel-focus-shows-a-subagent-that-waits ()
-  (agentel-focus-test-with-session
-    (let ((child (agentel-session-create :parent session)))
-      (agentel-session-register child "c1")
-      (agentel-focus-test-prompt session "delegate")
-      (agentel-conversation-send session
-                                 nil 'agentel-focus-test-subagent `(show ,child))
-      (agentel-focus-test-tool "t1" "Read a.el")
-      (should-not (string-match-p "the subagent" (agentel-focus-test-visible)))
-      (agentel-session-add-pending child (list :kind 'test))
-      (should (string-match-p "the subagent" (agentel-focus-test-visible))))))
 
 (ert-deftest agentel-focus-shows-everything-when-turned-off ()
   (agentel-focus-test-with-session
@@ -234,8 +209,10 @@
 
 (defun agentel-focus-test-random-step (session state)
   "Change SESSION in one random way.
-STATE is a plist of the tool calls made and the questions open."
+STATE is a plist of the tool calls and questions made and the
+questions open."
   (let ((tools (or (plist-get state :tools) 0))
+        (questions (or (plist-get state :questions) 0))
         (items (plist-get state :items)))
     (pcase (random 8)
       (0 (agentel-focus-test-prompt session "p"))
@@ -245,10 +222,12 @@ STATE is a plist of the tool calls made and the questions open."
       (4 (when (> tools 0)
            (agentel-focus-test-tool (format "t%d" (1+ (random tools)))
                                     (make-string (1+ (random 5)) ?u))))
-      (5 (push (agentel-focus-test-question session "Q?") items))
-      (6 (when items (agentel-session-remove-pending session (pop items))))
+      (5 (let ((key (format "q%d" (cl-incf questions))))
+           (agentel-focus-test-question session key "Q?" t)
+           (push key items)))
+      (6 (when items (agentel-focus-test-question session (pop items) "Q?" nil)))
       (7 (agentel-conversation-note session "n" (seq-random-elt '(error stop notice)))))
-    (list :tools tools :items items)))
+    (list :tools tools :questions questions :items items)))
 
 (ert-deftest agentel-focus-follows-changes-like-it-was-turned-on-afresh ()
   (dotimes (seed 200)
@@ -290,9 +269,10 @@ CHANGE is called with the session; the fastest of a few runs counts."
   (should (agentel-focus-test-scales-flat-p
            (lambda (_) (agentel-focus-test-chunk "agent_message_chunk" "more text ")))))
 
-(ert-deftest agentel-focus-follows-the-session-regardless-of-the-length ()
+(ert-deftest agentel-focus-follows-a-question-regardless-of-the-length ()
   (should (agentel-focus-test-scales-flat-p
-           (lambda (session) (setf (agentel-session-data session 'usage) (random))))))
+           (lambda (session)
+             (agentel-focus-test-question session 'q "Q?" (zerop (random 2)))))))
 
 (ert-deftest agentel-focus-can-be-turned-on-for-every-session-buffer ()
   (let ((agentel-session--registry nil)

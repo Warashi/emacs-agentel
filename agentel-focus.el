@@ -16,9 +16,10 @@
 ;; its rendering stay as they are, and turning the mode off shows
 ;; everything again.
 ;;
-;; A streamed chunk changes one entry and a change of the session can
-;; only move the questions, so only those entries are looked at again;
-;; the cost does not grow with the session or the turn.  Everything before the last prompt is covered by a
+;; Whether an entry is shown depends on the entry itself and on the
+;; entries that came after it, so a changed entry and a new entry are
+;; the only ones looked at again; the cost does not grow with the
+;; session or the turn.  Everything before the last prompt is covered by a
 ;; single overlay.  An overlay of a hidden entry follows text inserted
 ;; in front of it and not behind it, so it keeps covering its entry when
 ;; the neighbours are rendered again.
@@ -26,7 +27,6 @@
 ;;; Code:
 
 (require 'subr-x)
-(require 'agentel-session)
 (require 'agentel-chat)
 
 (defvar-local agentel-focus--overlays nil
@@ -45,9 +45,6 @@ The overlay is nil while the entry is shown.")
 (defvar-local agentel-focus--last-activity nil
   "Newest thought or tool call of the current turn after its last message.")
 
-(defvar-local agentel-focus--askers nil
-  "Entries of the current turn that may wait for an answer.")
-
 (defvar-local agentel-focus--latest nil
   "Entries shown as the last message and the current activity of the turn.")
 
@@ -55,19 +52,11 @@ The overlay is nil while the entry is shown.")
   "Return the entries that show the state of the turn."
   (delq nil (list agentel-focus--last-message agentel-focus--last-activity)))
 
-(defun agentel-focus--waits-p (entry)
-  "Return non-nil if ENTRY shows something owing an answer."
-  (let ((item (agentel-store-get entry 'item))
-        (child (agentel-store-get entry 'child)))
-    (or (and item agentel-chat--session
-             (memq item (agentel-session-pending agentel-chat--session)))
-        (and child (agentel-session-pending-items child)))))
-
 (defun agentel-focus--hidden-p (entry)
   "Return non-nil if ENTRY of the current turn is hidden."
   (not (or (memq entry agentel-focus--latest)
            (memq (agentel-store-model-type entry) '(user error stop))
-           (agentel-focus--waits-p entry))))
+           (agentel-store-get entry 'waiting))))
 
 (defun agentel-focus--entry-end (entry)
   "Return the position after the text of ENTRY."
@@ -99,19 +88,14 @@ MOVED means its text changed, so a hidden entry is covered again."
   (pcase (agentel-store-model-type entry)
     ('agent (setq agentel-focus--last-message entry
                   agentel-focus--last-activity nil))
-    ((or 'thought 'tool) (setq agentel-focus--last-activity entry)))
-  (when (or (agentel-store-get entry 'item)
-            (agentel-store-get entry 'child))
-    (push entry agentel-focus--askers)))
+    ((or 'thought 'tool) (setq agentel-focus--last-activity entry))))
 
 (defun agentel-focus--refresh ()
-  "Show or hide the entries that the state of the session can change."
+  "Show or hide the entries that a new entry can take the place of."
   (let ((previous agentel-focus--latest))
     (setq agentel-focus--latest (agentel-focus--current-latest))
     (mapc #'agentel-focus--fix previous)
-    (mapc #'agentel-focus--fix agentel-focus--latest))
-  (dolist (entry agentel-focus--askers)
-    (agentel-focus--fix entry)))
+    (mapc #'agentel-focus--fix agentel-focus--latest)))
 
 (defun agentel-focus--clear ()
   "Remove the overlays of this buffer."
@@ -125,7 +109,6 @@ MOVED means its text changed, so a hidden entry is covered again."
         agentel-focus--turn-start nil
         agentel-focus--last-message nil
         agentel-focus--last-activity nil
-        agentel-focus--askers nil
         agentel-focus--latest nil))
 
 (defun agentel-focus--start-turn (entries)
@@ -186,15 +169,6 @@ the latest thought or tool call when it came after that message."
     (remove-hook 'agentel-chat-entry-changed-functions #'agentel-focus--on-entry-changed t)
     (agentel-focus--clear)))
 
-(defun agentel-focus--on-changed (session)
-  "Follow the state of SESSION in its buffer."
-  (when-let* ((buffer (agentel-session-buffer session))
-              ((buffer-live-p buffer)))
-    (with-current-buffer buffer
-      (when agentel-focus-mode
-        (agentel-focus--refresh)))))
-
-(add-hook 'agentel-session-changed-functions #'agentel-focus--on-changed)
 (keymap-set agentel-chat-mode-map "C-c C-f" #'agentel-focus-mode)
 
 (provide 'agentel-focus)
