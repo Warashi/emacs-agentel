@@ -36,6 +36,12 @@
     (agentel-usage-test-update '((used . 190000) (size . 200000)))
     (should (equal (agentel-usage-summary session) "ctx 95% (190k/200k) · $0.50"))))
 
+(ert-deftest agentel-usage-report-without-cost-keeps-the-last-cost ()
+  (should (equal (agentel-usage--update '(report 190000 200000 nil)
+                                        (agentel-usage--update
+                                         '(report 1000 200000 (0.5 . "USD")) nil))
+                 '((used . 190000) (size . 200000) (cost 0.5 . "USD")))))
+
 (ert-deftest agentel-usage-shows-other-currencies-by-code ()
   (agentel-usage-test-with-session
     (agentel-usage-test-update '((used . 0) (size . 1000000)

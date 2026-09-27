@@ -25,15 +25,25 @@
   "Face of the context usage when the window is almost full."
   :group 'agentel)
 
+(defun agentel-usage--update (message data)
+  "Return the usage DATA changed by MESSAGE.
+DATA has the tokens `used' of the context window, its `size' and the
+`cost' so far as (AMOUNT . CURRENCY).  MESSAGE is (report USED SIZE
+COST); a report without COST keeps the last one."
+  (pcase message
+    (`(report ,used ,size ,cost)
+     `((used . ,used) (size . ,size)
+       (cost . ,(or cost (alist-get 'cost data)))))))
+
+(agentel-store-define 'agentel-usage #'agentel-usage--update)
+
 (defun agentel-usage--on-update (session update)
-  "Record the usage reported in UPDATE for SESSION."
-  (when (equal (alist-get 'sessionUpdate update) "usage_update")
-    (let ((previous (agentel-session-data session 'usage)))
-      (setf (agentel-session-data session 'usage)
-            (list :used (alist-get 'used update)
-                  :size (alist-get 'size update)
-                  :cost (or (alist-get 'cost update)
-                            (plist-get previous :cost)))))))
+  "Report to SESSION the usage the agent tells in UPDATE."
+  (let-alist update
+    (when (equal .sessionUpdate "usage_update")
+      (agentel-store-dispatch (agentel-session-store session) 'usage 'agentel-usage
+                              `(report ,.used ,.size
+                                       ,(and .cost (cons .cost.amount .cost.currency)))))))
 
 (defun agentel-usage--tokens (count)
   "Return the token COUNT in a short form."
@@ -46,23 +56,22 @@
   (concat (replace-regexp-in-string "\\.0\\'" "" (format "%.1f" number)) unit))
 
 (defun agentel-usage--cost (cost)
-  "Return the COST alist as text."
-  (let ((amount (alist-get 'amount cost))
-        (currency (alist-get 'currency cost)))
+  "Return the COST, (AMOUNT . CURRENCY), as text."
+  (pcase-let ((`(,amount . ,currency) cost))
     (if (equal currency "USD")
         (format "$%.2f" amount)
       (format "%.2f %s" amount currency))))
 
 (defun agentel-usage-summary (session)
   "Return the context usage and cost of SESSION as text, or nil."
-  (when-let* ((usage (agentel-session-data session 'usage)))
-    (let* ((used (or (plist-get usage :used) 0))
-           (size (plist-get usage :size))
+  (when-let* ((usage (agentel-store-find (agentel-session-store session) 'usage)))
+    (let* ((used (or (agentel-store-get usage 'used) 0))
+           (size (agentel-store-get usage 'size))
            (ratio (if (and size (> size 0)) (/ (float used) size) 0))
            (context (format "ctx %d%% (%s/%s)" (round (* 100 ratio))
                             (agentel-usage--tokens used)
                             (if size (agentel-usage--tokens size) "?")))
-           (cost (plist-get usage :cost)))
+           (cost (agentel-store-get usage 'cost)))
       (concat (if (>= ratio agentel-usage-warning-ratio)
                   (propertize context 'face 'agentel-usage-full-face)
                 context)
