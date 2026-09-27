@@ -9,10 +9,6 @@
 (require 'agentel-config)
 (require 'agentel-test-helper)
 
-(defun agentel-config-test-value (session category)
-  "Return the current value of the option of CATEGORY in SESSION."
-  (alist-get 'currentValue (agentel-config-option session category)))
-
 (defconst agentel-config-test-copilot-mode
   "https://agentclientprotocol.com/protocol/session-modes#"
   "Prefix of the mode values of Copilot CLI.")
@@ -27,14 +23,14 @@
   "Wait until SESSION finished applying its start options."
   (agentel-test-wait-until
    (lambda () (and (eq (agentel-session-state session) 'idle)
-                   (agentel-session-data session 'config-options)))))
+                   (agentel-config-option session "model")))))
 
 (ert-deftest agentel-config-applies-start-options-in-order ()
   (agentel-test-with-started session '(:model "opus[1m]" :effort "high" :mode "plan")
     (agentel-config-test-settled session)
-    (should (equal (agentel-config-test-value session "model") "opus[1m]"))
-    (should (equal (agentel-config-test-value session "thought_level") "high"))
-    (should (equal (agentel-config-test-value session "mode") "plan"))))
+    (should (equal (agentel-config-value session "model") "opus[1m]"))
+    (should (equal (agentel-config-value session "thought_level") "high"))
+    (should (equal (agentel-config-value session "mode") "plan"))))
 
 (ert-deftest agentel-config-runs-the-session-until-start-options-are-applied ()
   (let ((agentel-session--registry nil)
@@ -54,15 +50,15 @@
 (ert-deftest agentel-config-applies-start-options-to-the-options-of-their-category ()
   (agentel-config-test-with-copilot session '(:model "gpt-5.5" :effort "high")
     (agentel-config-test-settled session)
-    (should (equal (agentel-config-test-value session "model") "gpt-5.5"))
+    (should (equal (agentel-config-value session "model") "gpt-5.5"))
     (should (equal (alist-get 'id (agentel-config-option session "thought_level"))
                    "reasoning_effort"))
-    (should (equal (agentel-config-test-value session "thought_level") "high"))))
+    (should (equal (agentel-config-value session "thought_level") "high"))))
 
 (ert-deftest agentel-config-takes-the-name-of-a-value ()
   (agentel-config-test-with-copilot session '(:mode "plan")
     (agentel-config-test-settled session)
-    (should (equal (agentel-config-test-value session "mode")
+    (should (equal (agentel-config-value session "mode")
                    (concat agentel-config-test-copilot-mode "plan")))))
 
 (ert-deftest agentel-config-shows-the-settings-in-the-header ()
@@ -79,18 +75,30 @@
   (let ((agentel-session--registry nil)
         (agentel-session-changed-functions nil))
     (let ((session (agentel-session-create)))
-      (setf (agentel-session-data session 'config-options)
-            '(((id . "fast") (name . "Fast mode") (currentValue . "off")
-               (options . [((value . "off") (name . "Off"))]))
-              ((id . "model") (name . "Model") (category . "model") (currentValue . "sonnet")
-               (options . [((value . "sonnet") (name . "Sonnet 5"))]))))
+      (agentel-config--on-update
+       session '((sessionUpdate . "config_option_update")
+                 (configOptions
+                  . [((id . "fast") (name . "Fast mode") (currentValue . "off")
+                      (options . [((value . "off") (name . "Off"))]))
+                     ((id . "model") (name . "Model") (category . "model")
+                      (currentValue . "sonnet")
+                      (options . [((value . "sonnet") (name . "Sonnet 5"))]))])))
       (should (equal (agentel-config--header session) "Sonnet 5 · Fast mode: Off")))))
+
+(ert-deftest agentel-config-selecting-a-value-changes-only-its-option ()
+  (should (equal (alist-get 'options
+                            (agentel-config--update
+                             '(select "mode" "plan")
+                             '((options ((id . "model") (category . "model") (value . "opus"))
+                                        ((id . "mode") (category . "mode") (value . "default"))))))
+                 '(((id . "model") (category . "model") (value . "opus"))
+                   ((id . "mode") (category . "mode") (value . "plan"))))))
 
 (ert-deftest agentel-config-reports-unavailable-options ()
   ;; The mock, like the real adapter, has no effort levels for haiku.
   (agentel-test-with-started session '(:model "haiku" :effort "high" :mode "nonsense")
     (agentel-config-test-settled session)
-    (should (equal (agentel-config-test-value session "model") "haiku"))
+    (should (equal (agentel-config-value session "model") "haiku"))
     (agentel-test-wait-for-text "effort is not available")
     (agentel-test-wait-for-text
      "Could not set mode: Invalid value for config option mode: nonsense")))
@@ -98,7 +106,7 @@
 (ert-deftest agentel-config-leaves-aliases-to-the-agent ()
   (agentel-test-with-started session '(:model "opus")
     (agentel-config-test-settled session)
-    (should (equal (agentel-config-test-value session "model") "opus[1m]"))))
+    (should (equal (agentel-config-value session "model") "opus[1m]"))))
 
 (ert-deftest agentel-config-can-be-changed-interactively ()
   (agentel-test-with-started session nil
@@ -110,7 +118,7 @@
                  "Accept edits")))
       (agentel-config-set-mode))
     (agentel-test-wait-until
-     (lambda () (equal (agentel-config-test-value session "mode") "acceptEdits")))))
+     (lambda () (equal (agentel-config-value session "mode") "acceptEdits")))))
 
 (ert-deftest agentel-config-follows-mode-changes-by-the-agent ()
   (agentel-test-with-started session nil
@@ -119,14 +127,14 @@
      `((sessionId . ,(agentel-session-id session))
        (update . ((sessionUpdate . "current_mode_update")
                   (currentModeId . "acceptEdits")))))
-    (should (equal (agentel-config-test-value session "mode") "acceptEdits"))))
+    (should (equal (agentel-config-value session "mode") "acceptEdits"))))
 
 (ert-deftest agentel-config-restarts-with-the-current-settings ()
   (agentel-test-with-started session '(:model "sonnet")
     (agentel-config-test-settled session)
     (agentel-config-set session "mode" "plan")
     (agentel-test-wait-until
-     (lambda () (equal (agentel-config-test-value session "mode") "plan")))
+     (lambda () (equal (agentel-config-value session "mode") "plan")))
     (should (equal (agentel-config--restart-options session)
                    '(:model "sonnet" :effort "medium" :mode "plan")))))
 
@@ -146,7 +154,7 @@
                  "high")))
       (agentel-config-set-effort))
     (agentel-test-wait-until
-     (lambda () (equal (agentel-config-test-value session "thought_level") "high")))))
+     (lambda () (equal (agentel-config-value session "thought_level") "high")))))
 
 (ert-deftest agentel-config-restarts-without-options-the-model-lacks ()
   (agentel-test-with-started session '(:model "haiku")

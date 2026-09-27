@@ -41,7 +41,7 @@
 (ert-deftest agentel-resume-keeps-the-settings ()
   (agentel-test-with-started session '(:model "haiku" :mode "plan")
     (agentel-test-wait-until
-     (lambda () (equal (alist-get 'currentValue (agentel-config-option session "mode"))
+     (lambda () (equal (agentel-config-value session "mode")
                        "plan")))
     (let (resumed)
       (cl-letf (((symbol-function 'completing-read)
@@ -55,11 +55,9 @@
           (progn
             (agentel-test-wait-until
              (lambda () (and (eq (agentel-session-state resumed) 'idle)
-                             (equal (alist-get 'currentValue
-                                               (agentel-config-option resumed "mode"))
+                             (equal (agentel-config-value resumed "mode")
                                     "plan"))))
-            (should (equal (alist-get 'currentValue
-                                      (agentel-config-option resumed "model"))
+            (should (equal (agentel-config-value resumed "model")
                            "haiku")))
         (kill-buffer (agentel-session-buffer resumed))))))
 

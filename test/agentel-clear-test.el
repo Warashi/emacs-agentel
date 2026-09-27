@@ -12,7 +12,7 @@
 (ert-deftest agentel-clear-starts-over-with-the-same-settings ()
   (agentel-test-with-started session '(:model "haiku" :mode "plan")
     (agentel-test-wait-until
-     (lambda () (equal (alist-get 'currentValue (agentel-config-option session "mode"))
+     (lambda () (equal (agentel-config-value session "mode")
                        "plan")))
     (agentel-test-send "hello")
     (agentel-test-wait-for-text "Echo: hello")
@@ -33,12 +33,10 @@
               (should-not (memq session (agentel-session-list)))
               (agentel-test-wait-until
                (lambda () (and (eq (agentel-session-state cleared) 'idle)
-                               (equal (alist-get 'currentValue
-                                                 (agentel-config-option cleared "mode"))
+                               (equal (agentel-config-value cleared "mode")
                                       "plan"))))
               (should (equal (agentel-session-cwd cleared) (agentel-session-cwd session)))
-              (should (equal (alist-get 'currentValue
-                                        (agentel-config-option cleared "model"))
+              (should (equal (agentel-config-value cleared "model")
                              "haiku"))
               (with-current-buffer (agentel-session-buffer cleared)
                 (should-not (save-excursion (goto-char (point-min))

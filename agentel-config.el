@@ -40,26 +40,77 @@
 (defconst agentel-config--header-order '("model" "thought_level" "mode")
   "Config option categories shown first in the header line, in this order.")
 
+(defun agentel-config--update (message data)
+  "Return the config DATA of a session changed by MESSAGE.
+DATA has the `options', each an alist of its `id', `name', `category',
+current `value' and the `choices' of values, each an alist of its
+`value' and `name'.  MESSAGE is (report OPTIONS), which replaces the
+options, or (select CATEGORY VALUE)."
+  (pcase-let ((`(,field . ,value)
+               (pcase message
+                 (`(report ,options) `(options . ,options))
+                 (`(select ,category ,value)
+                  `(options
+                    . ,(mapcar (lambda (option)
+                                 (if (equal (alist-get 'category option) category)
+                                     (let ((option (copy-alist option)))
+                                       (setf (alist-get 'value option) value)
+                                       option)
+                                   option))
+                               (alist-get 'options data)))))))
+    (cons (cons field value) (assq-delete-all field (copy-alist data)))))
+
+(agentel-store-define 'agentel-config #'agentel-config--update)
+
+(defun agentel-config--send (session message)
+  "Change the config of SESSION by MESSAGE, see `agentel-config--update'."
+  (agentel-store-dispatch (agentel-session-store session) 'config 'agentel-config
+                          message))
+
+(defun agentel-config--get (session field)
+  "Return the value FIELD of the config of SESSION has now."
+  (when-let* ((model (agentel-store-find (agentel-session-store session) 'config)))
+    (agentel-store-get model field)))
+
+(defun agentel-config--options (session)
+  "Return the config options of SESSION."
+  (agentel-config--get session 'options))
+
 (defun agentel-config-option (session category)
   "Return the config option of CATEGORY in SESSION."
   (seq-find (lambda (o) (equal (alist-get 'category o) category))
-            (agentel-session-data session 'config-options)))
+            (agentel-config--options session)))
 
-(defun agentel-config--store (session options)
-  "Record the config OPTIONS the agent reported for SESSION."
+(defun agentel-config-value (session category)
+  "Return the current value of the config option of CATEGORY in SESSION."
+  (alist-get 'value (agentel-config-option session category)))
+
+(defun agentel-config--report (session options)
+  "Report to SESSION the config OPTIONS the agent gave, if any."
   (when options
-    (setf (agentel-session-data session 'config-options) (append options nil))))
+    (agentel-config--send
+     session
+     `(report
+       ,(mapcar (lambda (option)
+                  (let-alist option
+                    `((id . ,.id) (name . ,.name) (category . ,.category)
+                      (value . ,.currentValue)
+                      (choices . ,(mapcar (lambda (choice)
+                                            (let-alist choice
+                                              `((value . ,.value) (name . ,.name))))
+                                          .options)))))
+                options)))))
 
 (defun agentel-config--value-name (option)
   "Return the display name of the current value of OPTION."
-  (let ((value (alist-get 'currentValue option)))
+  (let ((value (alist-get 'value option)))
     (or (alist-get 'name (seq-find (lambda (v) (equal (alist-get 'value v) value))
-                                   (alist-get 'options option)))
+                                   (alist-get 'choices option)))
         (format "%s" value))))
 
 (defun agentel-config--header (session)
   "Return the header line segment of SESSION's settings."
-  (when-let* ((options (agentel-session-data session 'config-options)))
+  (when-let* ((options (agentel-config--options session)))
     (string-join
      (mapcar (lambda (option)
                (if (member (alist-get 'category option) agentel-config--header-order)
@@ -82,7 +133,7 @@ CALLBACK is called without arguments once the agent answered."
    (agentel-session-connection session) "session/set_config_option"
    `((sessionId . ,(agentel-session-id session)) (configId . ,id) (value . ,value))
    :on-success (lambda (result)
-                 (agentel-config--store session (alist-get 'configOptions result))
+                 (agentel-config--report session (alist-get 'configOptions result))
                  (when callback (funcall callback)))
    :on-failure (lambda (error)
                  (agentel-conversation-note session
@@ -95,7 +146,7 @@ CALLBACK is called without arguments once the agent answered."
   "Return the value of OPTION that VALUE gives, directly or by its name.
 Other values are left to the agent, which accepts aliases such as
 \"opus\" that are not among the values it lists."
-  (let ((values (alist-get 'options option)))
+  (let ((values (alist-get 'choices option)))
     (if (seq-find (lambda (v) (equal (alist-get 'value v) value)) values)
         value
       (or (alist-get 'value (seq-find (lambda (v)
@@ -125,7 +176,7 @@ category of the option it sets."
 
 (defun agentel-config--on-started (session result options)
   "Record the config options in RESULT and apply the start OPTIONS to SESSION."
-  (agentel-config--store session (alist-get 'configOptions result))
+  (agentel-config--report session (alist-get 'configOptions result))
   (let ((requests (delq nil (mapcar (lambda (entry)
                                       (when-let* ((value (plist-get options (car entry))))
                                         `(,(car entry) ,(cdr entry) . ,value)))
@@ -143,8 +194,7 @@ category of the option it sets."
 Options the current model lacks are left out, so the new session does
 not report them as unavailable."
   (mapcan (lambda (entry)
-            (when-let* ((value (alist-get 'currentValue
-                                          (agentel-config-option session (cdr entry)))))
+            (when-let* ((value (agentel-config-value session (cdr entry))))
               (list (car entry) value)))
           agentel-config--start-options))
 
@@ -152,20 +202,18 @@ not report them as unavailable."
   "Follow config changes the agent reports in UPDATE for SESSION."
   (pcase (alist-get 'sessionUpdate update)
     ("config_option_update"
-     (agentel-config--store session (alist-get 'configOptions update)))
+     (agentel-config--report session (alist-get 'configOptions update)))
     ("current_mode_update"
-     (when-let* ((option (agentel-config-option session "mode")))
-       (setf (alist-get 'currentValue option) (alist-get 'currentModeId update))
-       (agentel-session-changed session)))))
+     (agentel-config--send session `(select "mode" ,(alist-get 'currentModeId update))))))
 
 ;;;; Commands
 
 (defun agentel-config--read (session id)
   "Read a new value of the option ID of SESSION."
   (let* ((option (seq-find (lambda (o) (equal (alist-get 'id o) id))
-                           (agentel-session-data session 'config-options)))
+                           (agentel-config--options session)))
          (values (mapcar (lambda (v) (cons (alist-get 'name v) (alist-get 'value v)))
-                         (alist-get 'options option)))
+                         (alist-get 'choices option)))
          (choice (completing-read (format "%s (now %s): " (alist-get 'name option)
                                           (agentel-config--value-name option))
                                   (agentel-chat-ordered-completion values) nil t)))
@@ -175,8 +223,7 @@ not report them as unavailable."
   "Change the config option ID of the session of this buffer."
   (interactive
    (list (let ((options (mapcar (lambda (o) (cons (alist-get 'name o) (alist-get 'id o)))
-                                (agentel-session-data agentel-chat--session
-                                                      'config-options))))
+                                (agentel-config--options agentel-chat--session))))
            (cdr (assoc (completing-read "Option: " options nil t) options)))))
   (let ((session agentel-chat--session))
     (agentel-config-set session id (agentel-config--read session id))))
