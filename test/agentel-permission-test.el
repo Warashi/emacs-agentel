@@ -41,6 +41,17 @@
       (agentel-chat-answer))
     (agentel-test-wait-for-text "Permission outcome: allow-once")))
 
+(ert-deftest agentel-permission-stays-unanswered-when-nothing-is-chosen ()
+  (agentel-test-with-started session nil
+    (agentel-permission-test-ask)
+    (cl-letf (((symbol-function 'completing-read) (lambda (&rest _) "")))
+      (agentel-chat-answer))
+    (should (eq (agentel-session-state session) 'waiting))
+    (should (agentel-store-get
+             (seq-find (lambda (item) (eq (agentel-store-model-type item) 'permission))
+                       (agentel-conversation-items session))
+             'waiting))))
+
 (ert-deftest agentel-permission-item-holds-the-question-and-its-choices ()
   (agentel-test-with-started session nil
     (agentel-permission-test-ask)

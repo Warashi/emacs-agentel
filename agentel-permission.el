@@ -84,7 +84,8 @@ when the agent no longer asks."
          (choice (completing-read (concat (agentel-store-get item 'question) " ")
                                   (agentel-chat-ordered-completion choices)
                                   nil t)))
-    (agentel-permission-choose item (seq-position choices choice))))
+    (when-let* ((n (seq-position choices choice)))
+      (agentel-permission-choose item n))))
 
 (defun agentel-permission--close (item message)
   "Stop waiting for an answer to ITEM and send MESSAGE to it."
