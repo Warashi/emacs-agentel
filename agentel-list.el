@@ -100,7 +100,8 @@ their buffer was out of sight, until they are shown again."
       (`(shown ,sessions)
        `((sessions . ,.sessions)
          (unread . ,(seq-remove (lambda (session) (memq session sessions))
-                                .unread)))))))
+                                .unread))))
+      (_ (agentel-store-reject message)))))
 
 (defun agentel-list--session-lines (session seen sessions unread depth)
   "Return the lines of SESSION and its subagents indented by DEPTH.

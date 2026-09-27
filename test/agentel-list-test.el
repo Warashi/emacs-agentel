@@ -389,5 +389,9 @@
     (search-forward "Explore")
     (should-error (agentel-list-kill) :type 'user-error)))
 
+(ert-deftest agentel-list-rejects-an-unknown-message ()
+  (should-error (agentel-list--update '(forget) nil)
+                :type 'agentel-store-unknown-message))
+
 (provide 'agentel-list-test)
 ;;; agentel-list-test.el ends here
