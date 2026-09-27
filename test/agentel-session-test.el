@@ -122,6 +122,16 @@
     (should (eq (alist-get 'ended data) 'exited))
     (should (equal (alist-get 'title data) "Fix the bug"))))
 
+(ert-deftest agentel-session-rejects-an-unknown-message ()
+  (agentel-session-test-with-registry
+    (let ((session (agentel-session-create)))
+      (agentel-session-register session "s1")
+      (let* ((model (agentel-store-find (agentel-session-store session) 'state))
+             (revision (agentel-store-model-revision model)))
+        (should-error (agentel-session-send session '(rename "Fix the bug")))
+        (should (equal (agentel-store-model-data model) '((id . "s1"))))
+        (should (= (agentel-store-model-revision model) revision))))))
+
 (ert-deftest agentel-session-send-changes-the-session-and-tells-listeners ()
   (agentel-session-test-with-registry
     (let ((session (agentel-session-create))
