@@ -35,206 +35,241 @@
   "Return the client capability of answering forms."
   '((elicitation . ((form . nil)))))
 
-;;;; Schema
+;;;; Form
 
-(defun agentel-elicitation--fields (item)
-  "Return the fields of the form ITEM as (KEY . SCHEMA) in order."
-  (alist-get 'properties
-             (alist-get 'requestedSchema (plist-get item :params))))
+(defvar agentel-elicitation--requests (make-hash-table :test 'eq)
+  "Requests waiting for an answer by the items that show them.
+Each is a plist of the :connection and :id to answer, the :custom keys
+under which to send free text by the keys of their fields, and the
+:session waiting for it, where it is pending.")
 
-(defun agentel-elicitation--custom-for (field)
-  "Return the key of the choice whose custom answer FIELD is, or nil."
+(defun agentel-elicitation--render-field (field)
+  "Render FIELD of a form."
+  (let-alist field
+    (concat
+     "\n  "
+     (propertize .label 'face 'bold)
+     (if .description (concat " — " .description) "")
+     (if .multiple " (any number)" "")
+     (mapconcat (lambda (option)
+                  (let-alist option
+                    (concat "\n    • " .label
+                            (if .description (concat " — " .description) ""))))
+                .options ""))))
+
+(defun agentel-elicitation--summary (fields values others)
+  "Return the answers to a form of FIELDS as one line.
+VALUES and OTHERS are the answers as in `agentel-elicitation--update'."
+  (string-join
+   (mapcan
+    (lambda (field)
+      (let-alist field
+        (delq nil
+              (list
+               (when-let* ((value (assq .key values)))
+                 (format "%s: %s" .label
+                         (if (consp (cdr value))
+                             (mapconcat (lambda (v) (format "%s" v)) (cdr value) ", ")
+                           (cdr value))))
+               (when-let* ((text (alist-get .key others)))
+                 (format "%s: %s" .label text))))))
+    fields)
+   "; "))
+
+(defun agentel-elicitation--render (entry _options)
+  "Render the form ENTRY."
+  (let-alist (agentel-store-model-data entry)
+    (if (or .answered .declined .withdrawn)
+        (propertize (format "? %s → %s" .question
+                            (cond (.answered (agentel-elicitation--summary
+                                              .fields .values .others))
+                                  (.declined "declined")
+                                  (t "withdrawn")))
+                    'face 'agentel-chat-notice-face)
+      (concat
+       (propertize (concat "? " .question) 'face 'agentel-elicitation-face)
+       (mapconcat #'agentel-elicitation--render-field .fields "")
+       "\n  "
+       (buttonize "[Answer]" (lambda (_) (agentel-elicitation--ask entry)))
+       " "
+       (buttonize "[Decline]" (lambda (_) (agentel-elicitation-decline entry)))))))
+
+(defun agentel-elicitation--update (message data)
+  "Return the DATA of a form changed by MESSAGE.
+MESSAGE is (ask QUESTION FIELDS) when the agent asks, (answer VALUES
+OTHERS) when the user answers, (decline) when the user declines and
+\(withdraw) when the agent no longer asks.
+
+Each field has its `key', its `label', maybe a `description', its
+`kind', one of `choice', `boolean', `number' and `text', `multiple'
+when it takes any number of answers, and the `options' of a choice,
+each with its `label', its `value' and maybe a `description'.
+VALUES maps the keys of fields to their answers, a list of values for
+a multiple choice, and OTHERS maps the keys of choices to text typed
+that matches no option."
+  (pcase message
+    (`(ask ,question ,fields)
+     `((question . ,question) (fields . ,fields) (waiting . t)))
+    (`(answer ,values ,others)
+     (let-alist data
+       `((question . ,.question) (fields . ,.fields)
+         (answered . t) (values . ,values) (others . ,others))))
+    ('(decline)
+     (let-alist data `((question . ,.question) (fields . ,.fields) (declined . t))))
+    ('(withdraw)
+     (let-alist data `((question . ,.question) (fields . ,.fields) (withdrawn . t))))))
+
+(agentel-conversation-define 'elicitation #'agentel-elicitation--update)
+(agentel-ui-define-view 'elicitation #'agentel-elicitation--render)
+
+;;;; Answering
+
+(defun agentel-elicitation--read-choice (prompt options)
+  "Read one of OPTIONS with PROMPT.
+Return (VALUE . nil) for an option, (nil . TEXT) for other text and
+nil when skipped."
+  (let* ((labels (mapcar (lambda (o) (alist-get 'label o)) options))
+         (answer (string-trim
+                  (completing-read prompt
+                                   (agentel-chat-ordered-completion labels)))))
+    (cond ((string-empty-p answer) nil)
+          ((member answer labels)
+           (cons (alist-get 'value (nth (seq-position labels answer) options)) nil))
+          (t (cons nil answer)))))
+
+(defun agentel-elicitation--read-choices (prompt options)
+  "Read any number of OPTIONS with PROMPT.
+Return (VALUES . TEXT) where TEXT joins answers matching no option."
+  (let* ((labels (mapcar (lambda (o) (alist-get 'label o)) options))
+         (answers (completing-read-multiple prompt labels))
+         values others)
+    (dolist (answer answers)
+      (if (member answer labels)
+          (push (alist-get 'value (nth (seq-position labels answer) options)) values)
+        (push answer others)))
+    (cons (nreverse values)
+          (and others (string-join (nreverse others) ", ")))))
+
+(defun agentel-elicitation--read-field (field)
+  "Read the value of the plain FIELD, or nil to skip it."
+  (let ((prompt (format "%s: " (alist-get 'label field))))
+    (pcase (alist-get 'kind field)
+      ('boolean (if (y-or-n-p prompt) t :false))
+      ('number (read-number prompt))
+      (_ (let ((text (string-trim (read-string prompt))))
+           (unless (string-empty-p text) text))))))
+
+(defun agentel-elicitation--read (fields)
+  "Read the answers to FIELDS and return (VALUES . OTHERS).
+VALUES and OTHERS are as in `agentel-elicitation--update'."
+  (let (values others)
+    (dolist (field fields)
+      (let-alist field
+        (if (eq .kind 'choice)
+            (let* ((prompt (format "%s%s: " .label
+                                   (if .description (format " (%s)" .description) "")))
+                   (answer (if .multiple
+                               (agentel-elicitation--read-choices prompt .options)
+                             (agentel-elicitation--read-choice prompt .options))))
+              (when (car answer) (push (cons .key (car answer)) values))
+              (when (cdr answer) (push (cons .key (cdr answer)) others)))
+          (when-let* ((value (agentel-elicitation--read-field field)))
+            (push (cons .key value) values)))))
+    (cons (nreverse values) (nreverse others))))
+
+(defun agentel-elicitation--ask (item)
+  "Fill in the form ITEM from the minibuffer and send the answers."
+  (let ((answers (agentel-elicitation--read (agentel-store-get item 'fields))))
+    (agentel-elicitation-answer item (car answers) (cdr answers))))
+
+;;;; Protocol
+
+(defun agentel-elicitation--custom-for (property)
+  "Return the key of the choice whose custom answer PROPERTY is, or nil."
   (when-let* ((meta (alist-get '_askUserQuestionCustomAnswer
-                               (alist-get '_meta (cdr field))))
+                               (alist-get '_meta (cdr property))))
               (question (alist-get 'questionId meta)))
     (intern question)))
 
-(defun agentel-elicitation--custom-field (fields key)
-  "Return the key of the custom answer field of the choice KEY in FIELDS."
-  (car (seq-find (lambda (f) (eq (agentel-elicitation--custom-for f) key))
-                 fields)))
-
 (defun agentel-elicitation--options (schema)
-  "Return the options of the choice SCHEMA as (TITLE VALUE DESCRIPTION)."
+  "Return the options of the choice SCHEMA."
   (let ((items (or (alist-get 'oneOf schema)
                    (alist-get 'anyOf (alist-get 'items schema))))
         (plain (or (alist-get 'enum schema)
                    (alist-get 'enum (alist-get 'items schema)))))
     (if items
         (mapcar (lambda (o)
-                  (list (or (alist-get 'title o) (format "%s" (alist-get 'const o)))
-                        (alist-get 'const o)
-                        (alist-get 'description o)))
+                  (seq-filter
+                   #'cdr
+                   `((label . ,(or (alist-get 'title o)
+                                   (format "%s" (alist-get 'const o))))
+                     (value . ,(alist-get 'const o))
+                     (description . ,(alist-get 'description o)))))
                 items)
-      (mapcar (lambda (v) (list (format "%s" v) v nil)) plain))))
+      (mapcar (lambda (v) `((label . ,(format "%s" v)) (value . ,v))) plain))))
 
-(defun agentel-elicitation--label (key schema)
-  "Return the label of the field KEY with SCHEMA."
-  (or (alist-get 'title schema) (symbol-name key)))
+(defun agentel-elicitation--field (property)
+  "Return the field asked by the schema PROPERTY, a (KEY . SCHEMA)."
+  (let* ((schema (cdr property))
+         (options (agentel-elicitation--options schema)))
+    (seq-filter
+     #'cdr
+     `((key . ,(car property))
+       (label . ,(or (alist-get 'title schema) (symbol-name (car property))))
+       (description . ,(alist-get 'description schema))
+       (kind . ,(if options 'choice
+                  (pcase (alist-get 'type schema)
+                    ("boolean" 'boolean)
+                    ((or "number" "integer") 'number)
+                    (_ 'text))))
+       (multiple . ,(equal (alist-get 'type schema) "array"))
+       (options . ,options)))))
 
-;;;; Display
+(defun agentel-elicitation--content (request fields values others)
+  "Return the content of the answer to REQUEST with FIELDS.
+VALUES and OTHERS are as in `agentel-elicitation--update'."
+  (let (content)
+    (dolist (field fields)
+      (let ((key (alist-get 'key field)))
+        (when-let* ((value (assq key values)))
+          (push (cons key (if (consp (cdr value)) (vconcat (cdr value)) (cdr value)))
+                content))
+        (when-let* ((text (alist-get key others)))
+          (push (cons (or (alist-get key (plist-get request :custom)) key) text)
+                content))))
+    (or (nreverse content) (make-hash-table))))
 
-(defun agentel-elicitation--render-field (field)
-  "Render FIELD of a form."
-  (let* ((schema (cdr field))
-         (description (alist-get 'description schema))
-         (multiple (equal (alist-get 'type schema) "array")))
-    (concat
-     "\n  "
-     (propertize (agentel-elicitation--label (car field) schema) 'face 'bold)
-     (if description (concat " — " description) "")
-     (if multiple " (any number)" "")
-     (mapconcat (lambda (option)
-                  (concat "\n    • " (car option)
-                          (if (nth 2 option) (concat " — " (nth 2 option)) "")))
-                (agentel-elicitation--options schema) ""))))
+(defun agentel-elicitation--close (item message)
+  "Stop waiting for an answer to ITEM and send MESSAGE to it."
+  (let ((request (gethash item agentel-elicitation--requests)))
+    (remhash item agentel-elicitation--requests)
+    (agentel-session-remove-pending (plist-get request :session) request)
+    (agentel-conversation-send (plist-get request :session)
+                               (agentel-store-model-key item)
+                               'elicitation message)))
 
-(defun agentel-elicitation--summary (fields content)
-  "Return the answers CONTENT to a form of FIELDS as one line."
-  (mapconcat
-   (lambda (answer)
-     (let* ((key (or (agentel-elicitation--custom-for
-                      (assq (car answer) fields))
-                     (car answer)))
-            (value (cdr answer)))
-       (format "%s: %s"
-               (agentel-elicitation--label key (alist-get key fields))
-               (if (vectorp value)
-                   (mapconcat (lambda (v) (format "%s" v)) value ", ")
-                 value))))
-   content "; "))
-
-(defun agentel-elicitation--render (entry _options)
-  "Render the form ENTRY."
-  (let-alist (agentel-store-model-data entry)
-    (if .outcome
-        (propertize (format "? %s → %s" .question
-                            (if (eq .outcome 'accept)
-                                (agentel-elicitation--summary .fields .content)
-                              .outcome))
-                    'face 'agentel-chat-notice-face)
-      (concat
-       (propertize (concat "? " .question) 'face 'agentel-elicitation-face)
-       (mapconcat #'agentel-elicitation--render-field
-                  (seq-remove #'agentel-elicitation--custom-for .fields)
-                  "")
-       "\n  "
-       (buttonize "[Answer]" (lambda (_) (agentel-elicitation--ask .item)))
-       " "
-       (buttonize "[Decline]" (lambda (_) (agentel-elicitation-decline .item)))))))
-
-(defun agentel-elicitation--update (message data)
-  "Return the DATA of a form changed by MESSAGE.
-MESSAGE is (ask ITEM QUESTION FIELDS) when the agent asks, and
-\(close OUTCOME CONTENT) when the form is answered with CONTENT,
-declined or withdrawn.  ITEM is kept only to answer it."
-  (pcase message
-    (`(ask ,item ,question ,fields)
-     `((item . ,item) (question . ,question) (fields . ,fields) (waiting . t)))
-    (`(close ,outcome ,content)
-     (let-alist data
-       `((item . ,.item) (question . ,.question) (fields . ,.fields)
-         (outcome . ,outcome) (content . ,content))))))
-
-(agentel-conversation-define 'elicitation #'agentel-elicitation--update)
-(agentel-ui-define-view 'elicitation #'agentel-elicitation--render)
-
-(defun agentel-elicitation--send (item message)
-  "Send MESSAGE to the conversation item of the form ITEM."
-  (agentel-conversation-send (plist-get item :session)
-                             (cons 'elicitation (plist-get item :id))
-                             'elicitation message))
-
-;;;; Answering
-
-(defun agentel-elicitation--close (item outcome &optional content)
-  "Stop waiting for ITEM, recording OUTCOME and the answers CONTENT."
-  (plist-put item :outcome outcome)
-  (agentel-session-remove-pending (plist-get item :session) item)
-  (agentel-elicitation--send item `(close ,outcome ,content)))
-
-(defun agentel-elicitation--reply (item result outcome &optional content)
-  "Answer the form ITEM with RESULT and record OUTCOME and CONTENT."
-  (unless (plist-get item :outcome)
-    (agentel-connection-respond (plist-get item :connection) (plist-get item :id)
+(defun agentel-elicitation--reply (item result message)
+  "Answer the form ITEM with RESULT and send MESSAGE to it."
+  (when-let* ((request (gethash item agentel-elicitation--requests)))
+    (agentel-connection-respond (plist-get request :connection)
+                                (plist-get request :id)
                                 result)
-    (agentel-elicitation--close item outcome content)))
+    (agentel-elicitation--close item message)))
+
+(defun agentel-elicitation-answer (item values others)
+  "Answer the form ITEM with VALUES and OTHERS.
+They are as in `agentel-elicitation--update'."
+  (when-let* ((request (gethash item agentel-elicitation--requests)))
+    (agentel-elicitation--reply
+     item
+     `((action . "accept")
+       (content . ,(agentel-elicitation--content
+                    request (agentel-store-get item 'fields) values others)))
+     `(answer ,values ,others))))
 
 (defun agentel-elicitation-decline (item)
   "Decline to answer the form ITEM."
-  (agentel-elicitation--reply item '((action . "decline")) 'declined))
-
-(defun agentel-elicitation--read-choice (prompt schema)
-  "Read a choice of SCHEMA with PROMPT.
-Return (VALUE . nil) for an option, (nil . TEXT) for other text and
-nil when skipped."
-  (let* ((options (agentel-elicitation--options schema))
-         (answer (string-trim
-                  (completing-read prompt
-                                   (agentel-chat-ordered-completion
-                                    (mapcar #'car options))))))
-    (cond ((string-empty-p answer) nil)
-          ((assoc answer options) (cons (nth 1 (assoc answer options)) nil))
-          (t (cons nil answer)))))
-
-(defun agentel-elicitation--read-choices (prompt schema)
-  "Read any number of choices of SCHEMA with PROMPT.
-Return (VALUES . TEXT) where TEXT joins answers matching no option."
-  (let* ((options (agentel-elicitation--options schema))
-         (answers (completing-read-multiple prompt (mapcar #'car options)))
-         values others)
-    (dolist (answer answers)
-      (if-let* ((option (assoc answer options)))
-          (push (nth 1 option) values)
-        (push answer others)))
-    (cons (nreverse values)
-          (and others (string-join (nreverse others) ", ")))))
-
-(defun agentel-elicitation--read-field (key schema)
-  "Read the value of the plain field KEY with SCHEMA, or nil to skip it."
-  (let ((prompt (format "%s: " (agentel-elicitation--label key schema))))
-    (pcase (alist-get 'type schema)
-      ("boolean" (if (y-or-n-p prompt) t :false))
-      ((or "number" "integer") (read-number prompt))
-      (_ (let ((text (string-trim (read-string prompt))))
-           (unless (string-empty-p text) text))))))
-
-(defun agentel-elicitation--read (item)
-  "Read the answers to the form ITEM and return the content alist."
-  (let ((fields (agentel-elicitation--fields item))
-        content)
-    (dolist (field fields)
-      (let* ((key (car field))
-             (schema (cdr field))
-             (custom (agentel-elicitation--custom-field fields key))
-             (prompt (format "%s%s: "
-                             (agentel-elicitation--label key schema)
-                             (if-let* ((d (alist-get 'description schema)))
-                                 (format " (%s)" d) ""))))
-        (cond
-         ((agentel-elicitation--custom-for field))
-         ((agentel-elicitation--options schema)
-          (let ((answer (if (equal (alist-get 'type schema) "array")
-                            (agentel-elicitation--read-choices prompt schema)
-                          (agentel-elicitation--read-choice prompt schema))))
-            (when (car answer)
-              (push (cons key (if (listp (car answer)) (vconcat (car answer))
-                                (car answer)))
-                    content))
-            (when (cdr answer)
-              (push (cons (or custom key) (cdr answer)) content))))
-         (t (when-let* ((value (agentel-elicitation--read-field key schema)))
-              (push (cons key value) content))))))
-    (nreverse content)))
-
-(defun agentel-elicitation--ask (item)
-  "Fill in the form ITEM from the minibuffer and send the answers."
-  (let ((content (agentel-elicitation--read item)))
-    (agentel-elicitation--reply
-     item `((action . "accept") (content . ,(or content (make-hash-table))))
-     'accept content)))
-
-;;;; Protocol
+  (agentel-elicitation--reply item '((action . "decline")) '(decline)))
 
 (defun agentel-elicitation--session (connection params)
   "Return the session of CONNECTION that PARAMS ask in."
@@ -246,25 +281,37 @@ Return (VALUES . TEXT) where TEXT joins answers matching no option."
   "Handle the form request ID with PARAMS on CONNECTION."
   (let ((session (agentel-elicitation--session connection params)))
     (if (and session (equal (alist-get 'mode params) "form"))
-        (let ((item (list :kind 'elicitation :id id :params params
-                          :session session :connection connection)))
-          (plist-put item :answer (lambda () (agentel-elicitation--ask item)))
-          (agentel-session-add-pending session item)
-          (agentel-elicitation--send
-           item `(ask ,item ,(or (alist-get 'message params) "Question")
-                      ,(agentel-elicitation--fields item))))
+        (let* ((properties (alist-get 'properties (alist-get 'requestedSchema params)))
+               (custom (delq nil (mapcar (lambda (p)
+                                           (when-let* ((key (agentel-elicitation--custom-for p)))
+                                             (cons key (car p))))
+                                         properties)))
+               (item (agentel-conversation-send
+                      session (cons 'elicitation id) 'elicitation
+                      `(ask ,(or (alist-get 'message params) "Question")
+                            ,(mapcar #'agentel-elicitation--field
+                                     (seq-remove #'agentel-elicitation--custom-for
+                                                 properties)))))
+               (request (list :connection connection :id id :session session
+                              :custom custom
+                              :answer (lambda () (agentel-elicitation--ask item)))))
+          (puthash item request agentel-elicitation--requests)
+          (agentel-session-add-pending session request))
       (agentel-connection-respond connection id '((action . "decline"))))))
 
 (defun agentel-elicitation--withdraw (connection method params)
   "Drop the form of CONNECTION that the agent withdrew.
 METHOD and PARAMS are those of the notification."
   (when (equal method "$/cancel_request")
-    (dolist (session (agentel-session-list))
-      (dolist (item (agentel-session-pending session))
-        (when (and (eq (plist-get item :kind) 'elicitation)
-                   (eq (plist-get item :connection) connection)
-                   (equal (plist-get item :id) (alist-get 'requestId params)))
-          (agentel-elicitation--close item 'withdrawn))))))
+    (let (withdrawn)
+      (maphash (lambda (item request)
+                 (when (and (eq (plist-get request :connection) connection)
+                            (equal (plist-get request :id)
+                                   (alist-get 'requestId params)))
+                   (push item withdrawn)))
+               agentel-elicitation--requests)
+      (dolist (item withdrawn)
+        (agentel-elicitation--close item '(withdraw))))))
 
 (add-hook 'agentel-connection-capability-functions #'agentel-elicitation--capabilities)
 (setf (alist-get "elicitation/create" agentel-connection-request-handlers

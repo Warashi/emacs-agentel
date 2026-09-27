@@ -63,6 +63,26 @@
     (agentel-test-wait-for-text (regexp-quote "{\"action\":\"decline\"}"))
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))))
 
+(ert-deftest agentel-elicitation-item-holds-the-question-and-its-fields ()
+  (agentel-test-with-started session nil
+    (agentel-elicitation-test-ask)
+    (let ((item (seq-find (lambda (item) (eq (agentel-store-model-type item) 'elicitation))
+                          (agentel-conversation-items session))))
+      (should (equal (agentel-store-model-data item)
+                     '((question . "Please answer the following questions.")
+                       (fields
+                        ((key . question_0) (label . "Color")
+                         (description . "Which color do you prefer?") (kind . choice)
+                         (options ((label . "Red") (value . "Red") (description . "Warm"))
+                                  ((label . "Blue") (value . "Blue") (description . "Cool"))))
+                        ((key . question_1) (label . "Fruits")
+                         (description . "Which fruits do you like?") (kind . choice)
+                         (multiple . t)
+                         (options ((label . "Apple") (value . "Apple"))
+                                  ((label . "Banana") (value . "Banana"))
+                                  ((label . "Cherry") (value . "Cherry")))))
+                       (waiting . t)))))))
+
 (ert-deftest agentel-elicitation-item-waits-until-it-is-answered ()
   (agentel-test-with-started session nil
     (agentel-elicitation-test-ask)
@@ -88,23 +108,32 @@
      (agentel-ui-view (agentel-store-model--make :type 'elicitation :data data)))))
 
 (defconst agentel-elicitation-test-ask
-  '(ask item "Pick one"
-        ((color (title . "Color") (oneOf . [((const . "r") (title . "Red"))]))))
+  '(ask "Pick one"
+        (((key . color) (label . "Color") (kind . choice)
+          (options ((label . "Red") (value . "r"))))
+         ((key . fruits) (label . "Fruits") (kind . choice) (multiple . t)
+          (options ((label . "Apple") (value . "a")) ((label . "Cherry") (value . "c"))))))
   "The message asking for a color.")
 
 (ert-deftest agentel-elicitation-view-shows-what-it-was-asked ()
   (should (equal (agentel-elicitation-test-view agentel-elicitation-test-ask)
-                 "? Pick one\n  Color\n    • Red\n  [Answer] [Decline]")))
+                 (concat "? Pick one\n  Color\n    • Red"
+                         "\n  Fruits (any number)\n    • Apple\n    • Cherry"
+                         "\n  [Answer] [Decline]"))))
 
 (ert-deftest agentel-elicitation-view-shows-the-answers ()
   (should (equal (agentel-elicitation-test-view agentel-elicitation-test-ask
-                                                '(close accept ((color . "r"))))
-                 "? Pick one → Color: r")))
+                                                '(answer ((color . "r") (fruits "a" "c"))
+                                                         ((fruits . "Durian"))))
+                 "? Pick one → Color: r; Fruits: a, c; Fruits: Durian")))
 
 (ert-deftest agentel-elicitation-view-shows-why-it-was-not-answered ()
   (should (equal (agentel-elicitation-test-view agentel-elicitation-test-ask
-                                                '(close declined nil))
-                 "? Pick one → declined")))
+                                                '(decline))
+                 "? Pick one → declined"))
+  (should (equal (agentel-elicitation-test-view agentel-elicitation-test-ask
+                                                '(withdraw))
+                 "? Pick one → withdrawn")))
 
 (provide 'agentel-elicitation-test)
 ;;; agentel-elicitation-test.el ends here
