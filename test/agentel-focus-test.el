@@ -225,7 +225,7 @@
     (agentel-focus-test-prompt session "do it")
     (agentel-focus-test-chunk "agent_message_chunk" "Let me look.")
     (agentel-focus-test-tool "t1" "Read a.el")
-    (agentel-chat--finish-turn session)
+    (agentel-turn--finish session)
     (should (string-match-p "\\`❯ do it\n\nLet me look\\.\n\n.*Read a\\.el\n\n❯ \\'"
                             (agentel-focus-test-visible)))))
 

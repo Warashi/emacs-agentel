@@ -30,7 +30,7 @@
 (require 'cl-lib)
 (require 'subr-x)
 (require 'agentel-session)
-(require 'agentel-connection)
+(require 'agentel-turn)
 (require 'agentel-conversation)
 (require 'agentel-store)
 (require 'agentel-ui)
@@ -330,31 +330,6 @@ full on top of the output."
           (make-overlay (- (point) (length agentel-chat-prompt-string)) (point)))
     (setq agentel-chat--input-start (point-marker))))
 
-(defun agentel-chat--finish-turn (session)
-  "Record that the turn of SESSION ended."
-  (agentel-session-send session '(finish-turn))
-  (agentel-conversation-finish-message session))
-
-(defun agentel-chat--prompt (session text)
-  "Send TEXT to the agent as a prompt of SESSION."
-  (agentel-session-send session '(start-turn))
-  (agentel-connection-request
-   (agentel-session-connection session) "session/prompt"
-   `((sessionId . ,(agentel-session-id session))
-     (prompt . [((type . "text") (text . ,text))]))
-   :on-success
-   (lambda (result)
-     (agentel-chat--finish-turn session)
-     (let ((reason (alist-get 'stopReason result)))
-       (unless (member reason '("end_turn" nil))
-         (agentel-conversation-note session (format "Turn ended: %s" reason) 'stop))))
-   :on-failure
-   (lambda (error)
-     (agentel-chat--finish-turn session)
-     (agentel-conversation-note session
-                                (format "Prompt failed: %s" (alist-get 'message error))
-                                'error))))
-
 (defun agentel-chat-send ()
   "Send the input to the agent."
   (interactive)
@@ -370,16 +345,12 @@ full on top of the output."
       (agentel-chat--set-input "")
       (unless (run-hook-with-args-until-success 'agentel-chat-send-functions
                                                 session text)
-        (agentel-conversation-prompt session text)
-        (agentel-chat--prompt session text)))))
+        (agentel-turn-prompt session text)))))
 
 (defun agentel-chat-cancel ()
   "Ask the agent to stop the current turn."
   (interactive)
-  (let ((session agentel-chat--session))
-    (agentel-connection-notify (agentel-session-connection session)
-                               "session/cancel"
-                               `((sessionId . ,(agentel-session-id session))))))
+  (agentel-turn-cancel agentel-chat--session))
 
 (defun agentel-chat-previous-input (n)
   "Replace the input with the Nth previous sent input."
