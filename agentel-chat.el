@@ -12,12 +12,10 @@
 ;; The transcript shows the conversation of the session, whose items
 ;; (messages, thoughts, tool calls, ...) are its entries; see
 ;; `agentel-conversation'.  The conversation outlives the buffer showing
-;; it, and the buffer subscribes to it.  An entry owns the text carrying
-;; its item in the `agentel-chat-entry' property, starting at its start
-;; marker.  An entry is changed by rendering it again and replacing
-;; exactly that text, and new entries are always inserted at the end of
-;; the transcript, so updating an older entry never moves text that
-;; belongs to another one.
+;; it, and the buffer subscribes to it.  The entries are drawn in a
+;; region of `agentel-ui-region' in front of the prompt, which changes
+;; only the text of the entries that changed.  The text of an entry
+;; carries its item in the `agentel-chat-entry' property.
 
 ;;; Code:
 
@@ -28,6 +26,7 @@
 (require 'agentel-conversation)
 (require 'agentel-store)
 (require 'agentel-ui)
+(require 'agentel-ui-region)
 
 (defgroup agentel nil
   "Agent Client Protocol client."
@@ -93,11 +92,8 @@ again or extended.")
 (defvar-local agentel-chat--session nil
   "Session shown in this buffer.")
 
-(defvar-local agentel-chat--starts nil
-  "Hash table of the start markers of the entries of this buffer.")
-
-(defvar-local agentel-chat--collapsed nil
-  "Hash table of the entries folded in this buffer.")
+(defvar-local agentel-chat--region nil
+  "Region of `agentel-ui-region' showing the transcript.")
 
 (defvar-local agentel-chat--transcript-end nil
   "Marker at the end of the transcript.")
@@ -147,75 +143,32 @@ transcript grows above them, so the undo history is dropped."
 
 (defun agentel-chat-entry-start (entry)
   "Return the marker at the start of the text of ENTRY in this buffer."
-  (gethash entry agentel-chat--starts))
+  (agentel-ui-region-start agentel-chat--region entry))
 
-(defun agentel-chat--entry-end (entry)
-  "Return the position after the text of ENTRY."
-  (next-single-property-change (agentel-chat-entry-start entry)
-                               'agentel-chat-entry nil
-                               (marker-position agentel-chat--transcript-end)))
+(defun agentel-chat--fit-gap ()
+  "Hide the gap in front of the prompt while the transcript is empty."
+  (when agentel-chat--input-start
+    (let* ((end (marker-position agentel-chat--transcript-end))
+           (empty (= end (point-min))))
+      (unless (eq (get-text-property end 'invisible) empty)
+        (agentel-chat--with-transcript
+          (put-text-property end (+ end 2) 'invisible empty))))))
 
-(defun agentel-chat--propertize (entry string)
-  "Return STRING marked as text of ENTRY."
-  (let ((string (copy-sequence string)))
-    (add-text-properties 0 (length string)
-                         (list 'agentel-chat-entry entry
-                               'read-only t
-                               'rear-nonsticky t
-                               'front-sticky '(read-only))
-                         string)
-    string))
-
-(defun agentel-chat--entry-string (entry at)
-  "Return the text of ENTRY when it starts at position AT."
-  (agentel-chat--propertize
-   entry
-   (concat (if (> at (point-min)) "\n\n" "")
-           (agentel-ui-view entry
-                            :collapsed (gethash entry agentel-chat--collapsed)
-                            :width (agentel-ui-line-width)))))
-
-(defun agentel-chat--insert (entry)
-  "Append the text of ENTRY to the transcript."
-  (when (agentel-ui-view-property (agentel-store-model-type entry) :collapsed)
-    (puthash entry t agentel-chat--collapsed))
-  (agentel-chat--with-transcript
-    (save-excursion
-      (goto-char agentel-chat--transcript-end)
-      ;; The gap in front of the prompt is hidden while nothing was said.
-      (when (and agentel-chat--input-start (= (point) (point-min)))
-        (remove-text-properties (point) (+ (point) 2) '(invisible nil)))
-      (puthash entry (copy-marker (point)) agentel-chat--starts)
-      (insert (agentel-chat--entry-string entry (point)))))
-  (run-hook-with-args 'agentel-chat-entry-changed-functions entry))
-
-(defun agentel-chat--refresh (entry)
-  "Render ENTRY again in place."
-  (let* ((start (marker-position (agentel-chat-entry-start entry)))
-         (end (agentel-chat--entry-end entry))
-         (offset (and (<= start (point)) (< (point) end) (- (point) start))))
-    (agentel-chat--with-transcript
-      (save-excursion
-        (goto-char start)
-        (delete-region start end)
-        (insert (agentel-chat--entry-string entry start))
-        ;; The start of the next entry was left in front of the new text.
-        (when-let* ((next (and (< (point) agentel-chat--transcript-end)
-                               (agentel-chat-entry-at (point)))))
-          (set-marker (agentel-chat-entry-start next) (point)))))
-    (run-hook-with-args 'agentel-chat-entry-changed-functions entry)
-    (when offset
-      (goto-char (min (+ start offset) (agentel-chat--entry-end entry))))))
+(defun agentel-chat--render ()
+  "Show the conversation of the session of this buffer in its transcript."
+  (dolist (entry (agentel-ui-region-render
+                  agentel-chat--region
+                  (agentel-conversation-items agentel-chat--session)))
+    (run-hook-with-args 'agentel-chat-entry-changed-functions entry))
+  (agentel-chat--fit-gap))
 
 (defun agentel-chat--show (session)
   "Show the conversation of SESSION in this buffer and follow its changes."
-  (mapc #'agentel-chat--insert (agentel-conversation-items session))
+  (agentel-chat--render)
   (let* ((buffer (current-buffer))
-         (subscriber (lambda (entry added)
+         (subscriber (lambda (_entry _added)
                        (with-current-buffer buffer
-                         (if added
-                             (agentel-chat--insert entry)
-                           (agentel-chat--refresh entry)))))
+                         (agentel-chat--render))))
          (unsubscribe (lambda () (agentel-conversation-unsubscribe session subscriber))))
     (agentel-conversation-subscribe session subscriber)
     ;; Changing the major mode forgets the entries of the buffer.
@@ -224,15 +177,14 @@ transcript grows above them, so the undo history is dropped."
 
 (defun agentel-chat-entry-at (&optional pos)
   "Return the entry at POS, which defaults to point."
-  (get-text-property (or pos (point)) 'agentel-chat-entry))
+  (agentel-ui-region-model-at agentel-chat--region (or pos (point))))
 
 (defun agentel-chat-toggle ()
   "Fold or unfold the entry at point."
   (interactive)
   (when-let* ((entry (agentel-chat-entry-at)))
-    (puthash entry (not (gethash entry agentel-chat--collapsed))
-             agentel-chat--collapsed)
-    (agentel-chat--refresh entry)))
+    (agentel-ui-region-toggle agentel-chat--region entry)
+    (run-hook-with-args 'agentel-chat-entry-changed-functions entry)))
 
 ;;;; Rendering
 
@@ -369,8 +321,7 @@ full on top of the output."
   (agentel-chat--with-transcript
     (goto-char (point-max))
     (let ((end (point)))
-      (insert (propertize (concat (propertize "\n\n" 'invisible (= end (point-min)))
-                                  agentel-chat-prompt-string)
+      (insert (propertize (concat "\n\n" agentel-chat-prompt-string)
                           'face 'agentel-chat-prompt-face
                           'read-only t
                           'front-sticky '(read-only)
@@ -495,10 +446,8 @@ command that asks the user and replies to the agent."
   "Major mode of agentel session buffers.
 The transcript is read-only; type the prompt at the end of the buffer
 and send it with \\[agentel-chat-send]."
-  (setq-local agentel-chat--starts (make-hash-table :test 'eq))
-  (setq-local agentel-chat--collapsed (make-hash-table :test 'eq))
-  (setq-local agentel-chat--transcript-end (point-min-marker))
-  (set-marker-insertion-type agentel-chat--transcript-end t)
+  (setq-local agentel-chat--region (agentel-ui-region-create (point-min) 'agentel-chat-entry))
+  (setq-local agentel-chat--transcript-end (agentel-ui-region-end agentel-chat--region))
   ;; The result of :eval is itself a mode line format, where % is special.
   (setq-local header-line-format
               '(:eval (string-replace "%" "%%" (agentel-chat--header-line))))
@@ -506,15 +455,8 @@ and send it with \\[agentel-chat-send]."
 
 (defun agentel-chat--fit-width ()
   "Render the entries and pinned lines that fit the line width again."
-  (let ((pos (point-min)) entries)
-    (while (< pos agentel-chat--transcript-end)
-      (let* ((entry (agentel-chat-entry-at pos))
-             (end (agentel-chat--entry-end entry)))
-        (when (text-property-any pos end 'agentel-ui-fits-width t)
-          (push entry entries))
-        (setq pos end)))
-    (mapc #'agentel-chat--refresh entries))
   (when agentel-chat--session
+    (agentel-chat--render)
     (agentel-chat-refresh-pin agentel-chat--session)))
 
 (defun agentel-chat-refresh-pin (session)

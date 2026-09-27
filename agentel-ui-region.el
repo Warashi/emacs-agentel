@@ -59,6 +59,11 @@ Text inserted at it goes in front of it, so it stays the end."
   "Return the model whose text of REGION is at POS."
   (get-text-property pos (agentel-ui-region--property region)))
 
+(defun agentel-ui-region-start (region model)
+  "Return the marker at the start of the text of MODEL in REGION."
+  (when-let* ((drawing (gethash model (agentel-ui-region--index region))))
+    (agentel-ui-region--drawing-start drawing)))
+
 (defmacro agentel-ui-region--changing (&rest body)
   "Run BODY, which changes the read-only text of a region.
 The change is not recorded for undo.  Undo records positions, and

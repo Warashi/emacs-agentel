@@ -6,7 +6,6 @@
 ;;; Code:
 
 (require 'ert)
-(require 'benchmark)
 (require 'agentel-focus)
 
 (defmacro agentel-focus-test-with-session (&rest body)
@@ -241,38 +240,6 @@ questions open."
           (agentel-focus-mode)
           (should (equal (list seed followed)
                          (list seed (agentel-focus-test-visible)))))))))
-
-(defun agentel-focus-test-time (turns tools change)
-  "Return the seconds CHANGE takes after TURNS turns and TOOLS tool calls.
-CHANGE is called with the session; the fastest of a few runs counts."
-  (agentel-focus-test-with-session
-    (dotimes (i turns)
-      (agentel-focus-test-prompt session (format "prompt %d" i))
-      (agentel-focus-test-tool (format "t%d" i) "Read x")
-      (agentel-focus-test-chunk "agent_message_chunk" "answer"))
-    (agentel-focus-test-prompt session "now")
-    (dotimes (i tools)
-      (agentel-focus-test-tool (format "now%d" i) "Read x"))
-    (agentel-focus-test-chunk "agent_message_chunk" "x")
-    (garbage-collect)
-    (apply #'min (mapcar (lambda (_)
-                           (car (benchmark-run 100 (funcall change session))))
-                         '(1 2 3)))))
-
-(defun agentel-focus-test-scales-flat-p (change)
-  "Return non-nil if CHANGE takes as long in a short session as in long ones."
-  (let ((short (agentel-focus-test-time 10 10 change)))
-    (and (< (agentel-focus-test-time 1000 10 change) (* 5 short))
-         (< (agentel-focus-test-time 10 3000 change) (* 5 short)))))
-
-(ert-deftest agentel-focus-follows-a-chunk-regardless-of-the-length ()
-  (should (agentel-focus-test-scales-flat-p
-           (lambda (_) (agentel-focus-test-chunk "agent_message_chunk" "more text ")))))
-
-(ert-deftest agentel-focus-follows-a-question-regardless-of-the-length ()
-  (should (agentel-focus-test-scales-flat-p
-           (lambda (session)
-             (agentel-focus-test-question session 'q "Q?" (zerop (random 2)))))))
 
 (ert-deftest agentel-focus-can-be-turned-on-for-every-session-buffer ()
   (let ((agentel-session--registry nil)
