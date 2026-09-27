@@ -284,29 +284,6 @@
     (goto-char (point-min))
     (should-error (insert "x") :type 'text-read-only)))
 
-(ert-deftest agentel-chat-tells-which-entry-changed ()
-  (agentel-chat-test-with-session
-    (let ((agentel-chat-format-message-function nil)
-          changed)
-      (add-hook 'agentel-chat-entry-changed-functions (lambda (e) (push e changed)) nil t)
-      (agentel-chat-test-chunk "agent_message_chunk" "Hel")
-      (let ((message (agentel-chat-entry-at (point-min))))
-        (should (equal changed (list message)))
-        (agentel-chat-test-chunk "agent_message_chunk" "lo")
-        (should (equal changed (list message message))))
-      (agentel-conversation-finish-message session)
-      (setq changed nil)
-      (agentel-chat-test-update '((sessionUpdate . "tool_call") (toolCallId . "t1")
-                                  (title . "Read") (status . "pending")))
-      (should changed)
-      (should (seq-every-p (lambda (e) (eq e (agentel-conversation-find session
-                                                                        '(tool . "t1"))))
-                           changed))
-      (setq changed nil)
-      (goto-char (point-max))
-      (insert "typing")
-      (should-not changed))))
-
 (ert-deftest agentel-chat-fits-summary-lines-again-when-the-window-widens ()
   (agentel-chat-test-with-session
     (save-window-excursion

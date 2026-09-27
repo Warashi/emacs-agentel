@@ -81,11 +81,6 @@ sent to the agent as a prompt.")
 It is called with the text once the message is complete, so it never
 sees half of a construct, such as a code block, that spans chunks.")
 
-(defvar agentel-chat-entry-changed-functions nil
-  "Abnormal hook run in a session buffer after the text of an entry changed.
-Each function is called with the entry, once it was added, rendered
-again or extended.")
-
 (defvar-local agentel-chat-transcript-function #'identity
   "Function choosing the entries the transcript of this buffer shows.
 It is called with the items of the conversation, oldest first, and
@@ -147,10 +142,6 @@ transcript grows above them, so the undo history is dropped."
        (unless (eq buffer-undo-list t)
          (setq buffer-undo-list nil)))))
 
-(defun agentel-chat-entry-start (entry)
-  "Return the marker at the start of the text of ENTRY in this buffer."
-  (agentel-ui-region-start agentel-chat--region entry))
-
 (defun agentel-chat--fit-gap ()
   "Hide the gap in front of the prompt while the transcript is empty."
   (when agentel-chat--input-start
@@ -165,11 +156,9 @@ transcript grows above them, so the undo history is dropped."
 The entries shown are those `agentel-chat-transcript-function' chooses.
 Before the buffer shows a session, nothing is shown."
   (when agentel-chat--session
-    (dolist (entry (agentel-ui-region-render
-                    agentel-chat--region
-                    (funcall agentel-chat-transcript-function
-                             (agentel-conversation-items agentel-chat--session))))
-      (run-hook-with-args 'agentel-chat-entry-changed-functions entry))
+    (agentel-ui-region-render agentel-chat--region
+                              (funcall agentel-chat-transcript-function
+                                       (agentel-conversation-items agentel-chat--session)))
     (agentel-chat--fit-gap)))
 
 (defun agentel-chat--show (session)
@@ -193,8 +182,7 @@ Before the buffer shows a session, nothing is shown."
   "Fold or unfold the entry at point."
   (interactive)
   (when-let* ((entry (agentel-chat-entry-at)))
-    (agentel-ui-region-toggle agentel-chat--region entry)
-    (run-hook-with-args 'agentel-chat-entry-changed-functions entry)))
+    (agentel-ui-region-toggle agentel-chat--region entry)))
 
 ;;;; Rendering
 

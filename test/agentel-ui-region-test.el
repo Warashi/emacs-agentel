@@ -83,15 +83,6 @@ The buffer ends with the text \"END\" after the region."
       (should (equal agentel-ui-region-test-drawn '("one more")))
       (should (equal (agentel-ui-region-test-text) "one more\n\ntwoEND")))))
 
-(ert-deftest agentel-ui-region-tells-which-models-it-drew ()
-  (agentel-ui-region-test-with-region
-    (let ((a (agentel-ui-region-test-note store 'a "one"))
-          (b (agentel-ui-region-test-note store 'b "two")))
-      (should (equal (agentel-ui-region-render region (list a b)) (list a b)))
-      (agentel-store-update store b '(show "three"))
-      (should (equal (agentel-ui-region-render region (list a b)) (list b)))
-      (should-not (agentel-ui-region-render region (list a b))))))
-
 (ert-deftest agentel-ui-region-removes-models-left-out ()
   (agentel-ui-region-test-with-region
     (let ((a (agentel-ui-region-test-note store 'a "one"))
