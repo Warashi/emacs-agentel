@@ -116,7 +116,9 @@
 
 (ert-deftest agentel-shows-why-the-agent-exited ()
   (let* ((agentel-session--registry nil)
-         (agentel-agents '((sh "sh" "-c" "echo 'Not logged in' >&2; exit 3")))
+         ;; A batch Emacs dies of SIGPIPE when it writes to an agent
+         ;; that is gone, so the agent reads the initialize request first.
+         (agentel-agents '((sh "sh" "-c" "read request; echo 'Not logged in' >&2; exit 3")))
          (agentel-default-agent 'sh)
          (session (agentel-start :cwd temporary-file-directory :display nil)))
     (unwind-protect
