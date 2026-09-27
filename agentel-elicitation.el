@@ -41,7 +41,7 @@
   "Requests waiting for an answer by the items that show them.
 Each is a plist of the :connection and :id to answer, the :custom keys
 under which to send free text by the keys of their fields, and the
-:session waiting for it, where it is pending.")
+:session whose conversation holds the item.")
 
 (defun agentel-elicitation--render-field (field)
   "Render FIELD of a form."
@@ -245,7 +245,6 @@ VALUES and OTHERS are as in `agentel-elicitation--update'."
   "Stop waiting for an answer to ITEM and send MESSAGE to it."
   (let ((request (gethash item agentel-elicitation--requests)))
     (remhash item agentel-elicitation--requests)
-    (agentel-session-remove-pending (plist-get request :session) request)
     (agentel-conversation-send (plist-get request :session)
                                (agentel-store-model-key item)
                                'elicitation message)))
@@ -296,8 +295,7 @@ They are as in `agentel-elicitation--update'."
                                                  properties)))))
                (request (list :connection connection :id id :session session
                               :custom custom)))
-          (puthash item request agentel-elicitation--requests)
-          (agentel-session-add-pending session request))
+          (puthash item request agentel-elicitation--requests))
       (agentel-connection-respond connection id '((action . "decline"))))))
 
 (defun agentel-elicitation--withdraw (connection method params)

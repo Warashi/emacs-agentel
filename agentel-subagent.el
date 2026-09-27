@@ -125,7 +125,7 @@ of CHILD.  CHILD is kept only to open its buffer."
            (state . ,(agentel-session-state child))
            (task . ,(agentel-session-data child 'subagent-task))
            (activity . ,(agentel-session-data child 'subagent-activity))
-           (waiting . ,(and (agentel-session-pending-items child) t))))))
+           (waiting . ,(and (agentel-session-waiting-p child) t))))))
 
 (defun agentel-subagent--spawn (parent update)
   "Create the subagent announced by UPDATE under PARENT."

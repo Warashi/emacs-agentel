@@ -50,8 +50,25 @@ nil for a new one, and returning its new data."
 (defun agentel-conversation-send (session key type message)
   "Send MESSAGE to the item of TYPE under KEY in the conversation of SESSION.
 Without such an item, one is added to the end, so a nil KEY adds one
-every time.  Return the item."
-  (agentel-store-dispatch (agentel-conversation--store session) key type message))
+every time.  Return the item.
+
+An item whose data has `waiting' waits for the user to answer it, and
+the session waits while it does."
+  (let* ((store (agentel-conversation--store session))
+         (before (and key (agentel-store-find store key)))
+         (was-waiting (and before (agentel-store-get before 'waiting) t))
+         (item (agentel-store-dispatch store key type message)))
+    (unless (eq was-waiting (and (agentel-store-get item 'waiting) t))
+      (agentel-session-waiting-changed session))
+    item))
+
+(defun agentel-conversation--waiting-p (session)
+  "Return non-nil if an item of the conversation of SESSION waits for an answer."
+  (when-let* ((store (agentel-session-data session 'conversation)))
+    (seq-some (lambda (item) (agentel-store-get item 'waiting))
+              (agentel-store-models store))))
+
+(add-hook 'agentel-session-waiting-functions #'agentel-conversation--waiting-p)
 
 (defun agentel-conversation-items (session)
   "Return the items of the conversation of SESSION, oldest first."

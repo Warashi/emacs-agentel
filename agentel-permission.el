@@ -28,7 +28,7 @@
   "Requests waiting for an answer by the items that show them.
 Each is a plist of the :connection and :id to answer, the :options to
 answer with in the order of the choices of the item, and the :session
-waiting for it, where it is pending.")
+whose conversation holds the item.")
 
 (defun agentel-permission--render (entry _options)
   "Render the permission request ENTRY."
@@ -93,7 +93,6 @@ when the agent no longer asks."
   "Stop waiting for an answer to ITEM and send MESSAGE to it."
   (let ((request (gethash item agentel-permission--requests)))
     (remhash item agentel-permission--requests)
-    (agentel-session-remove-pending (plist-get request :session) request)
     (agentel-conversation-send (plist-get request :session)
                                (agentel-store-model-key item)
                                'permission message)))
@@ -113,8 +112,7 @@ when the agent no longer asks."
              (request (list :connection connection :id id :session session
                             :options (mapcar (lambda (o) (alist-get 'optionId o))
                                              options))))
-        (puthash item request agentel-permission--requests)
-        (agentel-session-add-pending session request))
+        (puthash item request agentel-permission--requests))
     (agentel-connection-respond connection id '((outcome . ((outcome . "cancelled")))))))
 
 (defun agentel-permission--withdraw (connection method params)

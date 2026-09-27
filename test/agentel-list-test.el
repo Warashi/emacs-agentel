@@ -7,6 +7,7 @@
 
 (require 'ert)
 (require 'agentel-list)
+(require 'agentel-test-helper)
 
 (defmacro agentel-list-test-with-sessions (&rest body)
   "Run BODY with a parent `parent', its child `child' and another `other'."
@@ -150,7 +151,7 @@
 
 (ert-deftest agentel-list-shows-when-a-subagent-waits-for-the-user ()
   (agentel-list-test-with-sessions
-    (agentel-session-add-pending child 'question)
+    (agentel-test-ask child)
     (agentel-list--refresh)
     (should (equal (agentel-list-test-lines)
                    '("  🙋 repo-one" "    Fix things"
@@ -159,7 +160,7 @@
 
 (ert-deftest agentel-list-puts-sessions-waiting-for-the-user-first ()
   (agentel-list-test-with-sessions
-    (agentel-session-add-pending other 'question)
+    (agentel-test-ask other)
     (agentel-list--refresh)
     (should (equal (agentel-list-test-lines)
                    '("  🙋 two"
@@ -180,7 +181,7 @@
   (agentel-list-test-with-sessions
     (agentel-session-set-busy other t)
     (agentel-session-set-busy other nil)
-    (agentel-session-add-pending child 'question)
+    (agentel-test-ask child)
     (agentel-list--refresh)
     (should (equal (car (agentel-list-test-lines)) "  🙋 repo-one"))))
 

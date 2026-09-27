@@ -14,7 +14,9 @@
 ;; and react through `agentel-session-update-functions' and
 ;; `agentel-session-changed-functions', so each feature can be removed
 ;; without touching this file.  `agentel-session-withhold-functions'
-;; lets a feature keep an update from the others.
+;; lets a feature keep an update from the others, and
+;; `agentel-session-waiting-functions' tells whether the user owes a
+;; session an answer.
 
 ;;; Code:
 
@@ -24,7 +26,7 @@
 (cl-defstruct (agentel-session (:constructor agentel-session--make)
                                (:copier nil))
   "One ACP session."
-  id connection parent cwd title buffer busy ended pending
+  id connection parent cwd title buffer busy ended
   (project nil :documentation "Name of the project the session works in.")
   (agent nil :documentation "Name of the agent in `agentel-agents' that runs it.")
   (alist nil :documentation "Per-feature values, see `agentel-session-data'."))
@@ -44,6 +46,12 @@ the update.")
 
 (defvar agentel-session-changed-functions nil
   "Abnormal hook run with a session whenever its visible state changes.")
+
+(defvar agentel-session-waiting-functions nil
+  "Abnormal hook asked whether a session waits for the user to answer.
+Each function is called with the session.  When one returns non-nil,
+the session waits.  Whoever answers it calls
+`agentel-session-waiting-changed' when that changes.")
 
 (cl-defun agentel-session-create (&key connection parent cwd project agent)
   "Create a session on CONNECTION and add it to the registry.
@@ -117,31 +125,18 @@ chosen by each agent, so two agents may use the same one."
         (agentel-session-busy session) nil)
   (agentel-session-changed session))
 
-(defun agentel-session--changed-with-ancestors (session)
-  "Tell listeners that SESSION and the sessions above it changed."
+(defun agentel-session-waiting-p (session)
+  "Return non-nil if the user owes an answer to SESSION or to its subagents.
+Whether a session waits is asked of `agentel-session-waiting-functions'."
+  (or (run-hook-with-args-until-success 'agentel-session-waiting-functions session)
+      (seq-some #'agentel-session-waiting-p (agentel-session-children session))))
+
+(defun agentel-session-waiting-changed (session)
+  "Tell listeners that whether SESSION waits for the user changed.
+The sessions above it are told too, as they wait while it does."
   (while session
     (agentel-session-changed session)
     (setq session (agentel-session-parent session))))
-
-(defun agentel-session-add-pending (session item)
-  "Record that SESSION waits for the user to answer ITEM."
-  (setf (agentel-session-pending session)
-        (append (agentel-session-pending session) (list item)))
-  (agentel-session--changed-with-ancestors session))
-
-(defun agentel-session-remove-pending (session item)
-  "Record that the user answered ITEM of SESSION."
-  (setf (agentel-session-pending session)
-        (delq item (agentel-session-pending session)))
-  (agentel-session--changed-with-ancestors session))
-
-(defun agentel-session-pending-items (session)
-  "Return what SESSION and its subagents wait for, oldest session first.
-Each element is (OWNER . ITEM) where OWNER is the waiting session."
-  (append (mapcar (lambda (item) (cons session item))
-                  (agentel-session-pending session))
-          (mapcan #'agentel-session-pending-items
-                  (agentel-session-children session))))
 
 (defun agentel-session-state (session)
   "Return the state of SESSION as a symbol.
@@ -150,7 +145,7 @@ ended, `waiting' while the user owes an answer to it or to one of its
 subagents, `running' during a turn, and `idle' otherwise."
   (cond ((agentel-session-ended session))
         ((not (agentel-session-id session)) 'starting)
-        ((agentel-session-pending-items session) 'waiting)
+        ((agentel-session-waiting-p session) 'waiting)
         ((agentel-session-busy session) 'running)
         (t 'idle)))
 

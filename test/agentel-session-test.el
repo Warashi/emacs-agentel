@@ -13,7 +13,8 @@
   (declare (indent 0))
   `(let ((agentel-session--registry nil)
          (agentel-session-update-functions nil)
-         (agentel-session-changed-functions nil))
+         (agentel-session-changed-functions nil)
+         (agentel-session-waiting-functions nil))
      ,@body))
 
 (ert-deftest agentel-session-register-makes-session-findable-by-id ()
@@ -122,10 +123,11 @@
       (should (eq (agentel-session-state session) 'idle))
       (agentel-session-set-busy session t)
       (should (eq (agentel-session-state session) 'running))
-      (agentel-session-add-pending session 'question)
-      (should (eq (agentel-session-state session) 'waiting))
-      (agentel-session-remove-pending session 'question)
-      (should (eq (agentel-session-state session) 'running)))))
+      (let ((waiting t))
+        (add-hook 'agentel-session-waiting-functions (lambda (_session) waiting))
+        (should (eq (agentel-session-state session) 'waiting))
+        (setq waiting nil)
+        (should (eq (agentel-session-state session) 'running))))))
 
 (ert-deftest agentel-session-state-of-ended-session ()
   (agentel-session-test-with-registry
@@ -147,10 +149,18 @@
            (child (agentel-session-create :parent parent)))
       (agentel-session-register parent "p")
       (agentel-session-register child "c")
-      (agentel-session-add-pending child 'question)
+      (add-hook 'agentel-session-waiting-functions (lambda (s) (eq s child)))
       (should (eq (agentel-session-state parent) 'waiting))
-      (should (equal (agentel-session-pending-items parent)
-                     (list (cons child 'question)))))))
+      (should (agentel-session-waiting-p parent)))))
+
+(ert-deftest agentel-session-tells-the-sessions-above-when-waiting-changes ()
+  (agentel-session-test-with-registry
+    (let* ((parent (agentel-session-create))
+           (child (agentel-session-create :parent parent))
+           changed)
+      (add-hook 'agentel-session-changed-functions (lambda (s) (push s changed)))
+      (agentel-session-waiting-changed child)
+      (should (equal changed (list parent child))))))
 
 (ert-deftest agentel-session-name-is-one-line ()
   (agentel-session-test-with-registry

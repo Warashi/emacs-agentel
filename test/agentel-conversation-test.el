@@ -132,5 +132,29 @@
       (agentel-conversation-note session "two")
       (should (equal told '((notice . t)))))))
 
+(agentel-conversation-define 'agentel-conversation-test-question
+  (lambda (message _data)
+    (pcase message
+      ('(ask) '((waiting . t)))
+      ('(answer) '((answered . t))))))
+
+(ert-deftest agentel-conversation-session-waits-while-an-item-waits ()
+  (agentel-conversation-test-with-session
+    (agentel-conversation-send session 'q 'agentel-conversation-test-question '(ask))
+    (should (eq (agentel-session-state session) 'waiting))
+    (agentel-conversation-send session 'q 'agentel-conversation-test-question '(answer))
+    (should (eq (agentel-session-state session) 'idle))))
+
+(ert-deftest agentel-conversation-tells-when-the-session-starts-or-stops-waiting ()
+  (agentel-conversation-test-with-session
+    (let (changed)
+      (add-hook 'agentel-session-changed-functions (lambda (s) (push s changed)))
+      (agentel-conversation-send session 'q 'agentel-conversation-test-question '(ask))
+      (should (equal changed (list session)))
+      (agentel-conversation-send session 'q 'agentel-conversation-test-question '(ask))
+      (should (equal changed (list session)))
+      (agentel-conversation-send session 'q 'agentel-conversation-test-question '(answer))
+      (should (equal changed (list session session))))))
+
 (provide 'agentel-conversation-test)
 ;;; agentel-conversation-test.el ends here

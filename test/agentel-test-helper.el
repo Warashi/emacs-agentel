@@ -63,5 +63,22 @@ Return the value of PREDICATE, failing the test on timeout."
    (lambda () (save-excursion (goto-char (point-min))
                               (re-search-forward regexp nil t)))))
 
+(agentel-conversation-define 'agentel-test-question
+  (lambda (message _data)
+    (pcase message
+      ('(ask) '((waiting . t)))
+      ('(answer) '((answered . t))))))
+
+(agentel-ui-define-view 'agentel-test-question
+  (lambda (_item _options) "Question"))
+
+(defun agentel-test-ask (session)
+  "Make SESSION wait for the user to answer a question."
+  (agentel-conversation-send session 'agentel-test-question 'agentel-test-question '(ask)))
+
+(defun agentel-test-answer (session)
+  "Answer the question SESSION waits for."
+  (agentel-conversation-send session 'agentel-test-question 'agentel-test-question '(answer)))
+
 (provide 'agentel-test-helper)
 ;;; agentel-test-helper.el ends here
