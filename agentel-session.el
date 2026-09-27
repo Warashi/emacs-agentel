@@ -45,8 +45,8 @@
 DATA has the `id' the agent gave it, its `title', `in-turn' while the
 agent works on a prompt, `loading' while an earlier session is loaded
 into it, and `ended' with the reason once it ended.  MESSAGE is one of
-\=(register ID), (retitle TITLE), (start-turn), (finish-turn),
-\=(start-loading), (finish-loading) and (end REASON)."
+\\=(register ID), (retitle TITLE), (start-turn), (finish-turn),
+\\=(start-loading), (finish-loading) and (end REASON)."
   (pcase-let ((`(,field . ,value)
                (pcase message
                  (`(register ,id) `(id . ,id))
