@@ -14,7 +14,7 @@
   (declare (indent 0))
   `(let ((agentel-session--registry nil)
          (agentel-session-changed-functions (list #'agentel-focus--on-changed))
-         (agentel-session-update-functions (list #'agentel-chat--on-update)))
+         (agentel-session-update-functions (list #'agentel-conversation--on-update)))
      (let* ((session (agentel-session-create :cwd "/tmp/project/"))
             (buffer (agentel-chat-open session :input t)))
        (agentel-session-register session "s1")
