@@ -323,12 +323,27 @@ METHOD and PARAMS are those of the notification."
       (dolist (item gone)
         (remhash item agentel-elicitation--requests)))))
 
+(defun agentel-elicitation--end (session)
+  "Withdraw the forms of SESSION once it ended, as none can be answered."
+  (when (agentel-session-ended session)
+    (let (ended)
+      (maphash (lambda (item request)
+                 (when (eq (plist-get request :session) session)
+                   (push item ended)))
+               agentel-elicitation--requests)
+      (dolist (item ended)
+        ;; Withdrawing one tells the session it changed, which runs this
+        ;; again and may withdraw the others first.
+        (when (gethash item agentel-elicitation--requests)
+          (agentel-elicitation--close item '(withdraw)))))))
+
 (add-hook 'agentel-connection-capability-functions #'agentel-elicitation--capabilities)
 (setf (alist-get "elicitation/create" agentel-connection-request-handlers
                  nil nil #'equal)
       #'agentel-elicitation--handle)
 (add-hook 'agentel-connection-notification-functions #'agentel-elicitation--withdraw)
 (add-hook 'agentel-session-changed-functions #'agentel-elicitation--forget)
+(add-hook 'agentel-session-changed-functions #'agentel-elicitation--end)
 
 (provide 'agentel-elicitation)
 ;;; agentel-elicitation.el ends here
