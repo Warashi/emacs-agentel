@@ -38,6 +38,27 @@
     (agentel-store-update store model '(add 2))
     (should (equal (agentel-store-test-counts store) '(3)))))
 
+(ert-deftest agentel-store-counts-the-changes-of-a-model ()
+  (let* ((store (agentel-store-create))
+         (a (agentel-store-dispatch store 'a 'agentel-store-test-counter '(add 1)))
+         (b (agentel-store-dispatch store 'b 'agentel-store-test-counter '(add 1)))
+         (first (agentel-store-model-revision a)))
+    (agentel-store-dispatch store 'a 'agentel-store-test-counter '(add 1))
+    (should-not (equal (agentel-store-model-revision a) first))
+    (let ((second (agentel-store-model-revision a)))
+      (agentel-store-update store b '(add 1))
+      (should (equal (agentel-store-model-revision a) second)))))
+
+(ert-deftest agentel-store-counts-a-change-that-keeps-the-same-data ()
+  (let* ((store (agentel-store-create))
+         (model (agentel-store-dispatch store nil 'agentel-store-test-counter '(add 1)))
+         (first (agentel-store-model-revision model)))
+    (agentel-store-define 'agentel-store-test-in-place
+      (lambda (_message data) data))
+    (setf (agentel-store-model-type model) 'agentel-store-test-in-place)
+    (agentel-store-update store model '(anything))
+    (should-not (equal (agentel-store-model-revision model) first))))
+
 (ert-deftest agentel-store-tells-subscribers-which-model-was-added-or-changed ()
   (let ((store (agentel-store-create))
         told)

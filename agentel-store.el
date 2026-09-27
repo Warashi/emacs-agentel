@@ -33,7 +33,10 @@ nil for a new one, and returning its new data."
 (cl-defstruct (agentel-store-model (:constructor agentel-store-model--make)
                                    (:copier nil))
   "A piece of what a store keeps."
-  key type data)
+  key type data
+  (revision 0 :documentation "Number of times the data was changed.
+An update may change the data in place, so whoever needs to know that
+the data changed compares this instead."))
 
 (defun agentel-store-get (model key)
   "Return the value the data of MODEL has under KEY."
@@ -86,6 +89,7 @@ It is called with the model and non-nil when the model was added."
   (setf (agentel-store-model-data model)
         (funcall (alist-get (agentel-store-model-type model) agentel-store--updates)
                  message (agentel-store-model-data model)))
+  (cl-incf (agentel-store-model-revision model))
   (agentel-store--tell store model nil))
 
 (defun agentel-store-dispatch (store key type message)
