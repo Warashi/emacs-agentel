@@ -116,16 +116,19 @@ of CHILD.  CHILD is kept only to open its buffer."
 (agentel-ui-define-view 'subagent #'agentel-subagent--render)
 
 (defun agentel-subagent--show (child)
-  "Show the state of CHILD as an item of its parent's transcript."
-  (agentel-conversation-send
-   (agentel-session-parent child) (cons 'subagent (agentel-session-id child))
-   'subagent
-   `(show ,child
-          ((name . ,(agentel-session-name child))
-           (state . ,(agentel-session-state child))
-           (task . ,(agentel-session-data child 'subagent-task))
-           (activity . ,(agentel-session-data child 'subagent-activity))
-           (waiting . ,(and (agentel-session-waiting-p child) t))))))
+  "Show the state of CHILD as an item of its parent's transcript.
+The item is keyed by the id of CHILD, so nothing is shown before it
+has one."
+  (when-let* ((id (agentel-session-id child)))
+    (agentel-conversation-send
+     (agentel-session-parent child) (cons 'subagent id)
+     'subagent
+     `(show ,child
+            ((name . ,(agentel-session-name child))
+             (state . ,(agentel-session-state child))
+             (task . ,(agentel-session-data child 'subagent-task))
+             (activity . ,(agentel-session-data child 'subagent-activity))
+             (waiting . ,(and (agentel-session-waiting-p child) t)))))))
 
 (defun agentel-subagent--spawn (parent update)
   "Create the subagent announced by UPDATE under PARENT."

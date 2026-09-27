@@ -95,6 +95,13 @@
     (agentel-test-wait-for-text "⎇ Explore the repository ✅")
     (agentel-test-wait-for-text "Read README\\.org")))
 
+(ert-deftest agentel-subagent-has-one-item-in-the-conversation-of-the-parent ()
+  (agentel-test-with-started session nil
+    (agentel-subagent-test-run session)
+    (should (= (cl-count 'subagent (agentel-conversation-items session)
+                         :key #'agentel-store-model-type)
+               1))))
+
 (ert-deftest agentel-subagent-item-waits-while-the-child-does ()
   (let* ((agentel-session--registry nil)
          (parent (agentel-session-create))
