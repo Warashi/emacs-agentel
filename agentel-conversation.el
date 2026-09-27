@@ -100,10 +100,14 @@ and `output' as text."
 
 (agentel-conversation-define 'tool #'agentel-conversation--update-tool)
 
-(agentel-conversation-define 'plan
-  (lambda (message _data)
-    (pcase message
-      (`(show ,entries) `((entries . ,entries))))))
+(defun agentel-conversation--update-plan (message _data)
+  "Return the data of a plan shown by MESSAGE.
+The message carries the list of steps, each with its `content' as text
+and its `status', one of `pending', `running' and `done'."
+  (pcase message
+    (`(show ,steps) `((steps . ,steps)))))
+
+(agentel-conversation-define 'plan #'agentel-conversation--update-plan)
 
 (defun agentel-conversation-prompt (session text)
   "Record TEXT sent by the user to SESSION."
@@ -134,10 +138,10 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
           (agentel-store-update store last `(chunk ,text))
         (agentel-store-dispatch store nil type `(chunk ,text))))))
 
-(defconst agentel-conversation--tool-statuses
+(defconst agentel-conversation--statuses
   '(("pending" . pending) ("in_progress" . running)
     ("completed" . done) ("failed" . failed))
-  "Statuses of tool calls by their names in the protocol.")
+  "Statuses of tool calls and plan steps by their names in the protocol.")
 
 (defun agentel-conversation--tool-output (content)
   "Return the tool call CONTENT list as text."
@@ -162,8 +166,16 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
      `((title . ,(alist-get 'title update))
        (why . ,(and (stringp why) why))
        (status . ,(cdr (assoc (alist-get 'status update)
-                              agentel-conversation--tool-statuses)))
+                              agentel-conversation--statuses)))
        (output . ,(and content (agentel-conversation--tool-output content)))))))
+
+(defun agentel-conversation--plan-steps (entries)
+  "Return the steps of a plan told by ENTRIES."
+  (mapcar (lambda (entry)
+            `((content . ,(alist-get 'content entry))
+              (status . ,(cdr (assoc (alist-get 'status entry)
+                                     agentel-conversation--statuses)))))
+          entries))
 
 (defun agentel-conversation--on-update (session update)
   "Record UPDATE of SESSION in its conversation."
@@ -177,7 +189,8 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
                                 `(update ,(agentel-conversation--tool-fields update))))
     ;; A plan replaces the previous one.
     ("plan" (agentel-conversation-send session 'plan 'plan
-                                       `(show ,(alist-get 'entries update))))))
+                                       `(show ,(agentel-conversation--plan-steps
+                                                (alist-get 'entries update)))))))
 
 (add-hook 'agentel-session-update-functions #'agentel-conversation--on-update)
 

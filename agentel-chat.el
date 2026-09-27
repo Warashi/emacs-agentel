@@ -269,20 +269,20 @@ full on top of the output."
 (agentel-ui-define-view 'tool #'agentel-chat--render-tool :collapsed t)
 
 (defconst agentel-chat--plan-marks
-  '(("completed" . "[x]") ("in_progress" . "[-]") ("pending" . "[ ]"))
-  "Check boxes of plan entry statuses.")
+  '((done . "[x]") (running . "[-]") (pending . "[ ]"))
+  "Check boxes of plan step statuses.")
 
 (defun agentel-chat--render-plan (entry _options)
   "Render the plan ENTRY."
   (concat
    (propertize "Plan" 'face 'bold)
-   (mapconcat (lambda (item)
+   (mapconcat (lambda (step)
                 (format "\n  %s %s"
-                        (or (cdr (assoc (alist-get 'status item)
-                                        agentel-chat--plan-marks))
+                        (or (alist-get (alist-get 'status step)
+                                       agentel-chat--plan-marks)
                             "[ ]")
-                        (alist-get 'content item)))
-              (agentel-store-get entry 'entries) "")))
+                        (alist-get 'content step)))
+              (agentel-store-get entry 'steps) "")))
 
 (agentel-ui-define-view 'plan #'agentel-chat--render-plan)
 

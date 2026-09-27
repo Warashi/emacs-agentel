@@ -88,10 +88,16 @@
 
 (ert-deftest agentel-conversation-replaces-the-plan ()
   (agentel-conversation-test-with-session
-    (agentel-conversation-test-update '((sessionUpdate . "plan") (entries . [a])))
-    (agentel-conversation-test-update '((sessionUpdate . "plan") (entries . [b])))
+    (agentel-conversation-test-update
+     '((sessionUpdate . "plan")
+       (entries . [((content . "Write tests") (status . "in_progress"))])))
+    (agentel-conversation-test-update
+     '((sessionUpdate . "plan")
+       (entries . [((content . "Write tests") (status . "completed"))
+                   ((content . "Implement") (status . "pending"))])))
     (should (equal (agentel-conversation-test-items session)
-                   '((plan (entries . [b])))))))
+                   '((plan (steps ((content . "Write tests") (status . done))
+                                  ((content . "Implement") (status . pending)))))))))
 
 (ert-deftest agentel-conversation-records-prompts-and-notes ()
   (agentel-conversation-test-with-session
