@@ -9,13 +9,14 @@
 ;; message changes its data.  A store keeps the models of one thing,
 ;; such as the conversation of a session, in the order they were added,
 ;; and messages are sent to them through the store.  Whoever shows or
-;; follows the models subscribes to the store, so one store can be
-;; shown in more than one way.  Nothing here knows what the models are
-;; about.
+;; follows the models subscribes to the store, or to one model of it,
+;; so one store can be shown in more than one way.  Nothing here knows
+;; what the models are about.
 
 ;;; Code:
 
 (require 'cl-lib)
+(require 'seq)
 (require 'subr-x)
 
 ;;;; Models
@@ -50,7 +51,8 @@ the data changed compares this instead."))
   "Models in the order they were added, and the functions watching them."
   (newest nil :documentation "Models, newest first.")
   (index (make-hash-table :test 'equal) :documentation "Models by key.")
-  (subscribers nil :documentation "Functions told of changes."))
+  (subscribers nil :documentation "Functions told of changes, each with
+the key of the only model it is told of, or nil."))
 
 (defun agentel-store-models (store)
   "Return the models of STORE, oldest first."
@@ -70,23 +72,26 @@ the data changed compares this instead."))
 
 (defun agentel-store-subscribers (store)
   "Return the functions told of the changes of STORE."
-  (agentel-store--subscribers store))
+  (mapcar #'car (agentel-store--subscribers store)))
 
-(defun agentel-store-subscribe (store function)
+(defun agentel-store-subscribe (store function &optional key)
   "Call FUNCTION whenever a model of STORE is added or changed.
-It is called with the model and non-nil when the model was added."
+It is called with the model and non-nil when the model was added.
+With KEY, it is called only for the model under KEY."
   (setf (agentel-store--subscribers store)
-        (append (agentel-store--subscribers store) (list function))))
+        (append (agentel-store--subscribers store) (list (cons function key)))))
 
 (defun agentel-store-unsubscribe (store function)
   "Stop calling FUNCTION for the changes of STORE."
   (setf (agentel-store--subscribers store)
-        (remq function (agentel-store--subscribers store))))
+        (seq-remove (lambda (subscriber) (eq (car subscriber) function))
+                    (agentel-store--subscribers store))))
 
 (defun agentel-store--tell (store model added)
   "Tell the subscribers of STORE that MODEL changed, or was ADDED."
-  (dolist (function (agentel-store--subscribers store))
-    (funcall function model added)))
+  (pcase-dolist (`(,function . ,key) (agentel-store--subscribers store))
+    (when (or (not key) (equal key (agentel-store-model-key model)))
+      (funcall function model added))))
 
 (defun agentel-store-update (store model message)
   "Change the data of MODEL of STORE by MESSAGE."
