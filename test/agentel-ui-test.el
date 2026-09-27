@@ -70,6 +70,10 @@
             (should (= (point) 5)))
         (kill-buffer shown)))))
 
+(ert-deftest agentel-ui-one-line-fits-a-given-width ()
+  (agentel-ui-test-with-narrow-window
+    (should (equal (agentel-ui-one-line "> " "abcdefghijkl" 6) "> abc…"))))
+
 (ert-deftest agentel-ui-one-line-is-marked-as-fitting-the-width ()
   (should (get-text-property 0 'agentel-ui-fits-width (agentel-ui-one-line "> " "x"))))
 

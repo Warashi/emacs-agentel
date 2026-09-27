@@ -194,6 +194,18 @@
        (title . "ls\n") (status . "completed")))
     (should (string-match-p "\\`  ✓ ls\\'" (agentel-chat-test-transcript)))))
 
+(ert-deftest agentel-chat-fits-a-tool-in-the-width-it-is-shown-in ()
+  (let ((tool (agentel-ui-model--make
+               :type 'tool
+               :data `((title . ,(make-string 100 ?t)) (status . "completed")))))
+    (should (= (string-width (agentel-ui-view tool :width 20 :collapsed t)) 20))
+    (should (= (string-width (agentel-ui-view tool :width 30 :collapsed t)) 30))))
+
+(ert-deftest agentel-chat-fits-a-folded-thought-in-the-width-it-is-shown-in ()
+  (let ((thought (agentel-ui-model--make
+                  :type 'thought :data `((text . ,(make-string 100 ?h))))))
+    (should (= (string-width (agentel-ui-view thought :width 20 :collapsed t)) 20))))
+
 (ert-deftest agentel-chat-updating-an-old-tool-keeps-later-entries-intact ()
   (agentel-chat-test-with-session
     (agentel-chat-test-update

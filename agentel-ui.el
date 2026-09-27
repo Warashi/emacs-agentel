@@ -131,12 +131,13 @@ It is the narrowest window showing the buffer, up to
            (mapcar #'window-max-chars-per-line
                    (get-buffer-window-list nil nil t)))))
 
-(defun agentel-ui-one-line (prefix text)
+(defun agentel-ui-one-line (prefix text &optional width)
   "Return PREFIX followed by the first line of TEXT as one summary line.
-The line fits in `agentel-ui-line-width' and ends in … when part of
-TEXT is left out.  It carries the `agentel-ui-fits-width' property, so
-text that has to be made again when the width changes can be found."
-  (let* ((width (agentel-ui-line-width))
+The line fits in WIDTH, which defaults to `agentel-ui-line-width', and
+ends in … when part of TEXT is left out.  It carries the
+`agentel-ui-fits-width' property, so text that has to be made again
+when the width changes can be found."
+  (let* ((width (or width (agentel-ui-line-width)))
          (lines (split-string (string-trim (or text "")) "\n"))
          (line (concat prefix (car lines))))
     (propertize

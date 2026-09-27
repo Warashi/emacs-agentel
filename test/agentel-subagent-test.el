@@ -120,6 +120,13 @@
                 nil)))
     (should (string-suffix-p "\n    ↳ make all…" (substring-no-properties text)))))
 
+(ert-deftest agentel-subagent-item-fits-the-width-it-is-shown-in ()
+  (let* ((child (agentel-subagent-test-busy-child))
+         (text (agentel-subagent--render
+                (agentel-ui-model--make :data `((child . ,child)))
+                '(:width 11))))
+    (should (string-suffix-p "\n    ↳ make…" (substring-no-properties text)))))
+
 (ert-deftest agentel-subagent-pin-shows-the-activity-on-one-line ()
   (let ((line (substring-no-properties
                (agentel-subagent--pin-line (agentel-subagent-test-busy-child)))))

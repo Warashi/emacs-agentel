@@ -41,17 +41,21 @@
   "RET" #'agentel-subagent-open
   "<mouse-1>" #'agentel-subagent-open)
 
-(defun agentel-subagent--render (entry _options)
-  "Render the subagent item ENTRY of a parent transcript."
+(defun agentel-subagent--render (entry options)
+  "Render the subagent item ENTRY of a parent transcript.
+Its lines fit in the :width of OPTIONS."
   (let* ((child (agentel-ui-get entry 'child))
-         (activity (agentel-session-data child 'subagent-activity)))
+         (activity (agentel-session-data child 'subagent-activity))
+         (width (plist-get options :width)))
     (propertize
      (concat "⎇ "
              (propertize (agentel-session-name child) 'face 'agentel-subagent-face)
              " " (agentel-ui-state (agentel-session-state child))
              "\n"
-             (agentel-ui-one-line "    " (agentel-session-data child 'subagent-task))
-             (if activity (concat "\n" (agentel-ui-one-line "    ↳ " activity)) ""))
+             (agentel-ui-one-line "    " (agentel-session-data child 'subagent-task) width)
+             (if activity
+                 (concat "\n" (agentel-ui-one-line "    ↳ " activity width))
+               ""))
      'keymap agentel-subagent-item-map
      'agentel-subagent child)))
 

@@ -207,7 +207,9 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
   (agentel-chat--propertize
    entry
    (concat (if (> at (point-min)) "\n\n" "")
-           (agentel-ui-view entry :collapsed (gethash entry agentel-chat--collapsed)))))
+           (agentel-ui-view entry
+                            :collapsed (gethash entry agentel-chat--collapsed)
+                            :width (agentel-ui-line-width)))))
 
 (defun agentel-chat--insert (entry)
   "Append the text of ENTRY to the transcript."
@@ -301,11 +303,12 @@ More text makes a finished message unfinished until it ends again."
   :view #'agentel-chat--render-text)
 
 (defun agentel-chat--render-thought (entry options)
-  "Render the thought ENTRY, folded to its first line when OPTIONS say so."
+  "Render the thought ENTRY, folded to its first line when OPTIONS say so.
+The folded line fits in the :width of OPTIONS."
   (let ((text (agentel-ui-get entry 'text)))
     (propertize
      (if (plist-get options :collapsed)
-         (agentel-ui-one-line "▸ Thinking: " text)
+         (agentel-ui-one-line "▸ Thinking: " text (plist-get options :width))
        (concat "▾ Thinking\n" text))
      'face 'agentel-chat-thought-face
      'keymap agentel-chat-entry-map)))
@@ -353,8 +356,9 @@ More text makes a finished message unfinished until it ends again."
 
 (defun agentel-chat--render-tool (entry options)
   "Render the tool call ENTRY, folded when OPTIONS say so.
-The header is one line, led by why the tool is called when the agent
-tells it; a title cut short there shows in full on top of the output."
+The header is one line in the :width of OPTIONS, led by why the tool
+is called when the agent tells it; a title cut short there shows in
+full on top of the output."
   (let* ((status (agentel-ui-get entry 'status))
          (collapsed (plist-get options :collapsed))
          (icon (or (cdr (assoc status agentel-chat--status-icons)) "…"))
@@ -365,7 +369,9 @@ tells it; a title cut short there shows in full on top of the output."
                       (concat (propertize (concat why " — ") 'face 'agentel-chat-tool-face)
                               title)
                     title))
-         (line (lambda (marker) (agentel-ui-one-line (concat marker icon " ") summary)))
+         (line (lambda (marker)
+                 (agentel-ui-one-line (concat marker icon " ") summary
+                                      (plist-get options :width))))
          (cut (not (equal (funcall line "  ")
                           (concat "  " icon " " (string-trim summary)))))
          (output (agentel-chat--content-text (agentel-ui-get entry 'content)))
