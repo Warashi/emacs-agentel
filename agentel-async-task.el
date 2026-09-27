@@ -54,11 +54,14 @@ ignored."
        . ,(pcase message
             (`(spawn ,id ,name)
              (agentel-async-task--merge tasks id `((state . running) (name . ,name))))
-            ((guard (not (assoc (cadr message) tasks))) tasks)
+            ((and `(,(or 'progress 'change-state) ,id . ,_)
+                  (guard (not (assoc id tasks))))
+             tasks)
             (`(progress ,id ,text)
              (agentel-async-task--merge tasks id `((progress . ,text))))
             (`(change-state ,id ,state)
-             (agentel-async-task--merge tasks id `((state . ,state)))))))))
+             (agentel-async-task--merge tasks id `((state . ,state))))
+            (_ (agentel-store-reject message)))))))
 
 (agentel-store-define 'agentel-async-tasks #'agentel-async-task--update)
 

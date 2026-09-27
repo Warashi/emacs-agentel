@@ -99,5 +99,12 @@
       (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
       (should-not (agentel-async-task-test-pin)))))
 
+(ert-deftest agentel-async-task-rejects-an-unknown-message ()
+  (let ((data (agentel-async-task--update '(spawn "t1" "Build") nil)))
+    (should-error (agentel-async-task--update '(pause "t1") data)
+                  :type 'agentel-store-unknown-message)
+    (should-error (agentel-async-task--update '(pause "t2") data)
+                  :type 'agentel-store-unknown-message)))
+
 (provide 'agentel-async-task-test)
 ;;; agentel-async-task-test.el ends here
