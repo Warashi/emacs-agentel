@@ -144,5 +144,9 @@
                                                '(withdraw))
                  "Allow ls? → withdrawn")))
 
+(ert-deftest agentel-permission-rejects-an-unknown-message ()
+  (should-error (agentel-permission--update '(forget) nil)
+                :type 'agentel-store-unknown-message))
+
 (provide 'agentel-permission-test)
 ;;; agentel-permission-test.el ends here

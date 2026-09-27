@@ -64,7 +64,8 @@ when the agent no longer asks."
        `((question . ,.question) (choices . ,.choices) (answer . ,choice))))
     ('(withdraw)
      (let-alist data
-       `((question . ,.question) (choices . ,.choices) (withdrawn . t))))))
+       `((question . ,.question) (choices . ,.choices) (withdrawn . t))))
+    (_ (agentel-store-reject message))))
 
 (agentel-conversation-define 'permission #'agentel-permission--update)
 (agentel-ui-define-view 'permission #'agentel-permission--render)
