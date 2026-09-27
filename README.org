@@ -218,6 +218,20 @@ tells =agentel-session-changed-functions= after a change of any of them,
 while whoever shows only some of them subscribes to their keys, as the
 item of a subagent in its parent does.
 
+The header line and the lines pinned above the prompt show the models
+of the session store whose views say where they go, with =:header= or
+=:pin= and a number that orders them, so a feature places its model
+along with its view and the session buffer knows none of them.  The
+buffer subscribes to the store and makes both again after a change,
+keeping the header line as a string rather than making it on every
+redisplay.  What no model keeps comes in the options of the views: the
+buffer works out the state of the session, its project and directory
+and the line width when it draws.  As nothing keeps whether a session
+waits, the buffer also draws again on
+=agentel-session-changed-functions=, which tells when that changes.  The
+subagents running in a session are pinned from a model the subagent
+feature keeps in the store of the parent, sent along with their items.
+
 The transcript is drawn like a view of React: after every change of
 the conversation the session buffer chooses the items to show and hands
 the whole list to a region (=agentel-ui-region.el=), which changes only
