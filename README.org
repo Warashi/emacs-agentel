@@ -171,17 +171,23 @@ Each feature is one file that hooks into the session registry
 session buffer (=agentel-chat.el=), so it can be removed by deleting
 the file and its =require= in =agentel.el=.
 
-What is shown is written in the way of Elm (=agentel-ui.el=).  A type
-of model defines how a message changes its data (=:update=) and how
-the data looks (=:view=), and both are to depend on nothing else:
-values from outside, such as the state of a session or the width of
-the window, come in messages or in the options of the view.  The
+State is written in the way of Elm.  A type of model defines how a
+message changes its data (=agentel-store-define=), and a store keeps
+the models of one thing and tells its subscribers when they change
+(=agentel-store.el=).  How a type looks is defined apart from it
+(=agentel-ui-define-view= in =agentel-ui.el=), so the state does not
+depend on how it is shown.  Updates and views are to depend on nothing
+else: values from outside, such as the state of a session or the width
+of the window, come in messages or in the options of the view.  The
 views of subagents, permission requests and forms in the transcript
-still read their session or request as it is now.  A store keeps the
-models of one thing, such as the transcript of a session or the
-session list, and presentations subscribe to it and put the views in a
-buffer.  The transcript is kept by its session, so a subagent buffer
-opened again after it was killed shows its earlier output.
+still read their session or request as it is now.
+
+The conversation of a session (=agentel-conversation.el=) is such a
+store, built from the updates of the agent and kept by the session.
+Features add their own items to it, such as permission requests, and
+the session buffer subscribes to it and only draws it, so a subagent
+buffer opened again after it was killed shows its earlier output.  The
+session list keeps its own model the same way.
 
 * Development
 
