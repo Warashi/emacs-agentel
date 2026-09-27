@@ -77,5 +77,37 @@
       (agentel-session-finish-turn session)
       (should-not (agentel-copilot-subagent--withhold-p session chunk)))))
 
+(defconst agentel-copilot-subagent-test-task
+  '((sessionUpdate . "tool_call") (toolCallId . "toolu_1")
+    (rawInput . ((agent_type . "explore") (prompt . "Look."))))
+  "A task that runs a Copilot subagent in the foreground.")
+
+(defconst agentel-copilot-subagent-test-chunk
+  '((sessionUpdate . "agent_message_chunk")
+    (content . ((type . "text") (text . "Hi"))))
+  "A message chunk, from the subagent while its task runs.")
+
+(ert-deftest agentel-copilot-subagent-task-replayed-while-loading-keeps-its-chunks ()
+  (let ((agentel-session--registry nil)
+        (agentel-session-changed-functions
+         (list #'agentel-copilot-subagent--on-changed)))
+    (let ((session (agentel-session-create)))
+      (agentel-session-start-loading session)
+      (agentel-copilot-subagent--withhold-p session agentel-copilot-subagent-test-task)
+      (should (agentel-copilot-subagent--withhold-p
+               session agentel-copilot-subagent-test-chunk)))))
+
+(ert-deftest agentel-copilot-subagent-task-replayed-while-loading-ends-with-the-next-turn ()
+  (let ((agentel-session--registry nil)
+        (agentel-session-changed-functions
+         (list #'agentel-copilot-subagent--on-changed)))
+    (let ((session (agentel-session-create)))
+      (agentel-session-start-loading session)
+      (agentel-copilot-subagent--withhold-p session agentel-copilot-subagent-test-task)
+      (agentel-session-finish-loading session)
+      (agentel-session-start-turn session)
+      (should-not (agentel-copilot-subagent--withhold-p
+                   session agentel-copilot-subagent-test-chunk)))))
+
 (provide 'agentel-copilot-subagent-test)
 ;;; agentel-copilot-subagent-test.el ends here

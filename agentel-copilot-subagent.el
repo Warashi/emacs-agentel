@@ -53,10 +53,14 @@
      (agentel-session-data session 'copilot-tasks))))
 
 (defun agentel-copilot-subagent--on-changed (session)
-  "Forget the tasks of SESSION once its turn is over."
-  (when (and (not (agentel-session-running-p session))
-             (agentel-session-data session 'copilot-tasks))
-    (setf (agentel-session-data session 'copilot-tasks) nil)))
+  "Forget the tasks of SESSION when a turn of it starts or ends.
+Tasks replayed while an earlier session loads are outside any turn, so
+they are kept until the next turn starts."
+  (let ((in-turn (agentel-session-in-turn session)))
+    (unless (eq in-turn (agentel-session-data session 'copilot-in-turn))
+      (setf (agentel-session-data session 'copilot-in-turn) in-turn)
+      (when (agentel-session-data session 'copilot-tasks)
+        (setf (agentel-session-data session 'copilot-tasks) nil)))))
 
 (add-hook 'agentel-session-withhold-functions #'agentel-copilot-subagent--withhold-p)
 (add-hook 'agentel-session-changed-functions #'agentel-copilot-subagent--on-changed)
