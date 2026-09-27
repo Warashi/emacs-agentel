@@ -31,41 +31,48 @@
 
 (defun agentel-permission--render (entry _options)
   "Render the permission request ENTRY."
-  (let* ((item (agentel-store-get entry 'item))
-         (answer (plist-get item :outcome)))
-    (if answer
-        (propertize (format "%s → %s" (agentel-permission--title item) answer)
+  (let-alist (agentel-store-model-data entry)
+    (if .outcome
+        (propertize (format "%s → %s" .question .outcome)
                     'face 'agentel-chat-notice-face)
       (concat
-       (propertize (concat "⚠ " (agentel-permission--title item))
-                   'face 'agentel-permission-face)
+       (propertize (concat "⚠ " .question) 'face 'agentel-permission-face)
        "\n  "
        (mapconcat
         (lambda (option)
           (buttonize (format "[%s]" (alist-get 'name option))
                      (lambda (_)
-                       (agentel-permission-choose item (alist-get 'optionId option)))))
-        (alist-get 'options (plist-get item :params))
+                       (agentel-permission-choose .item (alist-get 'optionId option)))))
+        .options
         " ")))))
 
-(agentel-conversation-define 'permission
-  (lambda (message _data)
-    (pcase message
-      (`(show ,item ,waiting) `((item . ,item) (waiting . ,waiting))))))
+(defun agentel-permission--update (message data)
+  "Return the DATA of a permission request changed by MESSAGE.
+MESSAGE is (ask ITEM QUESTION OPTIONS) when the agent asks, and
+\(close OUTCOME) when the request is answered or withdrawn.  ITEM is
+kept only to answer it."
+  (pcase message
+    (`(ask ,item ,question ,options)
+     `((item . ,item) (question . ,question) (options . ,options) (waiting . t)))
+    (`(close ,outcome)
+     (let-alist data
+       `((item . ,.item) (question . ,.question) (options . ,.options)
+         (outcome . ,outcome))))))
+
+(agentel-conversation-define 'permission #'agentel-permission--update)
 (agentel-ui-define-view 'permission #'agentel-permission--render)
 
-(defun agentel-permission--show (item)
-  "Show the state of the permission request ITEM in its session buffer."
-  (let ((session (plist-get item :session)))
-    (agentel-conversation-send
-     session (cons 'permission (plist-get item :id)) 'permission
-     `(show ,item ,(and (memq item (agentel-session-pending session)) t)))))
+(defun agentel-permission--send (item message)
+  "Send MESSAGE to the conversation item of the permission request ITEM."
+  (agentel-conversation-send (plist-get item :session)
+                             (cons 'permission (plist-get item :id))
+                             'permission message))
 
 (defun agentel-permission--close (item outcome)
   "Stop waiting for ITEM, recording OUTCOME as its answer."
   (plist-put item :outcome outcome)
   (agentel-session-remove-pending (plist-get item :session) item)
-  (agentel-permission--show item))
+  (agentel-permission--send item `(close ,outcome)))
 
 (defun agentel-permission-choose (item option-id)
   "Answer the permission request ITEM with the option OPTION-ID."
@@ -93,7 +100,9 @@
                         :session session :connection connection)))
         (plist-put item :answer (lambda () (agentel-permission--ask item)))
         (agentel-session-add-pending session item)
-        (agentel-permission--show item))
+        (agentel-permission--send
+         item `(ask ,item ,(agentel-permission--title item)
+                    ,(alist-get 'options params))))
     (agentel-connection-respond connection id '((outcome . ((outcome . "cancelled")))))))
 
 (defun agentel-permission--withdraw (connection method params)

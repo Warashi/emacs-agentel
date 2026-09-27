@@ -57,5 +57,27 @@
     (agentel-test-wait-until (lambda () (not (eq (agentel-session-state session) 'waiting))))
     (agentel-test-wait-for-text "Allow rm -rf build\\? → withdrawn")))
 
+(defun agentel-permission-test-view (&rest messages)
+  "Return the text of a permission request after MESSAGES."
+  (let ((data nil))
+    (dolist (message messages)
+      (setq data (agentel-permission--update message data)))
+    (substring-no-properties
+     (agentel-ui-view (agentel-store-model--make :type 'permission :data data)))))
+
+(defconst agentel-permission-test-ask
+  '(ask item "Allow ls?" [((name . "Yes") (optionId . "y"))
+                          ((name . "No") (optionId . "n"))])
+  "The message asking whether ls may run.")
+
+(ert-deftest agentel-permission-view-shows-what-it-was-asked ()
+  (should (equal (agentel-permission-test-view agentel-permission-test-ask)
+                 "⚠ Allow ls?\n  [Yes] [No]")))
+
+(ert-deftest agentel-permission-view-shows-the-answer ()
+  (should (equal (agentel-permission-test-view agentel-permission-test-ask
+                                               '(close "No"))
+                 "Allow ls? → No")))
+
 (provide 'agentel-permission-test)
 ;;; agentel-permission-test.el ends here
