@@ -34,7 +34,8 @@ The data has the `commands', each an alist of its `name', its
 `description' and the `hint' of its argument.  MESSAGE is (announce
 COMMANDS), which replaces the commands."
   (pcase message
-    (`(announce ,commands) `((commands . ,commands)))))
+    (`(announce ,commands) `((commands . ,commands)))
+    (_ (agentel-store-reject message))))
 
 (agentel-store-define 'agentel-commands #'agentel-commands--update)
 

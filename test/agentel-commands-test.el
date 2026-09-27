@@ -84,5 +84,9 @@
   (agentel-commands-test-with-session
     (should-not (agentel-commands--run session "/compact now"))))
 
+(ert-deftest agentel-commands-reject-an-unknown-message ()
+  (should-error (agentel-commands--update '(forget) '((commands)))
+                :type 'agentel-store-unknown-message))
+
 (provide 'agentel-commands-test)
 ;;; agentel-commands-test.el ends here
