@@ -74,19 +74,19 @@ A session no longer live is left out, and a new one goes last."
           (t (append sessions (list (cons session seen)))))))
 
 (defun agentel-list--ended-out-of-sight-p (before seen)
-  "Return non-nil if the turn of a top-level session ended out of sight.
+  "Return non-nil if a top-level session stopped running out of sight.
 BEFORE and SEEN are what was seen of it before and now."
   (and (plist-get seen :live)
-       (plist-get before :busy)
-       (not (plist-get seen :busy))
+       (plist-get before :running)
+       (not (plist-get seen :running))
        (not (plist-get seen :parent))
        (not (plist-get seen :shown))))
 
 (defun agentel-list--update (message data)
   "Return the DATA of the list changed by MESSAGE.
 DATA has the sessions, each with what was seen of it last, oldest
-first, and the unread sessions: top-level ones whose turn ended while
-their buffer was out of sight, until they are shown again."
+first, and the unread sessions: top-level ones that stopped running
+while their buffer was out of sight, until they are shown again."
   (let-alist data
     (pcase message
       (`(changed ,seen)
@@ -177,7 +177,7 @@ oldest first within a rank."
    `(changed (:session ,session
                        :live ,(and (memq session (agentel-session-list)) t)
                        :parent ,(agentel-session-parent session)
-                       :busy ,(agentel-session-busy session)
+                       :running ,(agentel-session-running-p session)
                        :shown ,(and (agentel-list--shown-p session) t)
                        :state ,(agentel-session-state session)
                        :project ,(agentel-session-project-name session)

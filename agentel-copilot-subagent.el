@@ -54,7 +54,7 @@
 
 (defun agentel-copilot-subagent--on-changed (session)
   "Forget the tasks of SESSION once its turn is over."
-  (when (and (not (agentel-session-busy session))
+  (when (and (not (agentel-session-running-p session))
              (agentel-session-data session 'copilot-tasks))
     (setf (agentel-session-data session 'copilot-tasks) nil)))
 

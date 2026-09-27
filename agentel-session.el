@@ -14,9 +14,10 @@
 ;; and react through `agentel-session-update-functions' and
 ;; `agentel-session-changed-functions', so each feature can be removed
 ;; without touching this file.  `agentel-session-withhold-functions'
-;; lets a feature keep an update from the others, and
+;; lets a feature keep an update from the others,
 ;; `agentel-session-waiting-functions' tells whether the user owes a
-;; session an answer.
+;; session an answer, and `agentel-session-running-functions' whether a
+;; feature is at work in it.
 
 ;;; Code:
 
@@ -52,6 +53,12 @@ the update.")
 Each function is called with the session.  When one returns non-nil,
 the session waits.  Whoever answers it calls
 `agentel-session-waiting-changed' when that changes.")
+
+(defvar agentel-session-running-functions nil
+  "Abnormal hook asked whether a feature is at work in a session.
+Each function is called with the session.  When one returns non-nil,
+the session runs.  Whoever works calls `agentel-session-changed' when
+that changes.")
 
 (cl-defun agentel-session-create (&key connection parent cwd project agent)
   "Create a session on CONNECTION and add it to the registry.
@@ -138,15 +145,24 @@ The sessions above it are told too, as they wait while it does."
     (agentel-session-changed session)
     (setq session (agentel-session-parent session))))
 
+(defun agentel-session-running-p (session)
+  "Return non-nil if SESSION is at work and has not ended.
+It is at work during a turn or while a feature of
+`agentel-session-running-functions' says so."
+  (and (not (agentel-session-ended session))
+       (or (agentel-session-busy session)
+           (run-hook-with-args-until-success 'agentel-session-running-functions
+                                             session))))
+
 (defun agentel-session-state (session)
   "Return the state of SESSION as a symbol.
 It is `starting' before the agent assigns an id, the end reason once
 ended, `waiting' while the user owes an answer to it or to one of its
-subagents, `running' during a turn, and `idle' otherwise."
+subagents, `running' while it is at work, and `idle' otherwise."
   (cond ((agentel-session-ended session))
         ((not (agentel-session-id session)) 'starting)
         ((agentel-session-waiting-p session) 'waiting)
-        ((agentel-session-busy session) 'running)
+        ((agentel-session-running-p session) 'running)
         (t 'idle)))
 
 (defun agentel-session-name (session)

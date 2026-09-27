@@ -46,52 +46,52 @@
 
 (ert-deftest agentel-list-update-marks-a-turn-that-ended-out-of-sight ()
   (should (equal (alist-get 'unread (agentel-list-test-after
-                                     (agentel-list-test-seen 'a :busy t)
-                                     (agentel-list-test-seen 'a :busy nil)))
+                                     (agentel-list-test-seen 'a :running t)
+                                     (agentel-list-test-seen 'a :running nil)))
                  '(a))))
 
 (ert-deftest agentel-list-update-does-not-mark-a-turn-that-ended-in-sight ()
   (should-not (alist-get 'unread (agentel-list-test-after
-                                  (agentel-list-test-seen 'a :busy t)
-                                  (agentel-list-test-seen 'a :busy nil :shown t)))))
+                                  (agentel-list-test-seen 'a :running t)
+                                  (agentel-list-test-seen 'a :running nil :shown t)))))
 
 (ert-deftest agentel-list-update-does-not-mark-a-subagent ()
   (should-not (alist-get 'unread (agentel-list-test-after
-                                  (agentel-list-test-seen 'c :busy t :parent 'p)
-                                  (agentel-list-test-seen 'c :busy nil :parent 'p)))))
+                                  (agentel-list-test-seen 'c :running t :parent 'p)
+                                  (agentel-list-test-seen 'c :running nil :parent 'p)))))
 
-(ert-deftest agentel-list-update-does-not-mark-a-session-that-was-not-busy ()
+(ert-deftest agentel-list-update-does-not-mark-a-session-that-was-not-running ()
   (should-not (alist-get 'unread (agentel-list-test-after
-                                  (agentel-list-test-seen 'a :busy nil)
-                                  (agentel-list-test-seen 'a :busy nil)))))
+                                  (agentel-list-test-seen 'a :running nil)
+                                  (agentel-list-test-seen 'a :running nil)))))
 
 (ert-deftest agentel-list-update-unmarks-sessions-once-shown ()
   (should (equal (alist-get 'unread (agentel-list-test-after
-                                     (agentel-list-test-seen 'a :busy t)
-                                     (agentel-list-test-seen 'b :busy t)
-                                     (agentel-list-test-seen 'a :busy nil)
-                                     (agentel-list-test-seen 'b :busy nil)
+                                     (agentel-list-test-seen 'a :running t)
+                                     (agentel-list-test-seen 'b :running t)
+                                     (agentel-list-test-seen 'a :running nil)
+                                     (agentel-list-test-seen 'b :running nil)
                                      '(shown (a))))
                  '(b))))
 
 (ert-deftest agentel-list-update-keeps-sessions-in-the-order-they-appeared ()
   (let ((data (agentel-list-test-after (agentel-list-test-seen 'a)
                                        (agentel-list-test-seen 'b)
-                                       (agentel-list-test-seen 'a :busy t))))
+                                       (agentel-list-test-seen 'a :running t))))
     (should (equal (mapcar #'car (alist-get 'sessions data)) '(a b)))))
 
 (ert-deftest agentel-list-update-forgets-a-removed-session ()
   (let ((data (agentel-list-test-after
-               (agentel-list-test-seen 'a :busy t)
-               (agentel-list-test-seen 'a :busy nil)
+               (agentel-list-test-seen 'a :running t)
+               (agentel-list-test-seen 'a :running nil)
                '(changed (:session a :live nil)))))
     (should-not (alist-get 'sessions data))
     (should-not (alist-get 'unread data))))
 
 (ert-deftest agentel-list-update-leaves-the-data-it-was-given-alone ()
-  (let* ((before (agentel-list-test-after (agentel-list-test-seen 'a :busy t)))
+  (let* ((before (agentel-list-test-after (agentel-list-test-seen 'a :running t)))
          (copy (copy-tree before)))
-    (agentel-list--update (agentel-list-test-seen 'a :busy nil) before)
+    (agentel-list--update (agentel-list-test-seen 'a :running nil) before)
     (agentel-list--update '(shown (a)) before)
     (should (equal before copy))))
 
@@ -114,7 +114,7 @@
 (ert-deftest agentel-list-view-puts-waiting-then-unread-sessions-first ()
   (should (equal (agentel-list-test-view
                   (agentel-list-test-seen 'a :state 'idle :project "a")
-                  (agentel-list-test-seen 'b :state 'running :project "b" :busy t)
+                  (agentel-list-test-seen 'b :state 'running :project "b" :running t)
                   (agentel-list-test-seen 'c :state 'waiting :project "c")
                   (agentel-list-test-seen 'b :state 'idle :project "b"))
                  '("  🙋 c" "● 💤 b" "  💤 a"))))

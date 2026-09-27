@@ -14,7 +14,8 @@
   `(let ((agentel-session--registry nil)
          (agentel-session-update-functions nil)
          (agentel-session-changed-functions nil)
-         (agentel-session-waiting-functions nil))
+         (agentel-session-waiting-functions nil)
+         (agentel-session-running-functions nil))
      ,@body))
 
 (ert-deftest agentel-session-register-makes-session-findable-by-id ()
@@ -128,6 +129,24 @@
         (should (eq (agentel-session-state session) 'waiting))
         (setq waiting nil)
         (should (eq (agentel-session-state session) 'running))))))
+
+(ert-deftest agentel-session-runs-while-a-feature-says-it-works ()
+  (agentel-session-test-with-registry
+    (let ((session (agentel-session-create))
+          (working t))
+      (agentel-session-register session "s1")
+      (add-hook 'agentel-session-running-functions (lambda (_session) working))
+      (should (eq (agentel-session-state session) 'running))
+      (setq working nil)
+      (should (eq (agentel-session-state session) 'idle)))))
+
+(ert-deftest agentel-session-stops-running-once-ended ()
+  (agentel-session-test-with-registry
+    (let ((session (agentel-session-create)))
+      (agentel-session-register session "s1")
+      (add-hook 'agentel-session-running-functions #'always)
+      (agentel-session-set-ended session 'exited)
+      (should-not (agentel-session-running-p session)))))
 
 (ert-deftest agentel-session-state-of-ended-session ()
   (agentel-session-test-with-registry
