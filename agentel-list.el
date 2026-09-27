@@ -23,7 +23,6 @@
 ;;; Code:
 
 (require 'agentel-session)
-(require 'agentel-connection)
 (require 'agentel-chat)
 (require 'agentel-store)
 (require 'agentel-ui)
