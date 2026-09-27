@@ -44,8 +44,10 @@
   "Return the config DATA of a session changed by MESSAGE.
 DATA has the `options', each an alist of its `id', `name', `category',
 current `value' and the `choices' of values, each an alist of its
-`value' and `name'.  MESSAGE is (report OPTIONS), which replaces the
-options, or (select CATEGORY VALUE)."
+`value' and `name'; and `applying' while the start options are
+applied.  MESSAGE is one of (report OPTIONS), which replaces the
+options, (select CATEGORY VALUE), (start-applying) and
+\\=(finish-applying)."
   (pcase-let ((`(,field . ,value)
                (pcase message
                  (`(report ,options) `(options . ,options))
@@ -57,7 +59,9 @@ options, or (select CATEGORY VALUE)."
                                        (setf (alist-get 'value option) value)
                                        option)
                                    option))
-                               (alist-get 'options data)))))))
+                               (alist-get 'options data))))
+                 ('(start-applying) '(applying . t))
+                 ('(finish-applying) '(applying)))))
     (cons (cons field value) (assq-delete-all field (copy-alist data)))))
 
 (agentel-store-define 'agentel-config #'agentel-config--update)
@@ -172,7 +176,7 @@ category of the option it sets."
          (t (agentel-config-set session (alist-get 'id option)
                                 (agentel-config--value option (cddr request))
                                 next))))
-    (setf (agentel-session-data session 'config-applying) nil)))
+    (agentel-config--send session '(finish-applying))))
 
 (defun agentel-config--on-started (session result options)
   "Record the config options in RESULT and apply the start OPTIONS to SESSION."
@@ -182,12 +186,12 @@ category of the option it sets."
                                         `(,(car entry) ,(cdr entry) . ,value)))
                                     agentel-config--start-options))))
     (when requests
-      (setf (agentel-session-data session 'config-applying) t)
+      (agentel-config--send session '(start-applying))
       (agentel-config--apply session requests))))
 
 (defun agentel-config--applying-p (session)
   "Return non-nil while SESSION applies its start options."
-  (agentel-session-data session 'config-applying))
+  (agentel-config--get session 'applying))
 
 (defun agentel-config--restart-options (session)
   "Return the start options that give a new session the settings of SESSION.

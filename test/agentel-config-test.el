@@ -85,6 +85,11 @@
                       (options . [((value . "sonnet") (name . "Sonnet 5"))]))])))
       (should (equal (agentel-config--header session) "Sonnet 5 · Fast mode: Off")))))
 
+(ert-deftest agentel-config-applies-start-options-until-told-it-finished ()
+  (let ((data (agentel-config--update '(start-applying) '((options)))))
+    (should (alist-get 'applying data))
+    (should-not (alist-get 'applying (agentel-config--update '(finish-applying) data)))))
+
 (ert-deftest agentel-config-selecting-a-value-changes-only-its-option ()
   (should (equal (alist-get 'options
                             (agentel-config--update
