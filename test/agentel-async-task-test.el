@@ -44,7 +44,8 @@
       (agentel-async-task--on-update
        session `((sessionUpdate . "async_task_progress") (asyncTaskId . "b1")
                  (summary . ,(format "line %d" i)))))
-    (let ((task (cdr (assoc "b1" (agentel-async-task--tasks session)))))
+    (let* ((model (agentel-store-find (agentel-session-store session) 'async-tasks))
+           (task (cdr (assoc "b1" (agentel-store-get model 'tasks)))))
       (should (equal (alist-get 'progress task) "line 99"))
       (should (= (length task) 3)))))
 
@@ -75,8 +76,20 @@
     (agentel-async-task--on-update
      session '((sessionUpdate . "async_task_progress") (asyncTaskId . "b1")
                (summary . "Compiling\nerror: missing semicolon")))
-    (should (equal (mapcar #'substring-no-properties (agentel-async-task--pin session))
-                   '("⚙ dev 🏃 ↳ Compiling…")))))
+    (should (equal (substring-no-properties
+                    (agentel-ui-view
+                     (agentel-store-find (agentel-session-store session) 'async-tasks)
+                     :width 80))
+                   "⚙ dev 🏃 ↳ Compiling…"))))
+
+(ert-deftest agentel-async-task-shows-each-task-on-a-line-of-the-width-oldest-first ()
+  (let ((tasks (agentel-store-model--make
+                :type 'agentel-async-tasks
+                :data (agentel-async-task--update
+                       '(spawn "b2" "test")
+                       (agentel-async-task--update '(spawn "b1" "development") nil)))))
+    (should (equal (substring-no-properties (agentel-ui-view tasks :width 9))
+                   "⚙ develo…\n⚙ test 🏃"))))
 
 (ert-deftest agentel-async-task-is-not-sent-without-the-capability ()
   (let ((agentel-connection-capability-functions

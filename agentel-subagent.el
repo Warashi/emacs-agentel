@@ -108,25 +108,53 @@ subagents of the session read from the minibuffer."
                    (agentel-subagent--read-running))))
     (pop-to-buffer (agentel-chat-buffer child))))
 
-(defun agentel-subagent--pin-line (child)
-  "Return the pinned line of the running subagent CHILD."
-  (let ((activity (agentel-subagent--get child 'activity))
-        (map (make-sparse-keymap)))
-    (keymap-set map "<mouse-1>" (lambda () (interactive) (agentel-subagent-open child)))
-    (propertize
-     (agentel-ui-one-line
-      (concat "⎇ "
-              (propertize (agentel-session-name child) 'face 'agentel-subagent-face)
-              " " (agentel-ui-state (agentel-session-state child))
-              (if activity " ↳ " ""))
-      activity)
-     'keymap map
-     'mouse-face 'highlight
-     'help-echo "mouse-1: visit the subagent")))
+(defun agentel-subagent--update-running (message data)
+  "Return the DATA of the running subagents of a session changed by MESSAGE.
+DATA has the `children' that have not ended, oldest first, each as
+\(CHILD . SEEN) where SEEN is an alist of what is shown of CHILD.
+MESSAGE is (show CHILD SEEN), or (forget CHILD) once CHILD ended.
+CHILD is kept only to open its buffer."
+  (let ((children (alist-get 'children data)))
+    `((children
+       . ,(pcase message
+            (`(show ,child ,seen)
+             (if (assq child children)
+                 (mapcar (lambda (entry)
+                           (if (eq (car entry) child) (cons child seen) entry))
+                         children)
+               (append children (list (cons child seen)))))
+            (`(forget ,child)
+             (seq-remove (lambda (entry) (eq (car entry) child)) children)))))))
 
-(defun agentel-subagent--pin (session)
-  "Return the pinned lines of the running subagents of SESSION."
-  (mapcar #'agentel-subagent--pin-line (agentel-subagent--running session)))
+(agentel-store-define 'agentel-subagent-running #'agentel-subagent--update-running)
+
+(defun agentel-subagent--pin-line (child seen width)
+  "Return the pinned line of the running subagent CHILD, of which SEEN is seen.
+It fits in WIDTH."
+  (let-alist seen
+    (let ((map (make-sparse-keymap)))
+      (keymap-set map "<mouse-1>" (lambda () (interactive) (agentel-subagent-open child)))
+      (propertize
+       (agentel-ui-one-line
+        (concat "⎇ "
+                (propertize .name 'face 'agentel-subagent-face)
+                " " (agentel-ui-state .state)
+                (if .activity " ↳ " ""))
+        .activity
+        width)
+       'keymap map
+       'mouse-face 'highlight
+       'help-echo "mouse-1: visit the subagent"))))
+
+(defun agentel-subagent--pin (model options)
+  "Return the pinned lines of the running subagents of MODEL.
+Each line fits in the :width of OPTIONS."
+  (mapconcat (pcase-lambda (`(,child . ,seen))
+               (agentel-subagent--pin-line child seen (plist-get options :width)))
+             (agentel-store-get model 'children)
+             "\n"))
+
+(agentel-ui-define-view 'agentel-subagent-running #'agentel-subagent--pin :pin 20)
 
 (defun agentel-subagent--update (message _data)
   "Return the data of a subagent item changed by MESSAGE.
@@ -139,28 +167,30 @@ of CHILD.  CHILD is kept only to open its buffer."
 (agentel-ui-define-view 'subagent #'agentel-subagent--render)
 
 (defun agentel-subagent--show (child)
-  "Show the state of CHILD as an item of its parent's transcript.
-The item is keyed by the id of CHILD, so nothing is shown before it
-has one."
-  (when-let* ((id (agentel-session-id child)))
-    (agentel-conversation-send
-     (agentel-session-parent child) (cons 'subagent id)
-     'subagent
-     `(show ,child
-            ((name . ,(agentel-session-name child))
-             (state . ,(agentel-session-state child))
-             (task . ,(agentel-subagent--get child 'task))
-             (activity . ,(agentel-subagent--get child 'activity))
-             (waiting . ,(and (agentel-session-waiting-p child) t)))))))
+  "Show the state of CHILD in its parent, as an item and in the pin.
+The item is keyed by the id of CHILD, so it is not shown before CHILD
+has one.  The pin shows CHILD until it ends."
+  (let ((parent (agentel-session-parent child))
+        (seen `((name . ,(agentel-session-name child))
+                (state . ,(agentel-session-state child))
+                (task . ,(agentel-subagent--get child 'task))
+                (activity . ,(agentel-subagent--get child 'activity))
+                (waiting . ,(and (agentel-session-waiting-p child) t)))))
+    (when-let* ((id (agentel-session-id child)))
+      (agentel-conversation-send parent (cons 'subagent id) 'subagent
+                                 `(show ,child ,seen)))
+    (agentel-store-dispatch (agentel-session-store parent) 'subagents
+                            'agentel-subagent-running
+                            (if (agentel-session-ended child)
+                                `(forget ,child)
+                              `(show ,child ,seen)))))
 
 (defun agentel-subagent--follow (child)
   "Keep the item and the pin of CHILD in its parent in step with CHILD.
 They show its name and state and what it works on, so they follow
 those models of CHILD and no other."
   (let ((store (agentel-session-store child))
-        (show (lambda (_model _added)
-                (agentel-subagent--show child)
-                (agentel-chat-refresh-pin (agentel-session-parent child)))))
+        (show (lambda (_model _added) (agentel-subagent--show child))))
     (agentel-store-subscribe store show 'state)
     (agentel-store-subscribe store show 'subagent)))
 
@@ -232,7 +262,6 @@ the session changes and the item tells otherwise."
 (add-hook 'agentel-session-running-functions #'agentel-subagent--running-p)
 (add-hook 'agentel-session-update-functions #'agentel-subagent--on-update)
 (add-hook 'agentel-session-changed-functions #'agentel-subagent--follow-waiting)
-(add-hook 'agentel-chat-pin-functions #'agentel-subagent--pin)
 (keymap-set agentel-chat-mode-map "C-c C-j" #'agentel-subagent-open)
 
 (provide 'agentel-subagent)

@@ -290,11 +290,10 @@
       (delete-other-windows)
       (split-window-right 21)
       (set-window-buffer (selected-window) (current-buffer))
-      (let ((agentel-ui--followers nil)
-            (agentel-chat-pin-functions
-             (list (lambda (_) (list (agentel-ui-one-line "" (make-string 100 ?p)))))))
+      (let ((agentel-ui--followers nil))
         (agentel-ui-follow-width #'agentel-chat--fit-width)
-        (agentel-chat-refresh-pin session)
+        (agentel-store-dispatch (agentel-session-store session) 'wide
+                                'agentel-chat-test-wide (make-string 100 ?p))
         (agentel-chat-test-chunk "agent_message_chunk" (make-string 100 ?m))
         (agentel-chat-test-update
          `((sessionUpdate . "tool_call") (toolCallId . "t1")
@@ -335,16 +334,30 @@
       (setq pos (1+ pos)))
     (substring-no-properties text)))
 
-(ert-deftest agentel-chat-pins-feature-lines-above-the-prompt ()
+(agentel-store-define 'agentel-chat-test-last #'agentel-chat-test-text)
+(agentel-ui-define-view 'agentel-chat-test-last
+  (lambda (model _options) (agentel-store-model-data model))
+  :pin 20)
+
+(agentel-store-define 'agentel-chat-test-first #'agentel-chat-test-text)
+(agentel-ui-define-view 'agentel-chat-test-first
+  (lambda (model _options) (agentel-store-model-data model))
+  :pin 10)
+
+(agentel-store-define 'agentel-chat-test-wide #'agentel-chat-test-text)
+(agentel-ui-define-view 'agentel-chat-test-wide
+  (lambda (model options)
+    (agentel-ui-one-line "" (agentel-store-model-data model) (plist-get options :width)))
+  :pin 10)
+
+(ert-deftest agentel-chat-pins-the-models-of-the-session-above-the-prompt ()
   (agentel-chat-test-with-session
-    (let* ((lines nil)
-           (agentel-chat-pin-functions (list (lambda (_) lines) (lambda (_) '("last"))))
-           (agentel-session-changed-functions (list #'agentel-chat--on-changed)))
+    (let ((store (agentel-session-store session)))
       (agentel-chat-test-chunk "agent_message_chunk" "Hello")
-      (agentel-session-changed session)
+      (agentel-store-dispatch store 'last 'agentel-chat-test-last "last")
+      (agentel-store-dispatch store 'first 'agentel-chat-test-first nil)
       (should (equal (agentel-chat-test-shown) "Hello\n\nlast\n❯ "))
-      (setq lines '("one" "two"))
-      (agentel-session-changed session)
+      (agentel-store-dispatch store 'first 'agentel-chat-test-first "one\ntwo")
       (should (equal (agentel-chat-test-shown) "Hello\n\none\ntwo\nlast\n❯ "))
       (agentel-chat-test-chunk "agent_message_chunk" " again")
       (agentel-chat-test-update '((sessionUpdate . "tool_call") (toolCallId . "t1")
@@ -357,21 +370,21 @@
 
 (ert-deftest agentel-chat-pins-nothing-without-lines ()
   (agentel-chat-test-with-session
-    (let ((agentel-chat-pin-functions (list (lambda (_) nil))))
-      (agentel-chat-test-chunk "agent_message_chunk" "Hello")
-      (agentel-chat-refresh-pin session)
-      (should (equal (agentel-chat-test-shown) "Hello\n\n❯ ")))))
+    (agentel-chat-test-chunk "agent_message_chunk" "Hello")
+    (agentel-store-dispatch (agentel-session-store session) 'first
+                            'agentel-chat-test-first nil)
+    (should (equal (agentel-chat-test-shown) "Hello\n\n❯ "))))
 
-(defun agentel-chat-test-segment (message _data)
-  "Return the data of a test header segment changed by MESSAGE, its text."
+(defun agentel-chat-test-text (message _data)
+  "Return the data of a test model changed by MESSAGE, its text."
   message)
 
-(agentel-store-define 'agentel-chat-test-late #'agentel-chat-test-segment)
+(agentel-store-define 'agentel-chat-test-late #'agentel-chat-test-text)
 (agentel-ui-define-view 'agentel-chat-test-late
   (lambda (model _options) (agentel-store-model-data model))
   :header 20)
 
-(agentel-store-define 'agentel-chat-test-early #'agentel-chat-test-segment)
+(agentel-store-define 'agentel-chat-test-early #'agentel-chat-test-text)
 (agentel-ui-define-view 'agentel-chat-test-early
   (lambda (model _options) (agentel-store-model-data model))
   :header 10)

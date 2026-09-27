@@ -191,14 +191,6 @@
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
     (should-not (agentel-subagent-test-pin))))
 
-(defun agentel-subagent-test-busy-child ()
-  "Return a subagent whose latest tool call is a long command."
-  (let ((child (agentel-session-create :cwd "/tmp/project/")))
-    (agentel-session-send child '(retitle "Build"))
-    (agentel-subagent--send child '(assign "Build it"))
-    (agentel-subagent--send child `(act ,(concat "make all\n" (make-string 100 ?x))))
-    child))
-
 (defun agentel-subagent-test-item (seen &optional width)
   "Return the text of a subagent item sent SEEN, shown WIDTH wide."
   (substring-no-properties
@@ -226,10 +218,50 @@
   (should (string-suffix-p "\n    ↳ make…"
                            (agentel-subagent-test-item agentel-subagent-test-busy 11))))
 
+(defun agentel-subagent-test-pinned (width &rest messages)
+  "Return the pinned lines of the running subagents after MESSAGES.
+They are shown WIDTH wide."
+  (let (data)
+    (dolist (message messages)
+      (setq data (agentel-subagent--update-running message data)))
+    (substring-no-properties
+     (agentel-ui-view (agentel-store-model--make :type 'agentel-subagent-running
+                                                 :data data)
+                      :width width))))
+
 (ert-deftest agentel-subagent-pin-shows-the-activity-on-one-line ()
-  (let ((line (substring-no-properties
-               (agentel-subagent--pin-line (agentel-subagent-test-busy-child)))))
-    (should (string-match-p "\\`⎇ Build ⏳ ↳ make all…\\'" line))))
+  (should (equal (agentel-subagent-test-pinned
+                  80 `(show child ,agentel-subagent-test-busy))
+                 "⎇ Build 🏃 ↳ make all…")))
+
+(ert-deftest agentel-subagent-pin-fits-the-width-it-is-shown-in ()
+  (should (equal (agentel-subagent-test-pinned
+                  15 `(show child ,agentel-subagent-test-busy))
+                 "⎇ Build 🏃 ↳ m…")))
+
+(ert-deftest agentel-subagent-pin-shows-the-running-children-oldest-first ()
+  (should (equal (agentel-subagent-test-pinned
+                  80
+                  '(show one ((name . "One") (state . running)))
+                  '(show two ((name . "Two") (state . running)))
+                  '(show three ((name . "Three") (state . running)))
+                  '(show one ((name . "One") (state . waiting)))
+                  '(forget two))
+                 "⎇ One 🙋\n⎇ Three 🏃")))
+
+(ert-deftest agentel-subagent-pin-follows-the-child-until-it-ends ()
+  (let* ((agentel-session--registry nil)
+         (parent (agentel-session-create))
+         (child (agentel-session-create :parent parent)))
+    (agentel-subagent--follow child)
+    (agentel-session-send child '(retitle "Build"))
+    (agentel-session-register child "c1")
+    (agentel-subagent--send child '(act "make"))
+    (let ((running (agentel-store-find (agentel-session-store parent) 'subagents)))
+      (should (equal (substring-no-properties (agentel-ui-view running :width 80))
+                     "⎇ Build 🏃 ↳ make"))
+      (agentel-session-send child '(end completed))
+      (should (equal (agentel-ui-view running :width 80) "")))))
 
 (ert-deftest agentel-subagent-runs-once-it-is-assigned-a-task ()
   (let* ((agentel-session--registry nil)

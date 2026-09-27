@@ -19,7 +19,6 @@
 (require 'subr-x)
 (require 'agentel-session)
 (require 'agentel-connection)
-(require 'agentel-chat)
 (require 'agentel-ui)
 
 (defface agentel-async-task-face
@@ -63,11 +62,6 @@ ignored."
 
 (agentel-store-define 'agentel-async-tasks #'agentel-async-task--update)
 
-(defun agentel-async-task--tasks (session)
-  "Return the background tasks of SESSION still running or paused, newest first."
-  (when-let* ((model (agentel-store-find (agentel-session-store session) 'async-tasks)))
-    (agentel-store-get model 'tasks)))
-
 (defun agentel-async-task--on-update (session update)
   "Tell SESSION of the background task reported in UPDATE."
   (when-let* ((message
@@ -82,21 +76,25 @@ ignored."
     (agentel-store-dispatch (agentel-session-store session) 'async-tasks
                             'agentel-async-tasks message)))
 
-(defun agentel-async-task--pin (session)
-  "Return the pinned lines of the running background tasks of SESSION."
-  (mapcar (lambda (item)
-            (let-alist (cdr item)
-              (agentel-ui-one-line
-               (concat "⚙ " (propertize (or .name "Background task")
-                                        'face 'agentel-async-task-face)
-                       " " (agentel-ui-state .state)
-                       (if .progress " ↳ " ""))
-               .progress)))
-          (reverse (agentel-async-task--tasks session))))
+(defun agentel-async-task--view (model options)
+  "Return the pinned lines of the background tasks of MODEL, oldest first.
+Each line fits in the :width of OPTIONS."
+  (mapconcat (lambda (item)
+               (let-alist (cdr item)
+                 (agentel-ui-one-line
+                  (concat "⚙ " (propertize (or .name "Background task")
+                                           'face 'agentel-async-task-face)
+                          " " (agentel-ui-state .state)
+                          (if .progress " ↳ " ""))
+                  .progress
+                  (plist-get options :width))))
+             (reverse (agentel-store-get model 'tasks))
+             "\n"))
+
+(agentel-ui-define-view 'agentel-async-tasks #'agentel-async-task--view :pin 10)
 
 (add-hook 'agentel-connection-capability-functions #'agentel-async-task--capabilities)
 (add-hook 'agentel-session-update-functions #'agentel-async-task--on-update)
-(add-hook 'agentel-chat-pin-functions #'agentel-async-task--pin)
 
 (provide 'agentel-async-task)
 ;;; agentel-async-task.el ends here
