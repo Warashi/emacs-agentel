@@ -116,7 +116,7 @@ params, for example to withdraw a question on `$/cancel_request'.")
   (dolist (session (agentel-session-list))
     (when (and (eq (agentel-session-connection session) connection)
                (not (agentel-session-ended session)))
-      (agentel-session-set-ended session 'exited)))
+      (agentel-session-send session '(end exited))))
   (unless (agentel-connection-stopping connection)
     (run-hook-with-args 'agentel-connection-exit-functions connection)))
 

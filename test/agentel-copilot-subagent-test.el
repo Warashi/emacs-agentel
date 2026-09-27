@@ -69,12 +69,12 @@
         (chunk '((sessionUpdate . "agent_message_chunk")
                  (content . ((type . "text") (text . "Hi"))))))
     (let ((session (agentel-session-create)))
-      (agentel-session-start-turn session)
+      (agentel-session-send session '(start-turn))
       (agentel-copilot-subagent--withhold-p
        session '((sessionUpdate . "tool_call") (toolCallId . "toolu_1")
                  (rawInput . ((agent_type . "explore") (prompt . "Look.")))))
       (should (agentel-copilot-subagent--withhold-p session chunk))
-      (agentel-session-finish-turn session)
+      (agentel-session-send session '(finish-turn))
       (should-not (agentel-copilot-subagent--withhold-p session chunk)))))
 
 (defconst agentel-copilot-subagent-test-task
@@ -92,7 +92,7 @@
         (agentel-session-changed-functions
          (list #'agentel-copilot-subagent--on-changed)))
     (let ((session (agentel-session-create)))
-      (agentel-session-start-loading session)
+      (agentel-session-send session '(start-loading))
       (agentel-copilot-subagent--withhold-p session agentel-copilot-subagent-test-task)
       (should (agentel-copilot-subagent--withhold-p
                session agentel-copilot-subagent-test-chunk)))))
@@ -102,10 +102,10 @@
         (agentel-session-changed-functions
          (list #'agentel-copilot-subagent--on-changed)))
     (let ((session (agentel-session-create)))
-      (agentel-session-start-loading session)
+      (agentel-session-send session '(start-loading))
       (agentel-copilot-subagent--withhold-p session agentel-copilot-subagent-test-task)
-      (agentel-session-finish-loading session)
-      (agentel-session-start-turn session)
+      (agentel-session-send session '(finish-loading))
+      (agentel-session-send session '(start-turn))
       (should-not (agentel-copilot-subagent--withhold-p
                    session agentel-copilot-subagent-test-chunk)))))
 

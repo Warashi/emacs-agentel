@@ -321,12 +321,12 @@ full on top of the output."
 
 (defun agentel-chat--finish-turn (session)
   "Record that the turn of SESSION ended."
-  (agentel-session-finish-turn session)
+  (agentel-session-send session '(finish-turn))
   (agentel-conversation-finish-message session))
 
 (defun agentel-chat--prompt (session text)
   "Send TEXT to the agent as a prompt of SESSION."
-  (agentel-session-start-turn session)
+  (agentel-session-send session '(start-turn))
   (agentel-connection-request
    (agentel-session-connection session) "session/prompt"
    `((sessionId . ,(agentel-session-id session))

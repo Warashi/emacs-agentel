@@ -109,7 +109,7 @@ of SESSION."
 (defun agentel--fail (session message)
   "End SESSION because it could not start, showing MESSAGE."
   (agentel-conversation-note session message 'error)
-  (agentel-session-set-ended session 'failed))
+  (agentel-session-send session '(end failed)))
 
 (defun agentel--open-session (session options)
   "Create or load the ACP session for SESSION as OPTIONS say."
@@ -120,7 +120,7 @@ of SESSION."
       ;; The agent replays the history before it answers, so the session
       ;; must be found by id before the request is sent.
       (agentel-session-register session session-id)
-      (agentel-session-start-loading session)
+      (agentel-session-send session '(start-loading))
       (push (cons 'sessionId session-id) params))
     (agentel-connection-request
      connection (if session-id "session/load" "session/new") params
@@ -128,7 +128,7 @@ of SESSION."
      (lambda (result)
        (if session-id
            (progn
-             (agentel-session-finish-loading session)
+             (agentel-session-send session '(finish-loading))
              ;; The replayed history ends without a turn ending it.
              (agentel-conversation-finish-message session))
          (agentel-session-register session (alist-get 'sessionId result)))

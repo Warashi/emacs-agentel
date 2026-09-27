@@ -175,26 +175,6 @@ chosen by each agent, so two agents may use the same one."
   `(prog1 (setf (alist-get ,key (agentel-session-alist ,session)) ,value)
      (agentel-session-changed ,session)))
 
-(defun agentel-session-start-turn (session)
-  "Record that the agent started working on a prompt of SESSION."
-  (agentel-session-send session '(start-turn)))
-
-(defun agentel-session-finish-turn (session)
-  "Record that the agent finished working on the prompt of SESSION."
-  (agentel-session-send session '(finish-turn)))
-
-(defun agentel-session-start-loading (session)
-  "Record that an earlier session started loading into SESSION."
-  (agentel-session-send session '(start-loading)))
-
-(defun agentel-session-finish-loading (session)
-  "Record that the earlier session finished loading into SESSION."
-  (agentel-session-send session '(finish-loading)))
-
-(defun agentel-session-set-ended (session reason)
-  "Record that SESSION ended for REASON, a symbol shown as its state."
-  (agentel-session-send session `(end ,reason)))
-
 (defun agentel-session-waiting-p (session)
   "Return non-nil if the user owes an answer to SESSION or to its subagents.
 Whether a session waits is asked of `agentel-session-waiting-functions'."

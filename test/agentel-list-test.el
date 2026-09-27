@@ -167,8 +167,8 @@
 
 (ert-deftest agentel-list-marks-a-session-whose-turn-ended-out-of-sight ()
   (agentel-list-test-with-sessions
-    (agentel-session-start-turn other)
-    (agentel-session-finish-turn other)
+    (agentel-session-send other '(start-turn))
+    (agentel-session-send other '(finish-turn))
     (agentel-list--refresh)
     (should (equal (agentel-list-test-lines)
                    '("● 💤 two"
@@ -187,8 +187,8 @@
 
 (ert-deftest agentel-list-puts-waiting-sessions-before-unread-ones ()
   (agentel-list-test-with-sessions
-    (agentel-session-start-turn other)
-    (agentel-session-finish-turn other)
+    (agentel-session-send other '(start-turn))
+    (agentel-session-send other '(finish-turn))
     (agentel-test-ask child)
     (agentel-list--refresh)
     (should (equal (car (agentel-list-test-lines)) "  🙋 repo-one"))))
@@ -197,23 +197,23 @@
   (agentel-list-test-with-sessions
     (save-window-excursion
       (switch-to-buffer (agentel-session-buffer other))
-      (agentel-session-start-turn other)
-      (agentel-session-finish-turn other))
+      (agentel-session-send other '(start-turn))
+      (agentel-session-send other '(finish-turn)))
     (agentel-list--refresh)
     (should (equal (car (last (agentel-list-test-lines))) "  💤 two"))))
 
 (ert-deftest agentel-list-does-not-mark-a-subagent ()
   (agentel-list-test-with-sessions
-    (agentel-session-start-turn child)
-    (agentel-session-finish-turn child)
+    (agentel-session-send child '(start-turn))
+    (agentel-session-send child '(finish-turn))
     (agentel-list--refresh)
     (should-not (seq-some (lambda (line) (string-prefix-p "●" line))
                           (agentel-list-test-lines)))))
 
 (ert-deftest agentel-list-unmarks-a-session-once-shown ()
   (agentel-list-test-with-sessions
-    (agentel-session-start-turn other)
-    (agentel-session-finish-turn other)
+    (agentel-session-send other '(start-turn))
+    (agentel-session-send other '(finish-turn))
     (save-window-excursion
       (switch-to-buffer (agentel-session-buffer other))
       (agentel-list--forget-shown (selected-frame)))
@@ -229,7 +229,7 @@
   (agentel-list-test-with-sessions
     (goto-char (point-min))
     (search-forward "two")
-    (agentel-session-start-turn parent)
+    (agentel-session-send parent '(start-turn))
     (agentel-list--refresh)
     (should (eq (agentel-list--session) other))))
 
@@ -240,7 +240,7 @@
         (goto-char (point-min))
         (search-forward "Fix things"))
       (with-temp-buffer
-        (agentel-session-start-turn other)
+        (agentel-session-send other '(start-turn))
         (agentel-list--refresh))
       (with-selected-window list-window
         (should (equal (buffer-substring-no-properties
@@ -250,7 +250,7 @@
 
 (ert-deftest agentel-list-follows-changes ()
   (agentel-list-test-with-sessions
-    (agentel-session-start-turn other)
+    (agentel-session-send other '(start-turn))
     (agentel-list--refresh)
     (goto-char (point-min))
     (should (search-forward "🏃 two" nil t))))

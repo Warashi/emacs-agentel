@@ -150,7 +150,7 @@ of CHILD.  CHILD is kept only to open its buffer."
   (let-alist update
     (when-let* ((child (agentel-session-get .subagentSessionId
                                             (agentel-session-connection parent))))
-      (agentel-session-set-ended child (intern .state)))))
+      (agentel-session-send child `(end ,(intern .state))))))
 
 (defun agentel-subagent--running-p (child)
   "Return non-nil if CHILD is a subagent, which runs until it ends."
