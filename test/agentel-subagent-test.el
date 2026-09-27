@@ -107,6 +107,7 @@
          (parent (agentel-session-create))
          (child (agentel-session-create :parent parent))
          (grandchild (agentel-session-create :parent child)))
+    (agentel-subagent--follow child)
     (agentel-session-register parent "p1")
     (agentel-session-register child "c1")
     (agentel-session-register grandchild "g1")
@@ -116,6 +117,23 @@
       (should (agentel-store-get item 'waiting))
       (agentel-test-answer grandchild)
       (should-not (agentel-store-get item 'waiting)))))
+
+(agentel-store-define 'agentel-subagent-test-other (lambda (message _data) message))
+
+(ert-deftest agentel-subagent-item-follows-only-what-it-shows-of-the-child ()
+  (let* ((agentel-session--registry nil)
+         (parent (agentel-session-create))
+         (child (agentel-session-create :parent parent)))
+    (agentel-subagent--follow child)
+    (agentel-session-register parent "p1")
+    (agentel-session-register child "c1")
+    (let* ((item (agentel-conversation-find parent '(subagent . "c1")))
+           (revision (agentel-store-model-revision item)))
+      (agentel-store-dispatch (agentel-session-store child) 'other
+                              'agentel-subagent-test-other '((anything . t)))
+      (should (= (agentel-store-model-revision item) revision))
+      (agentel-subagent--send child '(act "make"))
+      (should (equal (agentel-store-get item 'activity) "make")))))
 
 (ert-deftest agentel-subagent-item-opens-the-child-buffer ()
   (agentel-test-with-started session nil

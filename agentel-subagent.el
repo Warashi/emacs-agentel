@@ -153,6 +153,28 @@ has one."
              (activity . ,(agentel-subagent--get child 'activity))
              (waiting . ,(and (agentel-session-waiting-p child) t)))))))
 
+(defun agentel-subagent--follow (child)
+  "Keep the item and the pin of CHILD in its parent in step with CHILD.
+They show its name and state and what it works on, so they follow
+those models of CHILD and no other."
+  (let ((store (agentel-session-store child))
+        (show (lambda (_model _added)
+                (agentel-subagent--show child)
+                (agentel-chat-refresh-pin (agentel-session-parent child)))))
+    (agentel-store-subscribe store show 'state)
+    (agentel-store-subscribe store show 'subagent)))
+
+(defun agentel-subagent--follow-waiting (session)
+  "Show in the parent's item whether the subagent SESSION waits.
+Nothing keeps whether a session waits, so the item is sent again when
+the session changes and the item tells otherwise."
+  (when-let* ((parent (agentel-session-parent session))
+              (id (agentel-session-id session))
+              (item (agentel-conversation-find parent (cons 'subagent id))))
+    (unless (eq (and (agentel-session-waiting-p session) t)
+                (agentel-store-get item 'waiting))
+      (agentel-subagent--show session))))
+
 (defun agentel-subagent--spawn (parent update)
   "Create the subagent announced by UPDATE under PARENT."
   (let-alist update
@@ -162,6 +184,7 @@ has one."
                     :connection (agentel-session-connection parent)
                     :parent parent
                     :cwd (agentel-session-cwd parent))))
+        (agentel-subagent--follow child)
         (agentel-session-send child `(retitle ,.name))
         (agentel-session-register child .subagentSessionId)
         (agentel-subagent--send child `(assign ,.task))
@@ -204,17 +227,11 @@ has one."
      (when (agentel-session-parent session)
        (agentel-subagent--note-activity session update)))))
 
-(defun agentel-subagent--on-changed (session)
-  "Keep the parent's item and pin of SESSION in step with it."
-  (when-let* ((parent (agentel-session-parent session)))
-    (agentel-subagent--show session)
-    (agentel-chat-refresh-pin parent)))
-
 (add-hook 'agentel-connection-capability-functions #'agentel-subagent--capabilities)
 (add-hook 'agentel-session-withhold-functions #'agentel-subagent--withhold-p)
 (add-hook 'agentel-session-running-functions #'agentel-subagent--running-p)
 (add-hook 'agentel-session-update-functions #'agentel-subagent--on-update)
-(add-hook 'agentel-session-changed-functions #'agentel-subagent--on-changed)
+(add-hook 'agentel-session-changed-functions #'agentel-subagent--follow-waiting)
 (add-hook 'agentel-chat-pin-functions #'agentel-subagent--pin)
 (keymap-set agentel-chat-mode-map "C-c C-j" #'agentel-subagent-open)
 
