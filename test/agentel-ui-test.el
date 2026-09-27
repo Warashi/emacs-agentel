@@ -102,6 +102,9 @@
 (ert-deftest agentel-ui-state-shows-a-known-state-as-its-icon ()
   (should (equal (agentel-ui-state 'waiting) "🙋")))
 
+(ert-deftest agentel-ui-state-shows-loading-as-an-icon ()
+  (should (equal (agentel-ui-state 'loading) "📥")))
+
 (ert-deftest agentel-ui-state-names-the-state-on-hover ()
   (should (equal (get-text-property 0 'help-echo (agentel-ui-state 'running))
                  "running")))

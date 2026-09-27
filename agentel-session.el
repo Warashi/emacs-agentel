@@ -29,6 +29,7 @@
   "One ACP session."
   id connection parent cwd title buffer ended
   (in-turn nil :documentation "Non-nil while the agent works on a prompt.")
+  (loading nil :documentation "Non-nil while an earlier session is loaded into it.")
   (project nil :documentation "Name of the project the session works in.")
   (agent nil :documentation "Name of the agent in `agentel-agents' that runs it.")
   (alist nil :documentation "Per-feature values, see `agentel-session-data'."))
@@ -132,6 +133,16 @@ chosen by each agent, so two agents may use the same one."
   (setf (agentel-session-in-turn session) nil)
   (agentel-session-changed session))
 
+(defun agentel-session-start-loading (session)
+  "Record that an earlier session started loading into SESSION."
+  (setf (agentel-session-loading session) t)
+  (agentel-session-changed session))
+
+(defun agentel-session-finish-loading (session)
+  "Record that the earlier session finished loading into SESSION."
+  (setf (agentel-session-loading session) nil)
+  (agentel-session-changed session))
+
 (defun agentel-session-set-ended (session reason)
   "Record that SESSION ended for REASON, a symbol shown as its state."
   (setf (agentel-session-ended session) reason)
@@ -163,10 +174,12 @@ It is at work during a turn or while a feature of
   "Return the state of SESSION as a symbol.
 It is `starting' before the agent assigns an id, the end reason once
 ended, `waiting' while the user owes an answer to it or to one of its
-subagents, `running' while it is at work, and `idle' otherwise."
+subagents, `loading' while an earlier session loads into it, `running'
+while it is at work, and `idle' otherwise."
   (cond ((agentel-session-ended session))
         ((not (agentel-session-id session)) 'starting)
         ((agentel-session-waiting-p session) 'waiting)
+        ((agentel-session-loading session) 'loading)
         ((agentel-session-running-p session) 'running)
         (t 'idle)))
 

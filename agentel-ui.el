@@ -113,8 +113,8 @@ FUNCTION makes the text depending on `agentel-ui-line-width' again."
           (funcall agentel-ui--on-width-change))))))
 
 (defcustom agentel-ui-state-icons
-  '((starting . "⏳") (running . "🏃") (waiting . "🙋") (idle . "💤")
-    (paused . "💤") (completed . "✅") (failed . "❌") (cancelled . "🚫")
+  '((starting . "⏳") (loading . "📥") (running . "🏃") (waiting . "🙋")
+    (idle . "💤") (paused . "💤") (completed . "✅") (failed . "❌") (cancelled . "🚫")
     (exited . "🔌"))
   "Icons shown for the states of sessions and background tasks.
 Each icon should take the same width in every terminal, so an emoji

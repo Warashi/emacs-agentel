@@ -148,6 +148,22 @@
       (agentel-session-set-ended session 'exited)
       (should-not (agentel-session-running-p session)))))
 
+(ert-deftest agentel-session-state-shows-an-earlier-session-loading ()
+  (agentel-session-test-with-registry
+    (let ((session (agentel-session-create))
+          (waiting nil))
+      (agentel-session-register session "s1")
+      (add-hook 'agentel-session-waiting-functions (lambda (_session) waiting))
+      (agentel-session-start-loading session)
+      (should (eq (agentel-session-state session) 'loading))
+      (agentel-session-start-turn session)
+      (should (eq (agentel-session-state session) 'loading))
+      (setq waiting t)
+      (should (eq (agentel-session-state session) 'waiting))
+      (setq waiting nil)
+      (agentel-session-finish-loading session)
+      (should (eq (agentel-session-state session) 'running)))))
+
 (ert-deftest agentel-session-state-of-ended-session ()
   (agentel-session-test-with-registry
     (let ((session (agentel-session-create)))
