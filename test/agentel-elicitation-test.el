@@ -79,5 +79,32 @@
     (agentel-test-wait-until (lambda () (not (eq (agentel-session-state session) 'waiting))))
     (agentel-test-wait-for-text "→ withdrawn")))
 
+(defun agentel-elicitation-test-view (&rest messages)
+  "Return the text of a form after MESSAGES."
+  (let ((data nil))
+    (dolist (message messages)
+      (setq data (agentel-elicitation--update message data)))
+    (substring-no-properties
+     (agentel-ui-view (agentel-store-model--make :type 'elicitation :data data)))))
+
+(defconst agentel-elicitation-test-ask
+  '(ask item "Pick one"
+        ((color (title . "Color") (oneOf . [((const . "r") (title . "Red"))]))))
+  "The message asking for a color.")
+
+(ert-deftest agentel-elicitation-view-shows-what-it-was-asked ()
+  (should (equal (agentel-elicitation-test-view agentel-elicitation-test-ask)
+                 "? Pick one\n  Color\n    • Red\n  [Answer] [Decline]")))
+
+(ert-deftest agentel-elicitation-view-shows-the-answers ()
+  (should (equal (agentel-elicitation-test-view agentel-elicitation-test-ask
+                                                '(close accept ((color . "r"))))
+                 "? Pick one → Color: r")))
+
+(ert-deftest agentel-elicitation-view-shows-why-it-was-not-answered ()
+  (should (equal (agentel-elicitation-test-view agentel-elicitation-test-ask
+                                                '(close declined nil))
+                 "? Pick one → declined")))
+
 (provide 'agentel-elicitation-test)
 ;;; agentel-elicitation-test.el ends here

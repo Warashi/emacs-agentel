@@ -89,72 +89,76 @@
                           (if (nth 2 option) (concat " — " (nth 2 option)) "")))
                 (agentel-elicitation--options schema) ""))))
 
-(defun agentel-elicitation--summary (item)
-  "Return the answers of ITEM as one line."
-  (let ((content (plist-get item :content))
-        (fields (agentel-elicitation--fields item)))
-    (mapconcat
-     (lambda (answer)
-       (let* ((key (or (agentel-elicitation--custom-for
-                        (assq (car answer) fields))
-                       (car answer)))
-              (value (cdr answer)))
-         (format "%s: %s"
-                 (agentel-elicitation--label key (alist-get key fields))
-                 (if (vectorp value)
-                     (mapconcat (lambda (v) (format "%s" v)) value ", ")
-                   value))))
-     content "; ")))
+(defun agentel-elicitation--summary (fields content)
+  "Return the answers CONTENT to a form of FIELDS as one line."
+  (mapconcat
+   (lambda (answer)
+     (let* ((key (or (agentel-elicitation--custom-for
+                      (assq (car answer) fields))
+                     (car answer)))
+            (value (cdr answer)))
+       (format "%s: %s"
+               (agentel-elicitation--label key (alist-get key fields))
+               (if (vectorp value)
+                   (mapconcat (lambda (v) (format "%s" v)) value ", ")
+                 value))))
+   content "; "))
 
 (defun agentel-elicitation--render (entry _options)
   "Render the form ENTRY."
-  (let* ((item (agentel-store-get entry 'item))
-         (message (or (alist-get 'message (plist-get item :params)) "Question"))
-         (outcome (plist-get item :outcome)))
-    (if outcome
-        (propertize (format "? %s → %s" message
-                            (if (eq outcome 'accept)
-                                (agentel-elicitation--summary item)
-                              outcome))
+  (let-alist (agentel-store-model-data entry)
+    (if .outcome
+        (propertize (format "? %s → %s" .question
+                            (if (eq .outcome 'accept)
+                                (agentel-elicitation--summary .fields .content)
+                              .outcome))
                     'face 'agentel-chat-notice-face)
       (concat
-       (propertize (concat "? " message) 'face 'agentel-elicitation-face)
+       (propertize (concat "? " .question) 'face 'agentel-elicitation-face)
        (mapconcat #'agentel-elicitation--render-field
-                  (seq-remove #'agentel-elicitation--custom-for
-                              (agentel-elicitation--fields item))
+                  (seq-remove #'agentel-elicitation--custom-for .fields)
                   "")
        "\n  "
-       (buttonize "[Answer]" (lambda (_) (agentel-elicitation--ask item)))
+       (buttonize "[Answer]" (lambda (_) (agentel-elicitation--ask .item)))
        " "
-       (buttonize "[Decline]" (lambda (_) (agentel-elicitation-decline item)))))))
+       (buttonize "[Decline]" (lambda (_) (agentel-elicitation-decline .item)))))))
 
-(agentel-conversation-define 'elicitation
-  (lambda (message _data)
-    (pcase message
-      (`(show ,item ,waiting) `((item . ,item) (waiting . ,waiting))))))
+(defun agentel-elicitation--update (message data)
+  "Return the DATA of a form changed by MESSAGE.
+MESSAGE is (ask ITEM QUESTION FIELDS) when the agent asks, and
+\(close OUTCOME CONTENT) when the form is answered with CONTENT,
+declined or withdrawn.  ITEM is kept only to answer it."
+  (pcase message
+    (`(ask ,item ,question ,fields)
+     `((item . ,item) (question . ,question) (fields . ,fields) (waiting . t)))
+    (`(close ,outcome ,content)
+     (let-alist data
+       `((item . ,.item) (question . ,.question) (fields . ,.fields)
+         (outcome . ,outcome) (content . ,content))))))
+
+(agentel-conversation-define 'elicitation #'agentel-elicitation--update)
 (agentel-ui-define-view 'elicitation #'agentel-elicitation--render)
 
-(defun agentel-elicitation--show (item)
-  "Show the state of the form ITEM in its session buffer."
-  (let ((session (plist-get item :session)))
-    (agentel-conversation-send
-     session (cons 'elicitation (plist-get item :id)) 'elicitation
-     `(show ,item ,(and (memq item (agentel-session-pending session)) t)))))
+(defun agentel-elicitation--send (item message)
+  "Send MESSAGE to the conversation item of the form ITEM."
+  (agentel-conversation-send (plist-get item :session)
+                             (cons 'elicitation (plist-get item :id))
+                             'elicitation message))
 
 ;;;; Answering
 
-(defun agentel-elicitation--close (item outcome)
-  "Stop waiting for ITEM, recording OUTCOME."
+(defun agentel-elicitation--close (item outcome &optional content)
+  "Stop waiting for ITEM, recording OUTCOME and the answers CONTENT."
   (plist-put item :outcome outcome)
   (agentel-session-remove-pending (plist-get item :session) item)
-  (agentel-elicitation--show item))
+  (agentel-elicitation--send item `(close ,outcome ,content)))
 
-(defun agentel-elicitation--reply (item result outcome)
-  "Answer the form ITEM with RESULT and record OUTCOME."
+(defun agentel-elicitation--reply (item result outcome &optional content)
+  "Answer the form ITEM with RESULT and record OUTCOME and CONTENT."
   (unless (plist-get item :outcome)
     (agentel-connection-respond (plist-get item :connection) (plist-get item :id)
                                 result)
-    (agentel-elicitation--close item outcome)))
+    (agentel-elicitation--close item outcome content)))
 
 (defun agentel-elicitation-decline (item)
   "Decline to answer the form ITEM."
@@ -226,10 +230,9 @@ Return (VALUES . TEXT) where TEXT joins answers matching no option."
 (defun agentel-elicitation--ask (item)
   "Fill in the form ITEM from the minibuffer and send the answers."
   (let ((content (agentel-elicitation--read item)))
-    (plist-put item :content content)
     (agentel-elicitation--reply
      item `((action . "accept") (content . ,(or content (make-hash-table))))
-     'accept)))
+     'accept content)))
 
 ;;;; Protocol
 
@@ -247,7 +250,9 @@ Return (VALUES . TEXT) where TEXT joins answers matching no option."
                           :session session :connection connection)))
           (plist-put item :answer (lambda () (agentel-elicitation--ask item)))
           (agentel-session-add-pending session item)
-          (agentel-elicitation--show item))
+          (agentel-elicitation--send
+           item `(ask ,item ,(or (alist-get 'message params) "Question")
+                      ,(agentel-elicitation--fields item))))
       (agentel-connection-respond connection id '((action . "decline"))))))
 
 (defun agentel-elicitation--withdraw (connection method params)
