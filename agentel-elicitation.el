@@ -324,7 +324,9 @@ METHOD and PARAMS are those of the notification."
         (remhash item agentel-elicitation--requests)))))
 
 (defun agentel-elicitation--end (session)
-  "Withdraw the forms of SESSION once it ended, as none can be answered."
+  "Withdraw the forms of SESSION once it ended, as none can be answered.
+While the agent still runs, it is told each form was dismissed so it
+does not wait for them."
   (when (agentel-session-ended session)
     (let (ended)
       (maphash (lambda (item request)
@@ -334,7 +336,12 @@ METHOD and PARAMS are those of the notification."
       (dolist (item ended)
         ;; Withdrawing one tells the session it changed, which runs this
         ;; again and may withdraw the others first.
-        (when (gethash item agentel-elicitation--requests)
+        (when-let* ((request (gethash item agentel-elicitation--requests)))
+          (when (agentel-connection-live-p (plist-get request :connection))
+            ;; Cancel rather than decline: the user made no choice.
+            (agentel-connection-respond (plist-get request :connection)
+                                        (plist-get request :id)
+                                        '((action . "cancel"))))
           (agentel-elicitation--close item '(withdraw)))))))
 
 (add-hook 'agentel-connection-capability-functions #'agentel-elicitation--capabilities)

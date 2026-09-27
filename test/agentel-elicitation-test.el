@@ -113,6 +113,25 @@
                  (lambda (&rest _) (ert-fail "Answered over an ended connection"))))
         (agentel-elicitation-decline item)))))
 
+(ert-deftest agentel-elicitation-is-cancelled-when-its-session-ends-while-the-agent-runs ()
+  (agentel-test-with-started session nil
+    (let* ((connection (agentel-session-connection session))
+           (child (agentel-session-create :connection connection :parent session))
+           responses)
+      (agentel-session-register child "child")
+      (cl-letf (((symbol-function 'agentel-connection-respond)
+                 (lambda (_connection id result) (push (cons id result) responses))))
+        (agentel-elicitation--handle
+         connection 99 '((sessionId . "child") (mode . "form") (message . "Name?")
+                         (requestedSchema
+                          (properties (name (type . "string") (title . "Name"))))))
+        (agentel-session-send child '(end completed)))
+      (should (equal responses '((99 (action . "cancel")))))
+      (let ((item (seq-find (lambda (item) (eq (agentel-store-model-type item) 'elicitation))
+                            (agentel-conversation-items child))))
+        (should (agentel-store-get item 'withdrawn))
+        (should-not (agentel-store-get item 'waiting))))))
+
 (ert-deftest agentel-elicitation-is-withdrawn-when-the-turn-is-cancelled ()
   (agentel-test-with-started session nil
     (agentel-elicitation-test-ask)
