@@ -56,6 +56,20 @@
   (with-temp-buffer
     (should (= (agentel-ui-line-width) agentel-ui-max-line-width))))
 
+(ert-deftest agentel-ui-line-width-keeps-point-away-from-an-unselected-window ()
+  (save-window-excursion
+    (delete-other-windows)
+    (let ((shown (generate-new-buffer "shown")))
+      (unwind-protect
+          (with-current-buffer shown
+            (insert (make-string 20 ?x))
+            (set-window-buffer (split-window-right) shown)
+            (goto-char 5)
+            (should-not (= (point) (window-point (get-buffer-window shown))))
+            (agentel-ui-line-width)
+            (should (= (point) 5)))
+        (kill-buffer shown)))))
+
 (ert-deftest agentel-ui-one-line-is-marked-as-fitting-the-width ()
   (should (get-text-property 0 'agentel-ui-fits-width (agentel-ui-one-line "> " "x"))))
 

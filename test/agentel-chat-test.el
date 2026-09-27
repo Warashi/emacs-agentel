@@ -264,6 +264,18 @@
         (should (string-match-p "m\\{100\\}" (agentel-chat-test-transcript)))
         (should (string-match-p "p\\{40\\}" (agentel-chat-test-shown)))))))
 
+(ert-deftest agentel-chat-keeps-the-transcript-before-the-input-in-an-unselected-window ()
+  (agentel-chat-test-with-session
+    (save-window-excursion
+      (delete-other-windows)
+      (set-window-buffer (split-window-right) (current-buffer))
+      (agentel-chat-test-chunk "user_message_chunk" "hi")
+      (agentel-chat-test-update
+       '((sessionUpdate . "tool_call") (toolCallId . "t1")
+         (title . "Read") (status . "completed")))
+      (should (string-match-p "Read" (agentel-chat-test-transcript)))
+      (should (equal (agentel-chat-input) "")))))
+
 (ert-deftest agentel-chat-notice-appears-in-transcript ()
   (agentel-chat-test-with-session
     (agentel-chat-notice session "Agent exited" 'error)

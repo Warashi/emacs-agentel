@@ -24,9 +24,12 @@
   "Return the width of a summary line in this buffer.
 It is the narrowest window showing the buffer, up to
 `agentel-ui-max-line-width'."
-  (apply #'min agentel-ui-max-line-width
-         (mapcar #'window-max-chars-per-line
-                 (get-buffer-window-list nil nil t))))
+  ;; `window-max-chars-per-line' selects the window, which moves point
+  ;; to the point of that window.
+  (save-excursion
+    (apply #'min agentel-ui-max-line-width
+           (mapcar #'window-max-chars-per-line
+                   (get-buffer-window-list nil nil t)))))
 
 (defun agentel-ui-one-line (prefix text)
   "Return PREFIX followed by the first line of TEXT as one summary line.
