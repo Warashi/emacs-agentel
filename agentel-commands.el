@@ -28,19 +28,40 @@ FUNCTION is called with the session and the text after the name."
   (setf (alist-get name agentel-commands-client-commands nil nil #'equal)
         (list description function)))
 
+(defun agentel-commands--update (message _data)
+  "Return the data of the agent commands of a session changed by MESSAGE.
+The data has the `commands', each an alist of its `name', its
+`description' and the `hint' of its argument.  MESSAGE is (announce
+COMMANDS), which replaces the commands."
+  (pcase message
+    (`(announce ,commands) `((commands . ,commands)))))
+
+(agentel-store-define 'agentel-commands #'agentel-commands--update)
+
+(defun agentel-commands--agent-commands (session)
+  "Return the commands the agent announced for SESSION."
+  (when-let* ((model (agentel-store-find (agentel-session-store session) 'commands)))
+    (agentel-store-get model 'commands)))
+
 (defun agentel-commands--on-update (session update)
-  "Remember the commands the agent announced in UPDATE for SESSION."
+  "Announce to SESSION the commands the agent tells in UPDATE."
   (when (equal (alist-get 'sessionUpdate update) "available_commands_update")
-    (setf (agentel-session-data session 'commands)
-          (append (alist-get 'availableCommands update) nil))))
+    (agentel-store-dispatch
+     (agentel-session-store session) 'commands 'agentel-commands
+     `(announce
+       ,(mapcar (lambda (command)
+                  (let-alist command
+                    `((name . ,.name) (description . ,.description)
+                      ,@(and .input.hint `((hint . ,.input.hint))))))
+                (alist-get 'availableCommands update))))))
 
 (defun agentel-commands--annotation (session name)
   "Return the annotation of the command NAME in SESSION."
   (if-let* ((client (assoc name agentel-commands-client-commands)))
       (concat "  " (nth 1 client))
     (when-let* ((command (seq-find (lambda (c) (equal (alist-get 'name c) name))
-                                   (agentel-session-data session 'commands))))
-      (concat (if-let* ((hint (alist-get 'hint (alist-get 'input command))))
+                                   (agentel-commands--agent-commands session))))
+      (concat (if-let* ((hint (alist-get 'hint command)))
                   (concat " " hint)
                 "")
               "  "
@@ -58,7 +79,7 @@ FUNCTION is called with the session and the text after the name."
               ((<= (point) (match-end 0))))
     (let ((names (append (mapcar #'car agentel-commands-client-commands)
                          (mapcar (lambda (c) (alist-get 'name c))
-                                 (agentel-session-data session 'commands)))))
+                                 (agentel-commands--agent-commands session)))))
       (list (match-beginning 1) (match-end 1) names
             :exclusive 'no
             :annotation-function

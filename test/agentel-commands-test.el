@@ -59,6 +59,15 @@
       (should (string-match-p "keep a summary" (funcall annotate "compact")))
       (should (string-match-p "<instructions>" (funcall annotate "compact"))))))
 
+(ert-deftest agentel-commands-announced-replace-the-earlier-ones ()
+  (should (equal (agentel-commands--update
+                  '(announce (((name . "context") (description . "Show usage"))))
+                  (agentel-commands--update
+                   '(announce (((name . "compact") (description . "Compact")
+                                (hint . "<instructions>"))))
+                   nil))
+                 '((commands ((name . "context") (description . "Show usage")))))))
+
 (ert-deftest agentel-commands-completes-only-at-the-start-of-the-input ()
   (agentel-commands-test-with-session
     (insert "please /co")
