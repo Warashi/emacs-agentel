@@ -11,7 +11,8 @@
 (agentel-store-define 'agentel-store-test-counter
   (lambda (message data)
     (pcase message
-      (`(add ,n) `((count . ,(+ n (or (alist-get 'count data) 0))))))))
+      (`(add ,n) `((count . ,(+ n (or (alist-get 'count data) 0)))))
+      (_ (agentel-store-reject message)))))
 
 (defun agentel-store-test-counts (store)
   "Return the counts of the models of STORE, oldest first."
@@ -23,6 +24,21 @@
     (agentel-store-dispatch store 'c 'agentel-store-test-counter '(add 2))
     (should (equal (agentel-store-test-counts store) '(3)))
     (should (eq (agentel-store-find store 'c) (agentel-store-last store)))))
+
+(ert-deftest agentel-store-rejects-an-unknown-message-and-keeps-the-model ()
+  (let* ((store (agentel-store-create))
+         (model (agentel-store-dispatch store 'c 'agentel-store-test-counter '(add 1)))
+         told)
+    (agentel-store-subscribe store (lambda (model _added) (push model told)))
+    (should-error (agentel-store-dispatch store 'c 'agentel-store-test-counter '(sub 1))
+                  :type 'agentel-store-unknown-message)
+    (should (equal (agentel-store-model-data model) '((count . 1))))
+    (should (= (agentel-store-model-revision model) 0))
+    (should-error (agentel-store-dispatch store 'd 'agentel-store-test-counter '(sub 1))
+                  :type 'agentel-store-unknown-message)
+    (should-not (agentel-store-find store 'd))
+    (should (equal (agentel-store-models store) (list model)))
+    (should-not told)))
 
 (ert-deftest agentel-store-find-if-returns-the-newest-model-that-matches ()
   (let ((store (agentel-store-create)))

@@ -27,9 +27,18 @@
 (defun agentel-store-define (type update)
   "Define the model TYPE whose data is changed by UPDATE.
 UPDATE is a function taking a message and the data alist of a model,
-nil for a new one, and returning its new data."
+nil for a new one, and returning its new data.  For a message it does
+not know, it calls `agentel-store-reject'."
   (declare (indent 1))
   (setf (alist-get type agentel-store--updates) update))
+
+(define-error 'agentel-store-unknown-message "Unknown message to a model")
+
+(defun agentel-store-reject (message)
+  "Signal that MESSAGE is unknown to the model it was sent to.
+Messages come from agentel itself, so this is a mistake in agentel,
+and the model is left as it was."
+  (signal 'agentel-store-unknown-message (list message)))
 
 (cl-defstruct (agentel-store-model (:constructor agentel-store-model--make)
                                    (:copier nil))
