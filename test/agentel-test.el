@@ -60,7 +60,7 @@
     (agentel-test-wait-for-text "Working slowly")
     (agentel-chat-cancel)
     (agentel-test-wait-for-text "Turn ended: cancelled")
-    (should (eq (agentel-chat-entry-type (agentel-chat-entry-at (match-beginning 0)))
+    (should (eq (agentel-ui-model-type (agentel-chat-entry-at (match-beginning 0)))
                 'stop))))
 
 (ert-deftest agentel-killing-the-buffer-stops-the-agent ()

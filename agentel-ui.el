@@ -35,6 +35,7 @@ nil for a new one, and returning its new data.  :view is a function
 taking the model and a plist of how a presentation shows it, and
 returning its text.  Presentations read more properties of their own
 with `agentel-ui-kind'."
+  (declare (indent 1))
   (setf (alist-get type agentel-ui--kinds) definition))
 
 (defun agentel-ui-kind (type property)

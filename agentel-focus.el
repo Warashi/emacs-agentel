@@ -69,7 +69,7 @@ The overlay is nil while the entry is shown.")
 (defun agentel-focus--hidden-p (entry)
   "Return non-nil if ENTRY of the current turn is hidden."
   (not (or (memq entry agentel-focus--latest)
-           (memq (agentel-chat-entry-type entry) '(user error stop))
+           (memq (agentel-ui-model-type entry) '(user error stop))
            (agentel-focus--waits-p entry))))
 
 (defun agentel-focus--entry-end (entry)
@@ -99,7 +99,7 @@ MOVED means its text changed, so a hidden entry is covered again."
 (defun agentel-focus--add (entry)
   "Record ENTRY as the newest of the current turn."
   (puthash entry nil agentel-focus--overlays)
-  (pcase (agentel-chat-entry-type entry)
+  (pcase (agentel-ui-model-type entry)
     ('agent (setq agentel-focus--last-message entry))
     ((or 'thought 'tool) (setq agentel-focus--last-activity entry)))
   (when (or (agentel-chat-entry-get entry 'item)
@@ -136,7 +136,7 @@ The first of them is the last prompt, unless there is none."
   (agentel-focus--clear)
   (mapc #'agentel-focus--add entries)
   (when-let* ((prompt (car entries))
-              ((eq (agentel-chat-entry-type prompt) 'user)))
+              ((eq (agentel-ui-model-type prompt) 'user)))
     (setq agentel-focus--turn-start (agentel-chat-entry-start prompt))
     (when (> agentel-focus--turn-start (point-min))
       ;; The blank lines in front of the prompt are hidden too.
@@ -155,7 +155,7 @@ The first of them is the last prompt, unless there is none."
                                                  (point-min)))
       (when-let* ((entry (get-text-property pos 'agentel-chat-entry)))
         (push entry entries)
-        (when (eq (agentel-chat-entry-type entry) 'user)
+        (when (eq (agentel-ui-model-type entry) 'user)
           (setq pos (point-min)))))
     entries))
 
@@ -163,7 +163,7 @@ The first of them is the last prompt, unless there is none."
   "Show or hide ENTRY, which was added or changed."
   (cond ((not (eq (gethash entry agentel-focus--overlays 'absent) 'absent))
          (agentel-focus--fix entry t))
-        ((eq (agentel-chat-entry-type entry) 'user)
+        ((eq (agentel-ui-model-type entry) 'user)
          (agentel-focus--start-turn (list entry)))
         ((and agentel-focus--turn-start
               (< (agentel-chat-entry-start entry) agentel-focus--turn-start)))

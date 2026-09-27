@@ -9,13 +9,14 @@
 ;; followed by an input area where the prompt is edited like any other
 ;; text.
 ;;
-;; The transcript is a sequence of entries (messages, thoughts, tool
-;; calls, ...).  An entry owns the text carrying its object in the
-;; `agentel-chat-entry' property, starting at its start marker.  An
-;; entry is changed by rendering it again and replacing exactly that
-;; text, and new entries are always inserted at the end of the
-;; transcript, so updating an older entry never moves text that belongs
-;; to another one.
+;; The transcript is a store of `agentel-ui' kept by the session, whose
+;; models are its entries (messages, thoughts, tool calls, ...), so it
+;; outlives the buffer showing it.  The buffer subscribes to the store.
+;; An entry owns the text carrying its model in the `agentel-chat-entry'
+;; property, starting at its start marker.  An entry is changed by
+;; rendering it again and replacing exactly that text, and new entries
+;; are always inserted at the end of the transcript, so updating an
+;; older entry never moves text that belongs to another one.
 
 ;;; Code:
 
@@ -89,11 +90,14 @@ again or extended.")
 (defvar-local agentel-chat--session nil
   "Session shown in this buffer.")
 
-(defvar-local agentel-chat--entries nil
-  "Hash table of the entries of this buffer by key.")
+(defvar-local agentel-chat--store nil
+  "Store of the transcript shown in this buffer.")
 
-(defvar-local agentel-chat--last nil
-  "Entry at the end of the transcript.")
+(defvar-local agentel-chat--starts nil
+  "Hash table of the start markers of the entries of this buffer.")
+
+(defvar-local agentel-chat--collapsed nil
+  "Hash table of the entries folded in this buffer.")
 
 (defvar-local agentel-chat--transcript-end nil
   "Marker at the end of the transcript.")
@@ -109,11 +113,6 @@ again or extended.")
 
 (defvar-local agentel-chat--history-index nil
   "Position in `agentel-chat--history' while browsing it.")
-
-(cl-defstruct (agentel-chat-entry (:constructor agentel-chat-entry--make)
-                                  (:copier nil))
-  "A piece of the transcript."
-  key type data start collapsed)
 
 ;;;; Keymaps
 
@@ -146,19 +145,64 @@ transcript grows above them, so the undo history is dropped."
        (unless (eq buffer-undo-list t)
          (setq buffer-undo-list nil)))))
 
-(defvar agentel-chat--kinds nil
-  "Alist of entry types and the plists defining them.")
+;;;; Transcript
 
 (defun agentel-chat-define-entry (type &rest definition)
   "Define the entry TYPE by the plist DEFINITION.
 :update is a function taking a message and the data alist of an entry
 and returning its new data, :view a function returning the text of an
 entry, and :collapsed non-nil when a new entry starts folded."
-  (setf (alist-get type agentel-chat--kinds) definition))
+  (let ((view (plist-get definition :view)))
+    (apply #'agentel-ui-define type
+           :view (lambda (entry _options) (funcall view entry))
+           definition)))
 
-(defun agentel-chat--kind (type property)
-  "Return PROPERTY of the definition of the entry TYPE."
-  (plist-get (alist-get type agentel-chat--kinds) property))
+(defun agentel-chat-entry-get (entry key)
+  "Return the value ENTRY stores under KEY."
+  (agentel-ui-get entry key))
+
+(defun agentel-chat--finish-previous (store entry)
+  "Mark the agent message before ENTRY, the last one of STORE, as complete."
+  (let ((previous (cadr (agentel-ui-store-models store))))
+    (when (and previous (eq (agentel-ui-model-type previous) 'agent)
+               (not (agentel-ui-get previous 'finished)))
+      (agentel-ui-update store previous '(finish)))
+    entry))
+
+(defun agentel-chat-transcript (session)
+  "Return the store of the transcript of SESSION."
+  (or (agentel-session-data session 'transcript)
+      (let ((store (agentel-ui-store-create)))
+        (agentel-ui-subscribe store (lambda (entry added)
+                                      (when added
+                                        (agentel-chat--finish-previous store entry))))
+        ;; Making the store changes nothing shown, so listeners are not told.
+        (setf (alist-get 'transcript (agentel-session-alist session)) store))))
+
+(defun agentel-chat-dispatch (session key type message)
+  "Send MESSAGE to the entry of TYPE stored under KEY in SESSION's transcript.
+Without such an entry, one is added to the end of the transcript, so
+a nil KEY adds one every time.  Return the entry."
+  (agentel-ui-dispatch (agentel-chat-transcript session) key type message))
+
+(defun agentel-chat-finish-message (session)
+  "Mark the agent message at the end of the transcript of SESSION as complete."
+  (let* ((store (agentel-chat-transcript session))
+         (entry (agentel-ui-last store)))
+    (when (and entry (eq (agentel-ui-model-type entry) 'agent)
+               (not (agentel-ui-get entry 'finished)))
+      (agentel-ui-update store entry '(finish)))))
+
+(defun agentel-chat-notice (session text &optional type)
+  "Add the notice TEXT to the transcript of SESSION.
+TYPE is `error' for errors and `stop' for why a turn ended early."
+  (agentel-chat-dispatch session nil (or type 'notice) `(show ,text)))
+
+;;;; Entries
+
+(defun agentel-chat-entry-start (entry)
+  "Return the marker at the start of the text of ENTRY in this buffer."
+  (gethash entry agentel-chat--starts))
 
 (defun agentel-chat--entry-end (entry)
   "Return the position after the text of ENTRY."
@@ -182,36 +226,21 @@ entry, and :collapsed non-nil when a new entry starts folded."
   (agentel-chat--propertize
    entry
    (concat (if (> at (point-min)) "\n\n" "")
-           (funcall (agentel-chat--kind (agentel-chat-entry-type entry) :view)
-                    entry))))
+           (agentel-ui-view entry :collapsed (gethash entry agentel-chat--collapsed)))))
 
-(defun agentel-chat-entry-get (entry key)
-  "Return the value ENTRY stores under KEY."
-  (alist-get key (agentel-chat-entry-data entry)))
-
-(defun agentel-chat-find (key)
-  "Return the entry stored under KEY in this buffer."
-  (gethash key agentel-chat--entries))
-
-(defun agentel-chat--add (key type data)
-  "Append an entry of TYPE with DATA to the transcript and return it.
-KEY identifies the entry for `agentel-chat-find'."
-  (agentel-chat-finish-message)
-  (let ((entry (agentel-chat-entry--make
-                :key key :type type :data data
-                :collapsed (agentel-chat--kind type :collapsed))))
-    (agentel-chat--with-transcript
-      (save-excursion
-        (goto-char agentel-chat--transcript-end)
-        ;; The gap in front of the prompt is hidden while nothing was said.
-        (when (and agentel-chat--input-start (= (point) (point-min)))
-          (remove-text-properties (point) (+ (point) 2) '(invisible nil)))
-        (setf (agentel-chat-entry-start entry) (copy-marker (point)))
-        (insert (agentel-chat--entry-string entry (point)))))
-    (when key (puthash key entry agentel-chat--entries))
-    (setq agentel-chat--last entry)
-    (run-hook-with-args 'agentel-chat-entry-changed-functions entry)
-    entry))
+(defun agentel-chat--insert (entry)
+  "Append the text of ENTRY to the transcript."
+  (when (agentel-ui-kind (agentel-ui-model-type entry) :collapsed)
+    (puthash entry t agentel-chat--collapsed))
+  (agentel-chat--with-transcript
+    (save-excursion
+      (goto-char agentel-chat--transcript-end)
+      ;; The gap in front of the prompt is hidden while nothing was said.
+      (when (and agentel-chat--input-start (= (point) (point-min)))
+        (remove-text-properties (point) (+ (point) 2) '(invisible nil)))
+      (puthash entry (copy-marker (point)) agentel-chat--starts)
+      (insert (agentel-chat--entry-string entry (point)))))
+  (run-hook-with-args 'agentel-chat-entry-changed-functions entry))
 
 (defun agentel-chat--refresh (entry)
   "Render ENTRY again in place."
@@ -231,25 +260,24 @@ KEY identifies the entry for `agentel-chat-find'."
     (when offset
       (goto-char (min (+ start offset) (agentel-chat--entry-end entry))))))
 
-(defun agentel-chat-update (entry message)
-  "Change the data of ENTRY by MESSAGE and render it again."
-  (setf (agentel-chat-entry-data entry)
-        (funcall (agentel-chat--kind (agentel-chat-entry-type entry) :update)
-                 message (agentel-chat-entry-data entry)))
-  (agentel-chat--refresh entry))
-
-(defun agentel-chat-dispatch (session key type message)
-  "Send MESSAGE to the entry of TYPE stored under KEY in SESSION's buffer.
-Without such an entry, one is added to the end of the transcript, so
-a nil KEY adds one every time.  Return the entry, or nil when SESSION
-has no live buffer."
-  (when-let* ((buffer (agentel-session-buffer session))
-              ((buffer-live-p buffer)))
-    (with-current-buffer buffer
-      (if-let* ((entry (and key (agentel-chat-find key))))
-          (progn (agentel-chat-update entry message) entry)
-        (agentel-chat--add key type
-                           (funcall (agentel-chat--kind type :update) message nil))))))
+(defun agentel-chat--show (store)
+  "Show the entries of STORE in this buffer and follow their changes."
+  (setq agentel-chat--store store)
+  (mapc #'agentel-chat--insert (agentel-ui-models store))
+  (let* ((buffer (current-buffer))
+         (subscriber
+          (lambda (entry added)
+            (when (buffer-live-p buffer)
+              (with-current-buffer buffer
+                ;; Changing the major mode forgets the entries of the buffer.
+                (when (eq agentel-chat--store store)
+                  (if added
+                      (agentel-chat--insert entry)
+                    (agentel-chat--refresh entry))))))))
+    (agentel-ui-subscribe store subscriber)
+    (add-hook 'kill-buffer-hook
+              (lambda () (agentel-ui-unsubscribe store subscriber))
+              nil t)))
 
 (defun agentel-chat-entry-at (&optional pos)
   "Return the entry at POS, which defaults to point."
@@ -259,14 +287,9 @@ has no live buffer."
   "Fold or unfold the entry at point."
   (interactive)
   (when-let* ((entry (agentel-chat-entry-at)))
-    (setf (agentel-chat-entry-collapsed entry)
-          (not (agentel-chat-entry-collapsed entry)))
+    (puthash entry (not (gethash entry agentel-chat--collapsed))
+             agentel-chat--collapsed)
     (agentel-chat--refresh entry)))
-
-(defun agentel-chat-notice (session text &optional type)
-  "Add the notice TEXT to the buffer of SESSION.
-TYPE is `error' for errors and `stop' for why a turn ended early."
-  (agentel-chat-dispatch session nil (or type 'notice) `(show ,text)))
 
 ;;;; Rendering
 
@@ -277,56 +300,49 @@ More text makes a finished message unfinished until it ends again."
     (`(chunk ,text) `((text . ,(concat (alist-get 'text data) text))))
     ('(finish) `((text . ,(alist-get 'text data)) (finished . t)))))
 
-(defun agentel-chat--render-text (entry)
+(defun agentel-chat--render-text (entry _options)
   "Render the text message ENTRY."
-  (let ((text (agentel-chat-entry-get entry 'text)))
-    (pcase (agentel-chat-entry-type entry)
+  (let ((text (agentel-ui-get entry 'text)))
+    (pcase (agentel-ui-model-type entry)
       ('user (propertize (concat agentel-chat-prompt-string text)
                          'face 'agentel-chat-user-face))
-      ('agent (if (and (agentel-chat-entry-get entry 'finished)
+      ('agent (if (and (agentel-ui-get entry 'finished)
                        agentel-chat-format-message-function)
                   (funcall agentel-chat-format-message-function text)
                 text)))))
 
-(agentel-chat-define-entry 'user
+(agentel-ui-define 'user
   :update #'agentel-chat--update-text
   :view #'agentel-chat--render-text)
 
-(agentel-chat-define-entry 'agent
+(agentel-ui-define 'agent
   :update #'agentel-chat--update-text
   :view #'agentel-chat--render-text)
 
-(defun agentel-chat-finish-message ()
-  "Mark the agent message at the end of this buffer as complete."
-  (let ((entry agentel-chat--last))
-    (when (and entry (eq (agentel-chat-entry-type entry) 'agent)
-               (not (agentel-chat-entry-get entry 'finished)))
-      (agentel-chat-update entry '(finish)))))
-
-(defun agentel-chat--render-thought (entry)
-  "Render the thought ENTRY, folded to its first line when collapsed."
-  (let ((text (agentel-chat-entry-get entry 'text)))
+(defun agentel-chat--render-thought (entry options)
+  "Render the thought ENTRY, folded to its first line when OPTIONS say so."
+  (let ((text (agentel-ui-get entry 'text)))
     (propertize
-     (if (agentel-chat-entry-collapsed entry)
+     (if (plist-get options :collapsed)
          (agentel-ui-one-line "▸ Thinking: " text)
        (concat "▾ Thinking\n" text))
      'face 'agentel-chat-thought-face
      'keymap agentel-chat-entry-map)))
 
-(agentel-chat-define-entry 'thought
+(agentel-ui-define 'thought
   :update #'agentel-chat--update-text
   :view #'agentel-chat--render-thought
   :collapsed t)
 
-(defun agentel-chat--render-notice (entry)
+(defun agentel-chat--render-notice (entry _options)
   "Render the notice ENTRY."
-  (propertize (agentel-chat-entry-get entry 'text)
-              'face (if (eq (agentel-chat-entry-type entry) 'error)
+  (propertize (agentel-ui-get entry 'text)
+              'face (if (eq (agentel-ui-model-type entry) 'error)
                         'agentel-chat-error-face
                       'agentel-chat-notice-face)))
 
 (dolist (type '(notice error stop))
-  (agentel-chat-define-entry type
+  (agentel-ui-define type
     :update (lambda (message _data)
               (pcase message
                 (`(show ,text) `((text . ,text)))))
@@ -354,15 +370,16 @@ More text makes a finished message unfinished until it ends again."
   "Return TEXT with every line indented."
   (replace-regexp-in-string "^" "    " text))
 
-(defun agentel-chat--render-tool (entry)
-  "Render the tool call ENTRY.
+(defun agentel-chat--render-tool (entry options)
+  "Render the tool call ENTRY, folded when OPTIONS say so.
 The header is one line, led by why the tool is called when the agent
 tells it; a title cut short there shows in full on top of the output."
-  (let* ((status (agentel-chat-entry-get entry 'status))
+  (let* ((status (agentel-ui-get entry 'status))
+         (collapsed (plist-get options :collapsed))
          (icon (or (cdr (assoc status agentel-chat--status-icons)) "…"))
-         (title (propertize (or (agentel-chat-entry-get entry 'title) "Tool")
+         (title (propertize (or (agentel-ui-get entry 'title) "Tool")
                             'face 'agentel-chat-tool-face))
-         (why (alist-get 'description (agentel-chat-entry-get entry 'rawInput)))
+         (why (alist-get 'description (agentel-ui-get entry 'rawInput)))
          (summary (if (and (stringp why) (not (equal why title)))
                       (concat (propertize (concat why " — ") 'face 'agentel-chat-tool-face)
                               title)
@@ -370,14 +387,14 @@ tells it; a title cut short there shows in full on top of the output."
          (line (lambda (marker) (agentel-ui-one-line (concat marker icon " ") summary)))
          (cut (not (equal (funcall line "  ")
                           (concat "  " icon " " (string-trim summary)))))
-         (output (agentel-chat--content-text (agentel-chat-entry-get entry 'content)))
+         (output (agentel-chat--content-text (agentel-ui-get entry 'content)))
          (body (string-join (delete "" (list (if cut title "") output)) "\n"))
          (foldable (not (string-empty-p body)))
          (header (funcall line (cond ((not foldable) "  ")
-                                     ((agentel-chat-entry-collapsed entry) "▸ ")
+                                     (collapsed "▸ ")
                                      (t "▾ ")))))
     (propertize
-     (if (or (not foldable) (agentel-chat-entry-collapsed entry))
+     (if (or (not foldable) collapsed)
          header
        (concat header "\n"
                (propertize (agentel-chat--indent (string-trim-right body))
@@ -392,7 +409,7 @@ tells it; a title cut short there shows in full on top of the output."
        (when-let* ((value (alist-get field update)))
          (setf (alist-get field data) value))))))
 
-(agentel-chat-define-entry 'tool
+(agentel-ui-define 'tool
   :update #'agentel-chat--update-tool
   :view #'agentel-chat--render-tool
   :collapsed t)
@@ -401,7 +418,7 @@ tells it; a title cut short there shows in full on top of the output."
   '(("completed" . "[x]") ("in_progress" . "[-]") ("pending" . "[ ]"))
   "Check boxes of plan entry statuses.")
 
-(defun agentel-chat--render-plan (entry)
+(defun agentel-chat--render-plan (entry _options)
   "Render the plan ENTRY."
   (concat
    (propertize "Plan" 'face 'bold)
@@ -411,9 +428,9 @@ tells it; a title cut short there shows in full on top of the output."
                                         agentel-chat--plan-marks))
                             "[ ]")
                         (alist-get 'content item)))
-              (agentel-chat-entry-get entry 'entries) "")))
+              (agentel-ui-get entry 'entries) "")))
 
-(agentel-chat-define-entry 'plan
+(agentel-ui-define 'plan
   :update (lambda (message _data)
             (pcase message
               (`(show ,entries) `((entries . ,entries)))))
@@ -421,30 +438,28 @@ tells it; a title cut short there shows in full on top of the output."
 
 ;;;; Updates from the agent
 
-(defun agentel-chat--text-chunk (type update)
-  "Show the text chunk UPDATE as part of a message of TYPE."
-  (let ((text (alist-get 'text (alist-get 'content update))))
+(defun agentel-chat--text-chunk (session type update)
+  "Show the text chunk UPDATE of SESSION as part of a message of TYPE."
+  (let ((text (alist-get 'text (alist-get 'content update)))
+        (store (agentel-chat-transcript session)))
     (when (and text (not (string-empty-p text)))
-      (if (and agentel-chat--last
-               (eq (agentel-chat-entry-type agentel-chat--last) type))
-          (agentel-chat-update agentel-chat--last `(chunk ,text))
-        (agentel-chat-dispatch agentel-chat--session nil type `(chunk ,text))))))
+      (if-let* ((last (agentel-ui-last store))
+                ((eq (agentel-ui-model-type last) type)))
+          (agentel-ui-update store last `(chunk ,text))
+        (agentel-ui-dispatch store nil type `(chunk ,text))))))
 
 (defun agentel-chat--on-update (session update)
-  "Show UPDATE of SESSION in its buffer."
-  (when-let* ((buffer (agentel-session-buffer session))
-              ((buffer-live-p buffer)))
-    (with-current-buffer buffer
-      (pcase (alist-get 'sessionUpdate update)
-        ("agent_message_chunk" (agentel-chat--text-chunk 'agent update))
-        ("agent_thought_chunk" (agentel-chat--text-chunk 'thought update))
-        ("user_message_chunk" (agentel-chat--text-chunk 'user update))
-        ((or "tool_call" "tool_call_update")
-         (agentel-chat-dispatch session (cons 'tool (alist-get 'toolCallId update))
-                                'tool `(update ,update)))
-        ;; A plan replaces the previous one.
-        ("plan" (agentel-chat-dispatch session 'plan 'plan
-                                       `(show ,(alist-get 'entries update))))))))
+  "Show UPDATE of SESSION in its transcript."
+  (pcase (alist-get 'sessionUpdate update)
+    ("agent_message_chunk" (agentel-chat--text-chunk session 'agent update))
+    ("agent_thought_chunk" (agentel-chat--text-chunk session 'thought update))
+    ("user_message_chunk" (agentel-chat--text-chunk session 'user update))
+    ((or "tool_call" "tool_call_update")
+     (agentel-chat-dispatch session (cons 'tool (alist-get 'toolCallId update))
+                            'tool `(update ,update)))
+    ;; A plan replaces the previous one.
+    ("plan" (agentel-chat-dispatch session 'plan 'plan
+                                   `(show ,(alist-get 'entries update))))))
 
 (add-hook 'agentel-session-update-functions #'agentel-chat--on-update)
 
@@ -485,10 +500,7 @@ tells it; a title cut short there shows in full on top of the output."
 (defun agentel-chat--finish-turn (session)
   "Record that the turn of SESSION ended."
   (agentel-session-set-busy session nil)
-  (when-let* ((buffer (agentel-session-buffer session))
-              ((buffer-live-p buffer)))
-    (with-current-buffer buffer
-      (agentel-chat-finish-message))))
+  (agentel-chat-finish-message session))
 
 (defun agentel-chat--prompt (session text)
   "Send TEXT to the agent as a prompt of SESSION."
@@ -596,7 +608,8 @@ command that asks the user and replies to the agent."
   "Major mode of agentel session buffers.
 The transcript is read-only; type the prompt at the end of the buffer
 and send it with \\[agentel-chat-send]."
-  (setq-local agentel-chat--entries (make-hash-table :test 'equal))
+  (setq-local agentel-chat--starts (make-hash-table :test 'eq))
+  (setq-local agentel-chat--collapsed (make-hash-table :test 'eq))
   (setq-local agentel-chat--transcript-end (point-min-marker))
   (set-marker-insertion-type agentel-chat--transcript-end t)
   ;; The result of :eval is itself a mode line format, where % is special.
@@ -654,6 +667,7 @@ With INPUT, the buffer has an input area for prompts."
       (agentel-chat-mode)
       (setq agentel-chat--session session)
       (when input (agentel-chat--insert-prompt))
+      (agentel-chat--show (agentel-chat-transcript session))
       (unless input (setq buffer-read-only t)))
     (setf (agentel-session-buffer session) buffer)
     buffer))
@@ -664,8 +678,7 @@ Only a subagent outlives its buffer, so the new one has no input area."
   (let ((buffer (agentel-session-buffer session)))
     (if (buffer-live-p buffer)
         buffer
-      (prog1 (agentel-chat-open session :input (not (agentel-session-parent session)))
-        (agentel-chat-notice session "Earlier output was discarded with the buffer.")))))
+      (agentel-chat-open session :input (not (agentel-session-parent session))))))
 
 (provide 'agentel-chat)
 ;;; agentel-chat.el ends here

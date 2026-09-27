@@ -129,8 +129,7 @@ of SESSION."
            (progn
              (agentel-session-set-busy session nil)
              ;; The replayed history ends without a turn ending it.
-             (with-current-buffer (agentel-session-buffer session)
-               (agentel-chat-finish-message)))
+             (agentel-chat-finish-message session))
          (agentel-session-register session (alist-get 'sessionId result)))
        (run-hook-with-args 'agentel-session-started-functions
                            session result options))

@@ -58,6 +58,29 @@
       (agentel-chat-dispatch session 'c 'agentel-chat-test-counter '(add 1)))
     (should (equal (agentel-chat-test-transcript) "count 1"))))
 
+(ert-deftest agentel-chat-keeps-the-transcript-while-the-session-has-no-buffer ()
+  (agentel-chat-test-with-session
+    (kill-buffer buffer)
+    (agentel-chat-test-chunk "agent_message_chunk" "Hello")
+    (setq buffer (agentel-chat-open session :input t))
+    (with-current-buffer buffer
+      (should (equal (agentel-chat-test-transcript) "Hello"))
+      (should (equal (agentel-chat-input) "")))))
+
+(ert-deftest agentel-chat-shows-the-transcript-again-in-a-new-buffer ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-chunk "user_message_chunk" "hi")
+    (agentel-chat-test-update '((sessionUpdate . "tool_call") (toolCallId . "t1")
+                                (title . "Read") (status . "completed")))
+    (let ((shown (agentel-chat-test-transcript)))
+      (kill-buffer buffer)
+      (setq buffer (agentel-chat-open session :input t))
+      (with-current-buffer buffer
+        (should (equal (agentel-chat-test-transcript) shown))
+        (agentel-chat-test-update '((sessionUpdate . "tool_call_update") (toolCallId . "t1")
+                                    (title . "Read again")))
+        (should (string-match-p "Read again\\'" (agentel-chat-test-transcript)))))))
+
 (ert-deftest agentel-chat-open-shows-an-empty-input ()
   (agentel-chat-test-with-session
     (should (equal (agentel-chat-input) ""))
@@ -231,12 +254,12 @@
         (should (equal changed (list message)))
         (agentel-chat-test-chunk "agent_message_chunk" "lo")
         (should (equal changed (list message message))))
-      (agentel-chat-finish-message)
+      (agentel-chat-finish-message session)
       (setq changed nil)
       (agentel-chat-test-update '((sessionUpdate . "tool_call") (toolCallId . "t1")
                                   (title . "Read") (status . "pending")))
       (should changed)
-      (should (seq-every-p (lambda (e) (eq e (agentel-chat-find '(tool . "t1")))) changed))
+      (should (seq-every-p (lambda (e) (eq e (agentel-ui-find (agentel-chat-transcript session) '(tool . "t1")))) changed))
       (setq changed nil)
       (goto-char (point-max))
       (insert "typing")

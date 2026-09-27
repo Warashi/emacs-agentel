@@ -73,8 +73,9 @@
       (should (buffer-live-p (agentel-session-buffer child)))
       (should (eq (window-buffer (selected-window)) (agentel-session-buffer child)))
       (should (memq child (agentel-session-list)))
-      (should (string-match-p "Earlier output"
-                              (agentel-subagent-test-text (agentel-session-buffer child)))))))
+      (let ((text (agentel-subagent-test-text (agentel-session-buffer child))))
+        (should (string-match-p "I will look at the files\\." text))
+        (should-not (string-match-p "Earlier output" text))))))
 
 (ert-deftest agentel-subagent-buffer-has-no-input ()
   (agentel-test-with-started session nil
@@ -115,7 +116,7 @@
 (ert-deftest agentel-subagent-item-shows-the-activity-on-one-line ()
   (let* ((child (agentel-subagent-test-busy-child))
          (text (agentel-subagent--render
-                (agentel-chat-entry--make :data `((child . ,child))))))
+                (agentel-ui-model--make :data `((child . ,child))))))
     (should (string-suffix-p "\n    ↳ make all…" (substring-no-properties text)))))
 
 (ert-deftest agentel-subagent-pin-shows-the-activity-on-one-line ()
