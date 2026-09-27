@@ -109,5 +109,76 @@
   (let ((agentel-ui-state-icons '((idle . "-"))))
     (should (equal (agentel-ui-state 'idle) "-"))))
 
+(agentel-ui-define 'agentel-ui-test-counter
+  :update (lambda (message data)
+            (pcase message
+              (`(add ,n) `((count . ,(+ n (or (alist-get 'count data) 0)))))))
+  :view (lambda (model options)
+          (format "%s%s" (or (plist-get options :prefix) "")
+                  (agentel-ui-get model 'count))))
+
+(defun agentel-ui-test-counts (store)
+  "Return the counts of the models of STORE, oldest first."
+  (mapcar (lambda (model) (agentel-ui-get model 'count)) (agentel-ui-models store)))
+
+(ert-deftest agentel-ui-dispatch-keeps-one-model-per-key ()
+  (let ((store (agentel-ui-store-create)))
+    (agentel-ui-dispatch store 'c 'agentel-ui-test-counter '(add 1))
+    (agentel-ui-dispatch store 'c 'agentel-ui-test-counter '(add 2))
+    (should (equal (agentel-ui-test-counts store) '(3)))
+    (should (eq (agentel-ui-find store 'c) (agentel-ui-last store)))))
+
+(ert-deftest agentel-ui-dispatch-without-a-key-adds-a-model-each-time ()
+  (let ((store (agentel-ui-store-create)))
+    (agentel-ui-dispatch store nil 'agentel-ui-test-counter '(add 1))
+    (agentel-ui-dispatch store nil 'agentel-ui-test-counter '(add 2))
+    (should (equal (agentel-ui-test-counts store) '(1 2)))
+    (should (equal (agentel-ui-get (agentel-ui-last store) 'count) 2))))
+
+(ert-deftest agentel-ui-update-changes-a-model-without-a-key ()
+  (let* ((store (agentel-ui-store-create))
+         (model (agentel-ui-dispatch store nil 'agentel-ui-test-counter '(add 1))))
+    (agentel-ui-update store model '(add 2))
+    (should (equal (agentel-ui-test-counts store) '(3)))))
+
+(ert-deftest agentel-ui-tells-subscribers-which-model-was-added-or-changed ()
+  (let ((store (agentel-ui-store-create))
+        told)
+    (agentel-ui-subscribe store (lambda (model added)
+                                  (push (list (agentel-ui-model-key model) added) told)))
+    (agentel-ui-dispatch store 'a 'agentel-ui-test-counter '(add 1))
+    (agentel-ui-dispatch store 'a 'agentel-ui-test-counter '(add 1))
+    (agentel-ui-dispatch store 'b 'agentel-ui-test-counter '(add 1))
+    (should (equal (reverse told) '((a t) (a nil) (b t))))))
+
+(ert-deftest agentel-ui-tells-subscribers-in-the-order-they-subscribed ()
+  (let ((store (agentel-ui-store-create))
+        told)
+    (agentel-ui-subscribe store (lambda (_ _) (push 'first told)))
+    (agentel-ui-subscribe store (lambda (_ _) (push 'second told)))
+    (agentel-ui-dispatch store nil 'agentel-ui-test-counter '(add 1))
+    (should (equal (reverse told) '(first second)))))
+
+(ert-deftest agentel-ui-stops-telling-an-unsubscribed-function ()
+  (let* ((store (agentel-ui-store-create))
+         (told 0)
+         (subscriber (lambda (_ _) (setq told (1+ told)))))
+    (agentel-ui-subscribe store subscriber)
+    (agentel-ui-dispatch store nil 'agentel-ui-test-counter '(add 1))
+    (agentel-ui-unsubscribe store subscriber)
+    (agentel-ui-dispatch store nil 'agentel-ui-test-counter '(add 1))
+    (should (= told 1))))
+
+(ert-deftest agentel-ui-view-shows-a-model-as-its-type-defines ()
+  (let* ((store (agentel-ui-store-create))
+         (model (agentel-ui-dispatch store nil 'agentel-ui-test-counter '(add 4))))
+    (should (equal (agentel-ui-view model) "4"))
+    (should (equal (agentel-ui-view model :prefix "n=") "n=4"))))
+
+(ert-deftest agentel-ui-kind-returns-more-properties-of-a-type ()
+  (agentel-ui-define 'agentel-ui-test-folded :update #'ignore :view #'ignore :collapsed t)
+  (should (agentel-ui-kind 'agentel-ui-test-folded :collapsed))
+  (should-not (agentel-ui-kind 'agentel-ui-test-counter :collapsed)))
+
 (provide 'agentel-ui-test)
 ;;; agentel-ui-test.el ends here

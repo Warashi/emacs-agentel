@@ -5,15 +5,114 @@
 
 ;;; Commentary:
 
-;; Components that decide how things look regardless of what they show,
-;; such as how wide a summary line may be or how a state is shown.  Features build their lines
-;; with them, so the look changes in one place.
+;; What is shown is written in the way of Elm: a type of model defines
+;; how a message changes its data (update) and how the data looks
+;; (view).  A store keeps the models of one thing, such as the
+;; transcript of a session, and messages are sent to them through the
+;; store.  Presentations subscribe to a store and put the views where
+;; they belong, so one store can be shown in more than one way.
+;;
+;; The file also has components that decide how things look regardless
+;; of what they show, such as how wide a summary line may be or how a
+;; state is shown.  Features build their lines with them, so the look
+;; changes in one place.
 
 ;;; Code:
 
 (require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
+
+;;;; Models
+
+(defvar agentel-ui--kinds nil
+  "Alist of model types and the plists defining them.")
+
+(defun agentel-ui-define (type &rest definition)
+  "Define the model TYPE by the plist DEFINITION.
+:update is a function taking a message and the data alist of a model,
+nil for a new one, and returning its new data.  :view is a function
+taking the model and a plist of how a presentation shows it, and
+returning its text.  Presentations read more properties of their own
+with `agentel-ui-kind'."
+  (setf (alist-get type agentel-ui--kinds) definition))
+
+(defun agentel-ui-kind (type property)
+  "Return PROPERTY of the definition of the model TYPE."
+  (plist-get (alist-get type agentel-ui--kinds) property))
+
+(cl-defstruct (agentel-ui-model (:constructor agentel-ui-model--make)
+                                (:copier nil))
+  "A piece of what a store keeps."
+  key type data)
+
+(defun agentel-ui-get (model key)
+  "Return the value the data of MODEL has under KEY."
+  (alist-get key (agentel-ui-model-data model)))
+
+(defun agentel-ui-view (model &rest options)
+  "Return the text of MODEL shown with the plist OPTIONS."
+  (funcall (agentel-ui-kind (agentel-ui-model-type model) :view) model options))
+
+;;;; Stores
+
+(cl-defstruct (agentel-ui-store (:constructor agentel-ui-store-create)
+                                (:copier nil))
+  "Models in the order they were added, and the functions watching them."
+  (models nil :documentation "Models, newest first.")
+  (index (make-hash-table :test 'equal) :documentation "Models by key.")
+  (subscribers nil :documentation "Functions told of changes, oldest first."))
+
+(defun agentel-ui-models (store)
+  "Return the models of STORE, oldest first."
+  (reverse (agentel-ui-store-models store)))
+
+(defun agentel-ui-last (store)
+  "Return the model added last to STORE."
+  (car (agentel-ui-store-models store)))
+
+(defun agentel-ui-find (store key)
+  "Return the model of STORE under KEY."
+  (gethash key (agentel-ui-store-index store)))
+
+(defun agentel-ui-subscribe (store function)
+  "Call FUNCTION whenever a model of STORE is added or changed.
+It is called with the model and non-nil when the model was added."
+  (setf (agentel-ui-store-subscribers store)
+        (append (agentel-ui-store-subscribers store) (list function))))
+
+(defun agentel-ui-unsubscribe (store function)
+  "Stop calling FUNCTION for the changes of STORE."
+  (setf (agentel-ui-store-subscribers store)
+        (remq function (agentel-ui-store-subscribers store))))
+
+(defun agentel-ui--tell (store model added)
+  "Tell the subscribers of STORE that MODEL changed, or was ADDED."
+  (dolist (function (agentel-ui-store-subscribers store))
+    (funcall function model added)))
+
+(defun agentel-ui-update (store model message)
+  "Change the data of MODEL of STORE by MESSAGE."
+  (setf (agentel-ui-model-data model)
+        (funcall (agentel-ui-kind (agentel-ui-model-type model) :update)
+                 message (agentel-ui-model-data model)))
+  (agentel-ui--tell store model nil))
+
+(defun agentel-ui-dispatch (store key type message)
+  "Send MESSAGE to the model of TYPE under KEY in STORE and return it.
+Without such a model, one is added after the others, so a nil KEY adds
+one every time."
+  (if-let* ((model (and key (agentel-ui-find store key))))
+      (progn (agentel-ui-update store model message) model)
+    (let ((model (agentel-ui-model--make
+                  :key key :type type
+                  :data (funcall (agentel-ui-kind type :update) message nil))))
+      (push model (agentel-ui-store-models store))
+      (when key (puthash key model (agentel-ui-store-index store)))
+      (agentel-ui--tell store model t)
+      model)))
+
+;;;; Components
 
 (defcustom agentel-ui-max-line-width 80
   "Largest width of a summary line, including its prefix."
