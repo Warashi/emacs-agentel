@@ -314,5 +314,12 @@ They are shown WIDTH wide."
       (should-not (buffer-live-p buffer))
       (should-not (memq child (agentel-session-list))))))
 
+(ert-deftest agentel-subagent-models-reject-an-unknown-message ()
+  (dolist (update (list #'agentel-subagent--update-task
+                        #'agentel-subagent--update-running
+                        #'agentel-subagent--update))
+    (should-error (funcall update '(forget) nil)
+                  :type 'agentel-store-unknown-message)))
+
 (provide 'agentel-subagent-test)
 ;;; agentel-subagent-test.el ends here

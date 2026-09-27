@@ -46,7 +46,8 @@ is (assign TASK) or (act ACTIVITY)."
   (pcase-let ((`(,field . ,value)
                (pcase message
                  (`(assign ,task) `(task . ,task))
-                 (`(act ,activity) `(activity . ,activity)))))
+                 (`(act ,activity) `(activity . ,activity))
+                 (_ (agentel-store-reject message)))))
     (cons (cons field value) (assq-delete-all field (copy-alist data)))))
 
 (agentel-store-define 'agentel-subagent-task #'agentel-subagent--update-task)
@@ -124,7 +125,8 @@ CHILD is kept only to open its buffer."
                          children)
                (append children (list (cons child seen)))))
             (`(forget ,child)
-             (seq-remove (lambda (entry) (eq (car entry) child)) children)))))))
+             (seq-remove (lambda (entry) (eq (car entry) child)) children))
+            (_ (agentel-store-reject message)))))))
 
 (agentel-store-define 'agentel-subagent-running #'agentel-subagent--update-running)
 
@@ -161,7 +163,8 @@ Each line fits in the :width of OPTIONS."
 MESSAGE is (show CHILD SEEN), where SEEN is an alist of what is shown
 of CHILD.  CHILD is kept only to open its buffer."
   (pcase message
-    (`(show ,child ,seen) `((child . ,child) ,@seen))))
+    (`(show ,child ,seen) `((child . ,child) ,@seen))
+    (_ (agentel-store-reject message))))
 
 (agentel-conversation-define 'subagent #'agentel-subagent--update)
 (agentel-ui-define-view 'subagent #'agentel-subagent--render)
