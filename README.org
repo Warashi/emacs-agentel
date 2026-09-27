@@ -188,7 +188,11 @@ of the window, come in messages or in the options of the view.
 
 Models hold only what they are about, in words of their own: what
 comes from the agent is translated where each feature receives it, not
-in one place for all, so a feature still goes with its file.  When the
+in one place for all, so a feature still goes with its file.  What goes
+to the agent is made where it is sent in the same way: the session
+buffer asks the turn (=agentel-turn.el=) to send a prompt or to stop
+it, and the config feature changes a setting itself, so the buffer
+knows no message of the protocol.  When the
 agent asks a question, its item holds the question and its choices,
 and the feature keeps what it needs to reply keyed by the item, as the
 ids of requests are only unique in their connection.  The view hands the
