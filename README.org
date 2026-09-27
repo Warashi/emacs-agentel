@@ -209,10 +209,14 @@ the session buffer subscribes to it and only draws it, so a subagent
 buffer opened again after it was killed shows its earlier output.  The
 session list keeps its own model the same way, and so does a session
 for what changes over its life: its id, title, turn, loading and end
-change only by the messages sent with =agentel-session-send=, and the
-session tells =agentel-session-changed-functions= after each.  Even the
+change only by the messages sent with =agentel-session-send=.  Even the
 title the agent gives comes in as a message from its own feature
-(=agentel-title.el=).
+(=agentel-title.el=).  Features keep what they follow of a session, such
+as its usage, its config options or what a subagent works on, as models
+of their own in the same store, each under its own key.  The session
+tells =agentel-session-changed-functions= after a change of any of them,
+while whoever shows only some of them subscribes to their keys, as the
+item of a subagent in its parent does.
 
 The transcript is drawn like a view of React: after every change of
 the conversation the session buffer chooses the items to show and hands

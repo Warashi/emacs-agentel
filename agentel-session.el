@@ -11,11 +11,13 @@
 ;; derives the state shown to the user.
 ;;
 ;; What changes over the life of a session is a model of
-;; `agentel-store' changed by the messages of `agentel-session-send';
-;; listeners are told after each.  What ties it to the rest, such as
-;; its connection, its parent and its buffer, is kept in its slots.
+;; `agentel-store' changed by the messages of `agentel-session-send'.
+;; Features keep their own models of a session in the same store, each
+;; under a key of its own, and listeners are told after a change of any
+;; of them.  What ties it to the rest, such as its connection, its
+;; parent and its buffer, is kept in its slots.
 ;;
-;; Features keep their own per-session values in `agentel-session-data'
+;; Features keep other per-session values in `agentel-session-data'
 ;; and react through `agentel-session-update-functions' and
 ;; `agentel-session-changed-functions', so each feature can be removed
 ;; without touching this file.  `agentel-session-withhold-functions'
@@ -37,7 +39,7 @@
   (project nil :documentation "Name of the project the session works in.")
   (agent nil :documentation "Name of the agent in `agentel-agents' that runs it.")
   (store (agentel-store-create)
-         :documentation "Store of the model of what changes over its life.")
+         :documentation "Store of the models of what changes over its life.")
   (alist nil :documentation "Per-feature values, see `agentel-session-data'."))
 
 (defun agentel-session--update (message data)
