@@ -46,52 +46,52 @@
 
 (ert-deftest agentel-list-update-marks-a-turn-that-ended-out-of-sight ()
   (should (equal (alist-get 'unread (agentel-list-test-after
-                                     (agentel-list-test-seen 'a :running t)
-                                     (agentel-list-test-seen 'a :running nil)))
+                                     (agentel-list-test-seen 'a :in-turn t)
+                                     (agentel-list-test-seen 'a :in-turn nil)))
                  '(a))))
 
 (ert-deftest agentel-list-update-does-not-mark-a-turn-that-ended-in-sight ()
   (should-not (alist-get 'unread (agentel-list-test-after
-                                  (agentel-list-test-seen 'a :running t)
-                                  (agentel-list-test-seen 'a :running nil :shown t)))))
+                                  (agentel-list-test-seen 'a :in-turn t)
+                                  (agentel-list-test-seen 'a :in-turn nil :shown t)))))
 
 (ert-deftest agentel-list-update-does-not-mark-a-subagent ()
   (should-not (alist-get 'unread (agentel-list-test-after
-                                  (agentel-list-test-seen 'c :running t :parent 'p)
-                                  (agentel-list-test-seen 'c :running nil :parent 'p)))))
+                                  (agentel-list-test-seen 'c :in-turn t :parent 'p)
+                                  (agentel-list-test-seen 'c :in-turn nil :parent 'p)))))
 
-(ert-deftest agentel-list-update-does-not-mark-a-session-that-was-not-running ()
+(ert-deftest agentel-list-update-does-not-mark-a-session-that-was-not-in-a-turn ()
   (should-not (alist-get 'unread (agentel-list-test-after
-                                  (agentel-list-test-seen 'a :running nil)
-                                  (agentel-list-test-seen 'a :running nil)))))
+                                  (agentel-list-test-seen 'a :in-turn nil)
+                                  (agentel-list-test-seen 'a :in-turn nil)))))
 
 (ert-deftest agentel-list-update-unmarks-sessions-once-shown ()
   (should (equal (alist-get 'unread (agentel-list-test-after
-                                     (agentel-list-test-seen 'a :running t)
-                                     (agentel-list-test-seen 'b :running t)
-                                     (agentel-list-test-seen 'a :running nil)
-                                     (agentel-list-test-seen 'b :running nil)
+                                     (agentel-list-test-seen 'a :in-turn t)
+                                     (agentel-list-test-seen 'b :in-turn t)
+                                     (agentel-list-test-seen 'a :in-turn nil)
+                                     (agentel-list-test-seen 'b :in-turn nil)
                                      '(shown (a))))
                  '(b))))
 
 (ert-deftest agentel-list-update-keeps-sessions-in-the-order-they-appeared ()
   (let ((data (agentel-list-test-after (agentel-list-test-seen 'a)
                                        (agentel-list-test-seen 'b)
-                                       (agentel-list-test-seen 'a :running t))))
+                                       (agentel-list-test-seen 'a :in-turn t))))
     (should (equal (mapcar #'car (alist-get 'sessions data)) '(a b)))))
 
 (ert-deftest agentel-list-update-forgets-a-removed-session ()
   (let ((data (agentel-list-test-after
-               (agentel-list-test-seen 'a :running t)
-               (agentel-list-test-seen 'a :running nil)
+               (agentel-list-test-seen 'a :in-turn t)
+               (agentel-list-test-seen 'a :in-turn nil)
                '(changed (:session a :live nil)))))
     (should-not (alist-get 'sessions data))
     (should-not (alist-get 'unread data))))
 
 (ert-deftest agentel-list-update-leaves-the-data-it-was-given-alone ()
-  (let* ((before (agentel-list-test-after (agentel-list-test-seen 'a :running t)))
+  (let* ((before (agentel-list-test-after (agentel-list-test-seen 'a :in-turn t)))
          (copy (copy-tree before)))
-    (agentel-list--update (agentel-list-test-seen 'a :running nil) before)
+    (agentel-list--update (agentel-list-test-seen 'a :in-turn nil) before)
     (agentel-list--update '(shown (a)) before)
     (should (equal before copy))))
 
@@ -114,7 +114,7 @@
 (ert-deftest agentel-list-view-puts-waiting-then-unread-sessions-first ()
   (should (equal (agentel-list-test-view
                   (agentel-list-test-seen 'a :state 'idle :project "a")
-                  (agentel-list-test-seen 'b :state 'running :project "b" :running t)
+                  (agentel-list-test-seen 'b :state 'running :project "b" :in-turn t)
                   (agentel-list-test-seen 'c :state 'waiting :project "c")
                   (agentel-list-test-seen 'b :state 'idle :project "b"))
                  '("  🙋 c" "● 💤 b" "  💤 a"))))
@@ -176,6 +176,16 @@
                    '("● 💤 two"
                      "  💤 repo-one" "    Fix things"
                      "    └ 💤 Explore")))))
+
+(ert-deftest agentel-list-does-not-mark-a-session-whose-other-work-ended-out-of-sight ()
+  (agentel-list-test-with-sessions
+    (let* ((working t)
+           (agentel-session-running-functions (list (lambda (_session) working))))
+      (agentel-session-changed other)
+      (setq working nil)
+      (agentel-session-changed other))
+    (agentel-list--refresh)
+    (should (equal (car (last (agentel-list-test-lines))) "  💤 two"))))
 
 (ert-deftest agentel-list-puts-waiting-sessions-before-unread-ones ()
   (agentel-list-test-with-sessions
