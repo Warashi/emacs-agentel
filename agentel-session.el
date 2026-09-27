@@ -217,14 +217,17 @@ while it is at work, and `idle' otherwise."
         ((agentel-session-running-p session) 'running)
         (t 'idle)))
 
+(defun agentel-session-name-from (title cwd)
+  "Return a short human readable name of a session with TITLE working in CWD.
+It is TITLE on one line, or the name of CWD without a title."
+  (or (and title (string-trim (replace-regexp-in-string "[\n\t ]+" " " title)))
+      (and cwd (file-name-nondirectory (directory-file-name cwd)))
+      "agent"))
+
 (defun agentel-session-name (session)
   "Return a short human readable name for SESSION."
-  (or (when-let* ((title (agentel-session-title session)))
-        (string-trim (replace-regexp-in-string "[\n\t ]+" " " title)))
-      (and (agentel-session-cwd session)
-           (file-name-nondirectory
-            (directory-file-name (agentel-session-cwd session))))
-      "agent"))
+  (agentel-session-name-from (agentel-session-title session)
+                             (agentel-session-cwd session)))
 
 (defun agentel-session-project-name (session)
   "Return the name of the project SESSION works in.

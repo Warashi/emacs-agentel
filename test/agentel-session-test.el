@@ -219,6 +219,11 @@
       (agentel-session-send session '(retitle "first\nsecond"))
       (should (equal (agentel-session-name session) "first second")))))
 
+(ert-deftest agentel-session-name-comes-from-the-title-or-the-directory ()
+  (should (equal (agentel-session-name-from " Fix\tit " "/tmp/project/") "Fix it"))
+  (should (equal (agentel-session-name-from nil "/tmp/project/") "project"))
+  (should (equal (agentel-session-name-from nil nil) "agent")))
+
 (ert-deftest agentel-session-project-name-is-the-project-of-the-top-level-session ()
   (agentel-session-test-with-registry
     (let* ((parent (agentel-session-create :cwd "/tmp/one/" :project "repo-one"))
