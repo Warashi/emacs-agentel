@@ -13,8 +13,7 @@
   (declare (indent 0))
   `(let ((agentel-session--registry nil)
          (agentel-list--store (agentel-ui-store-create))
-         (agentel-session-changed-functions (list #'agentel-list--on-changed
-                                                  #'agentel-list--schedule-refresh)))
+         (agentel-session-changed-functions (list #'agentel-list--on-changed)))
      (let* ((parent (agentel-session-create :cwd "/tmp/one/" :project "repo-one"))
             (other (agentel-session-create :cwd "/tmp/two/"))
             (child (agentel-session-create :parent parent :cwd "/tmp/one/")))
@@ -23,6 +22,7 @@
        (agentel-session-register child "c")
        (setf (agentel-session-title parent) "Fix things"
              (agentel-session-title child) "Explore")
+       (mapc #'agentel-session-changed (list parent child))
        (agentel-chat-open parent :input t)
        (agentel-chat-open child)
        (agentel-chat-open other :input t)
@@ -94,6 +94,40 @@
     (agentel-list--update '(shown (a)) before)
     (should (equal before copy))))
 
+(defun agentel-list-test-view (&rest messages)
+  "Return the lines of the list after MESSAGES, starting with no session."
+  (split-string (substring-no-properties
+                 (agentel-ui-view (agentel-ui-model--make
+                                   :type 'agentel-list
+                                   :data (apply #'agentel-list-test-after messages))))
+                "\n" t))
+
+(ert-deftest agentel-list-view-shows-subagents-below-their-session ()
+  (should (equal (agentel-list-test-view
+                  (agentel-list-test-seen 'p :state 'idle :project "repo" :name "Fix"
+                                          :titled t)
+                  (agentel-list-test-seen 'o :state 'running :project "two" :name "two")
+                  (agentel-list-test-seen 'c :state 'idle :name "Explore" :parent 'p))
+                 '("  💤 repo" "    Fix" "    └ 💤 Explore" "  🏃 two"))))
+
+(ert-deftest agentel-list-view-puts-waiting-then-unread-sessions-first ()
+  (should (equal (agentel-list-test-view
+                  (agentel-list-test-seen 'a :state 'idle :project "a")
+                  (agentel-list-test-seen 'b :state 'running :project "b" :busy t)
+                  (agentel-list-test-seen 'c :state 'waiting :project "c")
+                  (agentel-list-test-seen 'b :state 'idle :project "b"))
+                 '("  🙋 c" "● 💤 b" "  💤 a"))))
+
+(ert-deftest agentel-list-view-marks-each-line-with-its-session ()
+  (let ((text (agentel-ui-view
+               (agentel-ui-model--make
+                :type 'agentel-list
+                :data (agentel-list-test-after
+                       (agentel-list-test-seen 'p :state 'idle :project "repo"
+                                               :name "Fix" :titled t))))))
+    (should (eq (get-text-property 0 'agentel-list-session text) 'p))
+    (should (eq (get-text-property (1- (length text)) 'agentel-list-session text) 'p))))
+
 (defun agentel-list-test-lines ()
   "Return the lines of the list."
   (split-string (buffer-substring-no-properties (point-min) (point-max))
@@ -109,6 +143,7 @@
 (ert-deftest agentel-list-shows-the-directory-of-a-session-outside-a-project ()
   (agentel-list-test-with-sessions
     (setf (agentel-session-title other) "Something")
+    (agentel-session-changed other)
     (agentel-list--refresh)
     (should (equal (last (agentel-list-test-lines) 2)
                    '("  💤 two" "    Something")))))

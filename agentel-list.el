@@ -14,6 +14,11 @@
 ;; buffer was out of sight, until it is shown again.  The list stays
 ;; open in a side window until closed with the same command, and
 ;; `other-window' passes over it.
+;;
+;; The list is one model of `agentel-ui'.  Hooks send it what they see
+;; of a session whenever the session changes, so its view depends on
+;; nothing else, and the buffer draws the view again soon after the
+;; model changes.
 
 ;;; Code:
 
@@ -97,8 +102,62 @@ their buffer was out of sight, until they are shown again."
          (unread . ,(seq-remove (lambda (session) (memq session sessions))
                                 .unread)))))))
 
+(defun agentel-list--session-lines (session seen sessions unread depth)
+  "Return the lines of SESSION and its subagents indented by DEPTH.
+SEEN is what was seen of SESSION, SESSIONS and UNREAD are those of the
+data of the list.  Each session leads with its state, which is short
+and would be cut off at the end of a long line in a narrow window.  A
+top-level session shows its project, or its directory outside of one,
+and then its title; a subagent has no project of its own and shows
+only its title."
+  (concat
+   (propertize
+    (concat (if (memq session unread)
+                (propertize "●" 'face 'agentel-list-unread-face)
+              " ")
+            " "
+            (if (> depth 0)
+                (concat (make-string (* 2 depth) ?\s) "└ "
+                        (agentel-ui-state (plist-get seen :state)) " "
+                        (plist-get seen :name) "\n")
+              (concat (agentel-ui-state (plist-get seen :state)) " "
+                      (plist-get seen :project) "\n"
+                      (if (plist-get seen :titled)
+                          (concat "    " (propertize (plist-get seen :name)
+                                                     'face 'agentel-list-title-face)
+                                  "\n")
+                        ""))))
+    'agentel-list-session session)
+   (mapconcat (pcase-lambda (`(,child . ,seen))
+                (agentel-list--session-lines child seen sessions unread (1+ depth)))
+              (seq-filter (lambda (entry) (eq (plist-get (cdr entry) :parent) session))
+                          sessions)
+              "")))
+
+(defun agentel-list--rank (session seen unread)
+  "Return where SESSION goes in the list, lower first.
+SEEN is what was seen of it and UNREAD the unread sessions."
+  (cond ((eq (plist-get seen :state) 'waiting) 0)
+        ((memq session unread) 1)
+        (t 2)))
+
+(defun agentel-list--view (model _options)
+  "Return the text of the list MODEL.
+Sessions waiting for the user come first, then the unread ones,
+oldest first within a rank."
+  (let-alist (agentel-ui-model-data model)
+    (mapconcat (pcase-lambda (`(,session . ,seen))
+                 (agentel-list--session-lines session seen .sessions .unread 0))
+               (seq-sort-by (pcase-lambda (`(,session . ,seen))
+                              (agentel-list--rank session seen .unread))
+                            #'<
+                            (seq-remove (lambda (entry) (plist-get (cdr entry) :parent))
+                                        .sessions))
+               "")))
+
 (agentel-ui-define 'agentel-list
-  :update #'agentel-list--update)
+  :update #'agentel-list--update
+  :view #'agentel-list--view)
 
 (defvar agentel-list--store (agentel-ui-store-create)
   "Store of the list, whose one model is under the key `sessions'.")
@@ -119,53 +178,19 @@ their buffer was out of sight, until they are shown again."
                        :live ,(and (memq session (agentel-session-list)) t)
                        :parent ,(agentel-session-parent session)
                        :busy ,(agentel-session-busy session)
-                       :shown ,(and (agentel-list--shown-p session) t)))))
+                       :shown ,(and (agentel-list--shown-p session) t)
+                       :state ,(agentel-session-state session)
+                       :project ,(agentel-session-project-name session)
+                       :name ,(agentel-session-name session)
+                       :titled ,(and (agentel-session-title session) t)))))
 
 (defun agentel-list--forget-shown (_frame)
   "Tell the list which of the unread sessions are now shown."
   (when-let* ((seen (seq-filter #'agentel-list--shown-p
                                 (agentel-list--data 'unread))))
-    (agentel-list--send `(shown ,seen))
-    (agentel-list--schedule-refresh)))
+    (agentel-list--send `(shown ,seen))))
 
 ;;;; Buffer
-
-(defun agentel-list--insert-session (session depth)
-  "Insert the lines of SESSION and its subagents indented by DEPTH.
-Each session leads with its state, which is short and would be cut off
-at the end of a long line in a narrow window.  A top-level session
-shows its project, or its directory outside of one, and then its
-title; a subagent has no project of its own and shows only its title."
-  (let ((start (point)))
-    (insert (if (memq session (agentel-list--data 'unread))
-                (propertize "●" 'face 'agentel-list-unread-face)
-              " ")
-            " ")
-    (if (> depth 0)
-        (insert (make-string (* 2 depth) ?\s) "└ "
-                (agentel-ui-state (agentel-session-state session)) " "
-                (agentel-session-name session) "\n")
-      (insert (agentel-ui-state (agentel-session-state session)) " "
-              (agentel-session-project-name session) "\n")
-      (when (agentel-session-title session)
-        (insert "    " (propertize (agentel-session-name session)
-                                   'face 'agentel-list-title-face)
-                "\n")))
-    (put-text-property start (point) 'agentel-list-session session))
-  (dolist (child (agentel-session-children session))
-    (agentel-list--insert-session child (1+ depth))))
-
-(defun agentel-list--rank (session)
-  "Return where SESSION goes in the list, lower first."
-  (cond ((eq (agentel-session-state session) 'waiting) 0)
-        ((memq session (agentel-list--data 'unread)) 1)
-        (t 2)))
-
-(defun agentel-list--roots ()
-  "Return the top-level sessions in the order the list shows them.
-Sessions waiting for the user come first, then the unread ones,
-oldest first within a rank."
-  (seq-sort-by #'agentel-list--rank #'< (agentel-session-roots)))
 
 (defun agentel-list--position (pos)
   "Return where POS is as (SESSION LINE COLUMN).
@@ -203,8 +228,8 @@ of the same session, since the lines are drawn again from scratch."
                          (get-buffer-window-list nil nil t)))
         (inhibit-read-only t))
     (erase-buffer)
-    (dolist (root (agentel-list--roots))
-      (agentel-list--insert-session root 0))
+    (when-let* ((model (agentel-ui-find agentel-list--store 'sessions)))
+      (insert (agentel-ui-view model)))
     (pcase-dolist (`(,window . ,position) windows)
       (set-window-point window (agentel-list--goto position)))
     (agentel-list--goto point)))
@@ -298,6 +323,12 @@ of the list."
 (define-derived-mode agentel-list-mode special-mode "agentel sessions"
   "Major mode listing agentel sessions."
   (setq truncate-lines t)
+  (let ((store agentel-list--store))
+    (agentel-ui-unsubscribe store #'agentel-list--schedule-refresh)
+    (agentel-ui-subscribe store #'agentel-list--schedule-refresh)
+    (add-hook 'kill-buffer-hook
+              (lambda () (agentel-ui-unsubscribe store #'agentel-list--schedule-refresh))
+              nil t))
   (setq-local revert-buffer-function
               (lambda (&rest _) (agentel-list--render))))
 
@@ -331,7 +362,6 @@ this command is the way in and out of it."
 
 (keymap-set agentel-chat-mode-map "C-c C-l" #'agentel-list)
 (add-hook 'agentel-session-changed-functions #'agentel-list--on-changed)
-(add-hook 'agentel-session-changed-functions #'agentel-list--schedule-refresh)
 (add-hook 'window-buffer-change-functions #'agentel-list--forget-shown)
 
 (provide 'agentel-list)
