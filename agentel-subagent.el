@@ -39,6 +39,29 @@
     (_meta . ((jetbrains . ((air . ((version . 1)
                                      (capabilities . ["nativeSubagentSessions"])))))))))
 
+(defun agentel-subagent--update-task (message data)
+  "Return the DATA of what a subagent works on changed by MESSAGE.
+DATA has the `task' it was given and its latest `activity'.  MESSAGE
+is (assign TASK) or (act ACTIVITY)."
+  (pcase-let ((`(,field . ,value)
+               (pcase message
+                 (`(assign ,task) `(task . ,task))
+                 (`(act ,activity) `(activity . ,activity)))))
+    (cons (cons field value) (assq-delete-all field (copy-alist data)))))
+
+(agentel-store-define 'agentel-subagent-task #'agentel-subagent--update-task)
+
+(defun agentel-subagent--send (child message)
+  "Change what the subagent CHILD works on by MESSAGE.
+See `agentel-subagent--update-task'."
+  (agentel-store-dispatch (agentel-session-store child) 'subagent
+                          'agentel-subagent-task message))
+
+(defun agentel-subagent--get (child field)
+  "Return the value FIELD of what the subagent CHILD works on has now."
+  (when-let* ((model (agentel-store-find (agentel-session-store child) 'subagent)))
+    (agentel-store-get model field)))
+
 (defvar-keymap agentel-subagent-item-map
   :doc "Keymap on subagent items of a parent transcript."
   "RET" #'agentel-subagent-open
@@ -87,7 +110,7 @@ subagents of the session read from the minibuffer."
 
 (defun agentel-subagent--pin-line (child)
   "Return the pinned line of the running subagent CHILD."
-  (let ((activity (agentel-session-data child 'subagent-activity))
+  (let ((activity (agentel-subagent--get child 'activity))
         (map (make-sparse-keymap)))
     (keymap-set map "<mouse-1>" (lambda () (interactive) (agentel-subagent-open child)))
     (propertize
@@ -126,8 +149,8 @@ has one."
      `(show ,child
             ((name . ,(agentel-session-name child))
              (state . ,(agentel-session-state child))
-             (task . ,(agentel-session-data child 'subagent-task))
-             (activity . ,(agentel-session-data child 'subagent-activity))
+             (task . ,(agentel-subagent--get child 'task))
+             (activity . ,(agentel-subagent--get child 'activity))
              (waiting . ,(and (agentel-session-waiting-p child) t)))))))
 
 (defun agentel-subagent--spawn (parent update)
@@ -141,8 +164,7 @@ has one."
                     :cwd (agentel-session-cwd parent))))
         (agentel-session-send child `(retitle ,.name))
         (agentel-session-register child .subagentSessionId)
-        (setf (agentel-session-data child 'subagent-task) .task)
-        (setf (agentel-session-data child 'subagent-running) t)
+        (agentel-subagent--send child `(assign ,.task))
         (with-current-buffer (agentel-chat-open child)
           (setq default-directory (or (agentel-session-cwd parent) default-directory))
           (agentel-conversation-note child (concat "Task: " (or .task ""))))
@@ -156,13 +178,13 @@ has one."
       (agentel-session-send child `(end ,(intern .state))))))
 
 (defun agentel-subagent--running-p (child)
-  "Return non-nil if CHILD is a subagent, which runs until it ends."
-  (agentel-session-data child 'subagent-running))
+  "Return non-nil if CHILD was given a task, which it works on until it ends."
+  (agentel-store-find (agentel-session-store child) 'subagent))
 
 (defun agentel-subagent--note-activity (child update)
   "Remember the tool call in UPDATE as the latest activity of CHILD."
   (when-let* ((title (alist-get 'title update)))
-    (setf (agentel-session-data child 'subagent-activity) title)))
+    (agentel-subagent--send child `(act ,title))))
 
 (defun agentel-subagent--withhold-p (session update)
   "Withhold an orphan Agent/Task control UPDATE from the parent SESSION."
