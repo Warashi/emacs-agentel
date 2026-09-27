@@ -13,6 +13,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'seq)
 (require 'agentel-session)
 (require 'agentel-connection)
 (require 'agentel-conversation)
@@ -23,98 +24,110 @@
   "Face of permission requests."
   :group 'agentel)
 
-(defun agentel-permission--title (item)
-  "Return the question of the permission request ITEM."
-  (format "Allow %s?"
-          (or (alist-get 'title (alist-get 'toolCall (plist-get item :params)))
-              "this tool call")))
+(defvar agentel-permission--requests (make-hash-table :test 'eq)
+  "Requests waiting for an answer by the items that show them.
+Each is a plist of the :connection and :id to answer, the :options to
+answer with in the order of the choices of the item, and the :session
+waiting for it, where it is pending.")
 
 (defun agentel-permission--render (entry _options)
   "Render the permission request ENTRY."
   (let-alist (agentel-store-model-data entry)
-    (if .outcome
-        (propertize (format "%s → %s" .question .outcome)
-                    'face 'agentel-chat-notice-face)
+    (cond
+     (.answer (propertize (format "%s → %s" .question .answer)
+                          'face 'agentel-chat-notice-face))
+     (.withdrawn (propertize (format "%s → withdrawn" .question)
+                             'face 'agentel-chat-notice-face))
+     (t
       (concat
        (propertize (concat "⚠ " .question) 'face 'agentel-permission-face)
        "\n  "
        (mapconcat
-        (lambda (option)
-          (buttonize (format "[%s]" (alist-get 'name option))
-                     (lambda (_)
-                       (agentel-permission-choose .item (alist-get 'optionId option)))))
-        .options
-        " ")))))
+        #'identity
+        (seq-map-indexed
+         (lambda (choice n)
+           (buttonize (format "[%s]" choice)
+                      (lambda (_) (agentel-permission-choose entry n))))
+         .choices)
+        " "))))))
 
 (defun agentel-permission--update (message data)
   "Return the DATA of a permission request changed by MESSAGE.
-MESSAGE is (ask ITEM QUESTION OPTIONS) when the agent asks, and
-\(close OUTCOME) when the request is answered or withdrawn.  ITEM is
-kept only to answer it."
+MESSAGE is (ask QUESTION CHOICES) when the agent asks, with CHOICES a
+list of texts, (answer CHOICE) when the user answers and (withdraw)
+when the agent no longer asks."
   (pcase message
-    (`(ask ,item ,question ,options)
-     `((item . ,item) (question . ,question) (options . ,options) (waiting . t)))
-    (`(close ,outcome)
+    (`(ask ,question ,choices)
+     `((question . ,question) (choices . ,choices) (waiting . t)))
+    (`(answer ,choice)
      (let-alist data
-       `((item . ,.item) (question . ,.question) (options . ,.options)
-         (outcome . ,outcome))))))
+       `((question . ,.question) (choices . ,.choices) (answer . ,choice))))
+    ('(withdraw)
+     (let-alist data
+       `((question . ,.question) (choices . ,.choices) (withdrawn . t))))))
 
 (agentel-conversation-define 'permission #'agentel-permission--update)
 (agentel-ui-define-view 'permission #'agentel-permission--render)
 
-(defun agentel-permission--send (item message)
-  "Send MESSAGE to the conversation item of the permission request ITEM."
-  (agentel-conversation-send (plist-get item :session)
-                             (cons 'permission (plist-get item :id))
-                             'permission message))
-
-(defun agentel-permission--close (item outcome)
-  "Stop waiting for ITEM, recording OUTCOME as its answer."
-  (plist-put item :outcome outcome)
-  (agentel-session-remove-pending (plist-get item :session) item)
-  (agentel-permission--send item `(close ,outcome)))
-
-(defun agentel-permission-choose (item option-id)
-  "Answer the permission request ITEM with the option OPTION-ID."
-  (unless (plist-get item :outcome)
-    (let ((option (seq-find (lambda (o) (equal (alist-get 'optionId o) option-id))
-                            (alist-get 'options (plist-get item :params)))))
-      (agentel-connection-respond
-       (plist-get item :connection) (plist-get item :id)
-       `((outcome . ((outcome . "selected") (optionId . ,option-id)))))
-      (agentel-permission--close item (or (alist-get 'name option) option-id)))))
+(defun agentel-permission-choose (item n)
+  "Answer the permission request ITEM with its Nth choice."
+  (when-let* ((request (gethash item agentel-permission--requests)))
+    (agentel-connection-respond
+     (plist-get request :connection) (plist-get request :id)
+     `((outcome . ((outcome . "selected")
+                   (optionId . ,(nth n (plist-get request :options)))))))
+    (agentel-permission--close item `(answer ,(nth n (agentel-store-get item 'choices))))))
 
 (defun agentel-permission--ask (item)
   "Ask in the minibuffer how to answer the permission request ITEM."
-  (let* ((options (mapcar (lambda (o) (cons (alist-get 'name o) (alist-get 'optionId o)))
-                          (alist-get 'options (plist-get item :params))))
-         (choice (completing-read (concat (agentel-permission--title item) " ")
-                                  (agentel-chat-ordered-completion options)
+  (let* ((choices (agentel-store-get item 'choices))
+         (choice (completing-read (concat (agentel-store-get item 'question) " ")
+                                  (agentel-chat-ordered-completion choices)
                                   nil t)))
-    (agentel-permission-choose item (cdr (assoc choice options)))))
+    (agentel-permission-choose item (seq-position choices choice))))
+
+(defun agentel-permission--close (item message)
+  "Stop waiting for an answer to ITEM and send MESSAGE to it."
+  (let ((request (gethash item agentel-permission--requests)))
+    (remhash item agentel-permission--requests)
+    (agentel-session-remove-pending (plist-get request :session) request)
+    (agentel-conversation-send (plist-get request :session)
+                               (agentel-store-model-key item)
+                               'permission message)))
 
 (defun agentel-permission--handle (connection id params)
   "Handle the permission request ID with PARAMS on CONNECTION."
   (if-let* ((session (agentel-session-get (alist-get 'sessionId params) connection)))
-      (let ((item (list :kind 'permission :id id :params params
-                        :session session :connection connection)))
-        (plist-put item :answer (lambda () (agentel-permission--ask item)))
-        (agentel-session-add-pending session item)
-        (agentel-permission--send
-         item `(ask ,item ,(agentel-permission--title item)
-                    ,(alist-get 'options params))))
+      (let* ((options (append (alist-get 'options params) nil))
+             (item (agentel-conversation-send
+                    session (cons 'permission id) 'permission
+                    `(ask ,(format "Allow %s?"
+                                   (or (alist-get 'title (alist-get 'toolCall params))
+                                       "this tool call"))
+                          ,(mapcar (lambda (o) (or (alist-get 'name o)
+                                                   (alist-get 'optionId o)))
+                                   options))))
+             (request (list :connection connection :id id :session session
+                            :options (mapcar (lambda (o) (alist-get 'optionId o))
+                                             options)
+                            :answer (lambda () (agentel-permission--ask item)))))
+        (puthash item request agentel-permission--requests)
+        (agentel-session-add-pending session request))
     (agentel-connection-respond connection id '((outcome . ((outcome . "cancelled")))))))
 
 (defun agentel-permission--withdraw (connection method params)
   "Drop the request of CONNECTION that the agent withdrew.
 METHOD and PARAMS are those of the notification."
   (when (equal method "$/cancel_request")
-    (dolist (session (agentel-session-list))
-      (dolist (item (agentel-session-pending session))
-        (when (and (eq (plist-get item :kind) 'permission)
-                   (eq (plist-get item :connection) connection)
-                   (equal (plist-get item :id) (alist-get 'requestId params)))
-          (agentel-permission--close item "withdrawn"))))))
+    (let (withdrawn)
+      (maphash (lambda (item request)
+                 (when (and (eq (plist-get request :connection) connection)
+                            (equal (plist-get request :id)
+                                   (alist-get 'requestId params)))
+                   (push item withdrawn)))
+               agentel-permission--requests)
+      (dolist (item withdrawn)
+        (agentel-permission--close item '(withdraw))))))
 
 (setf (alist-get "session/request_permission" agentel-connection-request-handlers
                  nil nil #'equal)

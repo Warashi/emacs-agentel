@@ -41,6 +41,16 @@
       (agentel-chat-answer))
     (agentel-test-wait-for-text "Permission outcome: allow-once")))
 
+(ert-deftest agentel-permission-item-holds-the-question-and-its-choices ()
+  (agentel-test-with-started session nil
+    (agentel-permission-test-ask)
+    (let ((item (seq-find (lambda (item) (eq (agentel-store-model-type item) 'permission))
+                          (agentel-conversation-items session))))
+      (should (equal (agentel-store-model-data item)
+                     '((question . "Allow rm -rf build?")
+                       (choices "Yes" "Yes, and don't ask again for rm commands" "No")
+                       (waiting . t)))))))
+
 (ert-deftest agentel-permission-item-waits-until-it-is-answered ()
   (agentel-test-with-started session nil
     (agentel-permission-test-ask)
@@ -66,8 +76,7 @@
      (agentel-ui-view (agentel-store-model--make :type 'permission :data data)))))
 
 (defconst agentel-permission-test-ask
-  '(ask item "Allow ls?" [((name . "Yes") (optionId . "y"))
-                          ((name . "No") (optionId . "n"))])
+  '(ask "Allow ls?" ("Yes" "No"))
   "The message asking whether ls may run.")
 
 (ert-deftest agentel-permission-view-shows-what-it-was-asked ()
@@ -76,8 +85,13 @@
 
 (ert-deftest agentel-permission-view-shows-the-answer ()
   (should (equal (agentel-permission-test-view agentel-permission-test-ask
-                                               '(close "No"))
+                                               '(answer "No"))
                  "Allow ls? → No")))
+
+(ert-deftest agentel-permission-view-shows-that-it-was-withdrawn ()
+  (should (equal (agentel-permission-test-view agentel-permission-test-ask
+                                               '(withdraw))
+                 "Allow ls? → withdrawn")))
 
 (provide 'agentel-permission-test)
 ;;; agentel-permission-test.el ends here
