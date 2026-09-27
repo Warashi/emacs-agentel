@@ -371,13 +371,13 @@
 (ert-deftest agentel-chat-header-starts-with-the-state ()
   (agentel-chat-test-with-session
     (let ((agentel-chat-header-functions nil))
-      (setf (agentel-session-title session) "Fix things")
+      (agentel-session-send session '(retitle "Fix things"))
       (should (string-prefix-p "💤 " (agentel-chat--header-line))))))
 
 (ert-deftest agentel-chat-header-shows-the-project-before-the-title ()
   (agentel-chat-test-with-session
     (let ((agentel-chat-header-functions nil))
-      (setf (agentel-session-title session) "Fix things")
+      (agentel-session-send session '(retitle "Fix things"))
       (should (equal (agentel-chat--header-line) "💤 project  │  Fix things")))))
 
 (ert-deftest agentel-chat-header-of-a-subagent-shows-the-project-of-its-parent ()
@@ -386,8 +386,8 @@
            (child (agentel-session-create :parent session :cwd "/tmp/project/"))
            (buffer (agentel-chat-open child)))
       (agentel-session-register child "c1")
-      (setf (agentel-session-project session) "repo"
-            (agentel-session-title child) "Explore")
+      (setf (agentel-session-project session) "repo")
+      (agentel-session-send child '(retitle "Explore"))
       (unwind-protect
           (with-current-buffer buffer
             (should (equal (agentel-chat--header-line) "💤 repo  │  Explore")))

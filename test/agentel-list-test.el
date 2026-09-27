@@ -21,9 +21,8 @@
        (agentel-session-register parent "p")
        (agentel-session-register other "o")
        (agentel-session-register child "c")
-       (setf (agentel-session-title parent) "Fix things"
-             (agentel-session-title child) "Explore")
-       (mapc #'agentel-session-changed (list parent child))
+       (agentel-session-send parent '(retitle "Fix things"))
+       (agentel-session-send child '(retitle "Explore"))
        (agentel-chat-open parent :input t)
        (agentel-chat-open child)
        (agentel-chat-open other :input t)
@@ -143,8 +142,7 @@
 
 (ert-deftest agentel-list-shows-the-directory-of-a-session-outside-a-project ()
   (agentel-list-test-with-sessions
-    (setf (agentel-session-title other) "Something")
-    (agentel-session-changed other)
+    (agentel-session-send other '(retitle "Something"))
     (agentel-list--refresh)
     (should (equal (last (agentel-list-test-lines) 2)
                    '("  💤 two" "    Something")))))

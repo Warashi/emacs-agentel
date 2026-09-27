@@ -23,16 +23,67 @@
 
 (require 'cl-lib)
 (require 'seq)
+(require 'agentel-store)
 
 (cl-defstruct (agentel-session (:constructor agentel-session--make)
                                (:copier nil))
   "One ACP session."
-  id connection parent cwd title buffer ended
-  (in-turn nil :documentation "Non-nil while the agent works on a prompt.")
-  (loading nil :documentation "Non-nil while an earlier session is loaded into it.")
+  connection parent cwd buffer
   (project nil :documentation "Name of the project the session works in.")
   (agent nil :documentation "Name of the agent in `agentel-agents' that runs it.")
+  (store (agentel-store-create)
+         :documentation "Store of the model of what changes over its life.")
   (alist nil :documentation "Per-feature values, see `agentel-session-data'."))
+
+(defun agentel-session--update (message data)
+  "Return the DATA of a session changed by MESSAGE.
+DATA has the `id' the agent gave it, its `title', `in-turn' while the
+agent works on a prompt, `loading' while an earlier session is loaded
+into it, and `ended' with the reason once it ended.  MESSAGE is one of
+\=(register ID), (retitle TITLE), (start-turn), (finish-turn),
+\=(start-loading), (finish-loading) and (end REASON)."
+  (pcase-let ((`(,field . ,value)
+               (pcase message
+                 (`(register ,id) `(id . ,id))
+                 (`(retitle ,title) `(title . ,title))
+                 ('(start-turn) '(in-turn . t))
+                 ('(finish-turn) '(in-turn))
+                 ('(start-loading) '(loading . t))
+                 ('(finish-loading) '(loading))
+                 (`(end ,reason) `(ended . ,reason)))))
+    (cons (cons field value) (assq-delete-all field (copy-alist data)))))
+
+(agentel-store-define 'agentel-session #'agentel-session--update)
+
+(defun agentel-session-send (session message)
+  "Change SESSION by MESSAGE, see `agentel-session--update'."
+  (agentel-store-dispatch (agentel-session-store session) 'state 'agentel-session
+                          message))
+
+(defun agentel-session--get (session field)
+  "Return the value FIELD of SESSION has now."
+  (when-let* ((model (agentel-store-find (agentel-session-store session) 'state)))
+    (agentel-store-get model field)))
+
+(defun agentel-session-id (session)
+  "Return the id the agent gave SESSION, or nil before it has one."
+  (agentel-session--get session 'id))
+
+(defun agentel-session-title (session)
+  "Return the title of SESSION, or nil."
+  (agentel-session--get session 'title))
+
+(defun agentel-session-in-turn (session)
+  "Return non-nil while the agent works on a prompt of SESSION."
+  (agentel-session--get session 'in-turn))
+
+(defun agentel-session-loading (session)
+  "Return non-nil while an earlier session is loaded into SESSION."
+  (agentel-session--get session 'loading))
+
+(defun agentel-session-ended (session)
+  "Return the reason SESSION ended for, or nil while it lives."
+  (agentel-session--get session 'ended))
 
 (defvar agentel-session--registry nil
   "Live sessions, oldest first.")
@@ -75,13 +126,14 @@ name of the agent that runs it.  The session has no id until
                                         :agent agent)))
     (setq agentel-session--registry
           (append agentel-session--registry (list session)))
+    (agentel-store-subscribe (agentel-session-store session)
+                             (lambda (_model _added) (agentel-session-changed session)))
     (agentel-session-changed session)
     session))
 
 (defun agentel-session-register (session id)
   "Give SESSION the id ID assigned by the agent."
-  (setf (agentel-session-id session) id)
-  (agentel-session-changed session))
+  (agentel-session-send session `(register ,id)))
 
 (defun agentel-session-remove (session)
   "Remove SESSION from the registry."
@@ -125,28 +177,23 @@ chosen by each agent, so two agents may use the same one."
 
 (defun agentel-session-start-turn (session)
   "Record that the agent started working on a prompt of SESSION."
-  (setf (agentel-session-in-turn session) t)
-  (agentel-session-changed session))
+  (agentel-session-send session '(start-turn)))
 
 (defun agentel-session-finish-turn (session)
   "Record that the agent finished working on the prompt of SESSION."
-  (setf (agentel-session-in-turn session) nil)
-  (agentel-session-changed session))
+  (agentel-session-send session '(finish-turn)))
 
 (defun agentel-session-start-loading (session)
   "Record that an earlier session started loading into SESSION."
-  (setf (agentel-session-loading session) t)
-  (agentel-session-changed session))
+  (agentel-session-send session '(start-loading)))
 
 (defun agentel-session-finish-loading (session)
   "Record that the earlier session finished loading into SESSION."
-  (setf (agentel-session-loading session) nil)
-  (agentel-session-changed session))
+  (agentel-session-send session '(finish-loading)))
 
 (defun agentel-session-set-ended (session reason)
   "Record that SESSION ended for REASON, a symbol shown as its state."
-  (setf (agentel-session-ended session) reason)
-  (agentel-session-changed session))
+  (agentel-session-send session `(end ,reason)))
 
 (defun agentel-session-waiting-p (session)
   "Return non-nil if the user owes an answer to SESSION or to its subagents.
@@ -210,8 +257,7 @@ CONNECTION is the connection it arrived on."
     (when-let* ((session (agentel-session-get .sessionId connection)))
       (when (equal (alist-get 'sessionUpdate .update) "session_info_update")
         (when-let* ((title (alist-get 'title .update)))
-          (setf (agentel-session-title session) title)
-          (agentel-session-changed session)))
+          (agentel-session-send session `(retitle ,title))))
       (unless (run-hook-with-args-until-success
                'agentel-session-withhold-functions session .update)
         (run-hook-with-args 'agentel-session-update-functions

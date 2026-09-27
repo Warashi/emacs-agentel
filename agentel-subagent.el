@@ -136,7 +136,7 @@ of CHILD.  CHILD is kept only to open its buffer."
                     :connection (agentel-session-connection parent)
                     :parent parent
                     :cwd (agentel-session-cwd parent))))
-        (setf (agentel-session-title child) .name)
+        (agentel-session-send child `(retitle ,.name))
         (agentel-session-register child .subagentSessionId)
         (setf (agentel-session-data child 'subagent-task) .task)
         (setf (agentel-session-data child 'subagent-running) t)

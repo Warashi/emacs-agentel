@@ -116,6 +116,31 @@
       (should (equal (agentel-session-data session 'usage) 42))
       (should (equal changed (list session))))))
 
+(ert-deftest agentel-session-update-follows-the-life-of-a-session ()
+  (let ((data nil))
+    (dolist (message '((register "s1") (retitle "Fix the bug")
+                       (start-loading) (start-turn)))
+      (setq data (agentel-session--update message data)))
+    (should (equal (alist-get 'id data) "s1"))
+    (should (equal (alist-get 'title data) "Fix the bug"))
+    (should (alist-get 'loading data))
+    (should (alist-get 'in-turn data))
+    (dolist (message '((finish-loading) (finish-turn) (end exited)))
+      (setq data (agentel-session--update message data)))
+    (should-not (alist-get 'loading data))
+    (should-not (alist-get 'in-turn data))
+    (should (eq (alist-get 'ended data) 'exited))
+    (should (equal (alist-get 'title data) "Fix the bug"))))
+
+(ert-deftest agentel-session-send-changes-the-session-and-tells-listeners ()
+  (agentel-session-test-with-registry
+    (let ((session (agentel-session-create))
+          changed)
+      (add-hook 'agentel-session-changed-functions (lambda (s) (push s changed)))
+      (agentel-session-send session '(retitle "Fix the bug"))
+      (should (equal (agentel-session-title session) "Fix the bug"))
+      (should (equal changed (list session))))))
+
 (ert-deftest agentel-session-state-reflects-activity ()
   (agentel-session-test-with-registry
     (let ((session (agentel-session-create)))
@@ -201,7 +226,7 @@
   (agentel-session-test-with-registry
     (let ((session (agentel-session-create :cwd "/tmp/project/")))
       (should (equal (agentel-session-name session) "project"))
-      (setf (agentel-session-title session) "first\nsecond")
+      (agentel-session-send session '(retitle "first\nsecond"))
       (should (equal (agentel-session-name session) "first second")))))
 
 (ert-deftest agentel-session-project-name-is-the-project-of-the-top-level-session ()

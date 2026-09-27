@@ -169,7 +169,7 @@
 (defun agentel-subagent-test-busy-child ()
   "Return a subagent whose latest tool call is a long command."
   (let ((child (agentel-session-create :cwd "/tmp/project/")))
-    (setf (agentel-session-title child) "Build")
+    (agentel-session-send child '(retitle "Build"))
     (setf (agentel-session-data child 'subagent-task) "Build it")
     (setf (agentel-session-data child 'subagent-activity)
           (concat "make all\n" (make-string 100 ?x)))

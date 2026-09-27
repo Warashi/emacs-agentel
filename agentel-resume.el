@@ -47,8 +47,7 @@
                           (append (when-let* ((cwd (alist-get 'cwd session)))
                                     (list :cwd cwd))
                                   (agentel-session-restart-options current)))))
-      (setf (agentel-session-title resumed) (alist-get 'title session))
-      (agentel-session-changed resumed)
+      (agentel-session-send resumed `(retitle ,(alist-get 'title session)))
       resumed)))
 
 (defun agentel-resume (session _args)
