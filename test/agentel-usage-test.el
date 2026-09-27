@@ -59,5 +59,9 @@
     (should (eq (get-text-property 4 'face (agentel-usage-test-shown session))
                 'agentel-usage-full-face))))
 
+(ert-deftest agentel-usage-rejects-an-unknown-message ()
+  (should-error (agentel-usage--update '(forget) '((used . 1) (size . 2)))
+                :type 'agentel-store-unknown-message))
+
 (provide 'agentel-usage-test)
 ;;; agentel-usage-test.el ends here

@@ -33,7 +33,8 @@ COST); a report without COST keeps the last one."
   (pcase message
     (`(report ,used ,size ,cost)
      `((used . ,used) (size . ,size)
-       (cost . ,(or cost (alist-get 'cost data)))))))
+       (cost . ,(or cost (alist-get 'cost data)))))
+    (_ (agentel-store-reject message))))
 
 (agentel-store-define 'agentel-usage #'agentel-usage--update)
 
