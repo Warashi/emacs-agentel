@@ -539,7 +539,8 @@ which no model keeps."
   (when-let* ((buffer (agentel-session-buffer session))
               ((buffer-live-p buffer)))
     (with-current-buffer buffer
-      (agentel-chat--draw))))
+      (when agentel-chat--session
+        (agentel-chat--draw-header (agentel-chat--view-options session))))))
 
 (add-hook 'agentel-session-changed-functions #'agentel-chat--on-changed)
 
