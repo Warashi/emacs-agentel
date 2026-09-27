@@ -10,6 +10,11 @@
 ;; routes `session/update' notifications to them by session id, and
 ;; derives the state shown to the user.
 ;;
+;; What changes over the life of a session is a model of
+;; `agentel-store' changed by the messages of `agentel-session-send';
+;; listeners are told after each.  What ties it to the rest, such as
+;; its connection, its parent and its buffer, is kept in its slots.
+;;
 ;; Features keep their own per-session values in `agentel-session-data'
 ;; and react through `agentel-session-update-functions' and
 ;; `agentel-session-changed-functions', so each feature can be removed
