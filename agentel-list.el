@@ -323,12 +323,13 @@ of the list."
 (define-derived-mode agentel-list-mode special-mode "agentel sessions"
   "Major mode listing agentel sessions."
   (setq truncate-lines t)
-  (let ((store agentel-list--store))
-    (agentel-ui-unsubscribe store #'agentel-list--schedule-refresh)
+  (let* ((store agentel-list--store)
+         (unsubscribe (lambda ()
+                        (agentel-ui-unsubscribe store #'agentel-list--schedule-refresh))))
+    (funcall unsubscribe)
     (agentel-ui-subscribe store #'agentel-list--schedule-refresh)
-    (add-hook 'kill-buffer-hook
-              (lambda () (agentel-ui-unsubscribe store #'agentel-list--schedule-refresh))
-              nil t))
+    (add-hook 'change-major-mode-hook unsubscribe nil t)
+    (add-hook 'kill-buffer-hook unsubscribe nil t))
   (setq-local revert-buffer-function
               (lambda (&rest _) (agentel-list--render))))
 

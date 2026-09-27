@@ -248,19 +248,16 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
   (setq agentel-chat--store store)
   (mapc #'agentel-chat--insert (agentel-ui-models store))
   (let* ((buffer (current-buffer))
-         (subscriber
-          (lambda (entry added)
-            (when (buffer-live-p buffer)
-              (with-current-buffer buffer
-                ;; Changing the major mode forgets the entries of the buffer.
-                (when (eq agentel-chat--store store)
-                  (if added
-                      (agentel-chat--insert entry)
-                    (agentel-chat--refresh entry))))))))
+         (subscriber (lambda (entry added)
+                       (with-current-buffer buffer
+                         (if added
+                             (agentel-chat--insert entry)
+                           (agentel-chat--refresh entry)))))
+         (unsubscribe (lambda () (agentel-ui-unsubscribe store subscriber))))
     (agentel-ui-subscribe store subscriber)
-    (add-hook 'kill-buffer-hook
-              (lambda () (agentel-ui-unsubscribe store subscriber))
-              nil t)))
+    ;; Changing the major mode forgets the entries of the buffer.
+    (add-hook 'change-major-mode-hook unsubscribe nil t)
+    (add-hook 'kill-buffer-hook unsubscribe nil t)))
 
 (defun agentel-chat-entry-at (&optional pos)
   "Return the entry at POS, which defaults to point."

@@ -81,6 +81,14 @@
                                     (title . "Read again")))
         (should (string-match-p "Read again\\'" (agentel-chat-test-transcript)))))))
 
+(ert-deftest agentel-chat-stops-following-the-transcript-in-another-mode ()
+  (agentel-chat-test-with-session
+    (let ((followers (length (agentel-ui-store-subscribers
+                              (agentel-chat-transcript session)))))
+      (fundamental-mode)
+      (should (= (length (agentel-ui-store-subscribers (agentel-chat-transcript session)))
+                 (1- followers))))))
+
 (ert-deftest agentel-chat-open-shows-an-empty-input ()
   (agentel-chat-test-with-session
     (should (equal (agentel-chat-input) ""))

@@ -246,6 +246,14 @@
     (goto-char (point-min))
     (should (search-forward "🏃 two" nil t))))
 
+(ert-deftest agentel-list-stops-following-the-sessions-in-another-mode ()
+  (agentel-list-test-with-sessions
+    (should (memq #'agentel-list--schedule-refresh
+                  (agentel-ui-store-subscribers agentel-list--store)))
+    (fundamental-mode)
+    (should-not (memq #'agentel-list--schedule-refresh
+                      (agentel-ui-store-subscribers agentel-list--store)))))
+
 (ert-deftest agentel-list-visits-the-session-on-its-title-line ()
   (agentel-list-test-with-sessions
     (goto-char (point-min))
