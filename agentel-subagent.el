@@ -139,7 +139,7 @@ of CHILD.  CHILD is kept only to open its buffer."
         (setf (agentel-session-title child) .name)
         (agentel-session-register child .subagentSessionId)
         (setf (agentel-session-data child 'subagent-task) .task)
-        (agentel-session-set-busy child t)
+        (setf (agentel-session-data child 'subagent-running) t)
         (with-current-buffer (agentel-chat-open child)
           (setq default-directory (or (agentel-session-cwd parent) default-directory))
           (agentel-conversation-note child (concat "Task: " (or .task ""))))
@@ -151,6 +151,10 @@ of CHILD.  CHILD is kept only to open its buffer."
     (when-let* ((child (agentel-session-get .subagentSessionId
                                             (agentel-session-connection parent))))
       (agentel-session-set-ended child (intern .state)))))
+
+(defun agentel-subagent--running-p (child)
+  "Return non-nil if CHILD is a subagent, which runs until it ends."
+  (agentel-session-data child 'subagent-running))
 
 (defun agentel-subagent--note-activity (child update)
   "Remember the tool call in UPDATE as the latest activity of CHILD."
@@ -183,6 +187,7 @@ of CHILD.  CHILD is kept only to open its buffer."
 
 (add-hook 'agentel-connection-capability-functions #'agentel-subagent--capabilities)
 (add-hook 'agentel-session-withhold-functions #'agentel-subagent--withhold-p)
+(add-hook 'agentel-session-running-functions #'agentel-subagent--running-p)
 (add-hook 'agentel-session-update-functions #'agentel-subagent--on-update)
 (add-hook 'agentel-session-changed-functions #'agentel-subagent--on-changed)
 (add-hook 'agentel-chat-pin-functions #'agentel-subagent--pin)
