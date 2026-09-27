@@ -25,6 +25,7 @@
 (require 'project)
 (require 'agentel-session)
 (require 'agentel-connection)
+(require 'agentel-conversation)
 (require 'agentel-chat)
 (require 'agentel-permission)
 (require 'agentel-elicitation)
@@ -107,7 +108,7 @@ of SESSION."
 
 (defun agentel--fail (session message)
   "End SESSION because it could not start, showing MESSAGE."
-  (agentel-chat-notice session message 'error)
+  (agentel-conversation-note session message 'error)
   (agentel-session-set-ended session 'failed))
 
 (defun agentel--open-session (session options)
@@ -129,7 +130,7 @@ of SESSION."
            (progn
              (agentel-session-set-busy session nil)
              ;; The replayed history ends without a turn ending it.
-             (agentel-chat-finish-message session))
+             (agentel-conversation-finish-message session))
          (agentel-session-register session (alist-get 'sessionId result)))
        (run-hook-with-args 'agentel-session-started-functions
                            session result options))
@@ -143,7 +144,7 @@ of SESSION."
   (let ((stderr (agentel-connection-stderr connection)))
     (dolist (session (agentel-session-roots))
       (when (eq (agentel-session-connection session) connection)
-        (agentel-chat-notice
+        (agentel-conversation-note
          session
          (concat "Agent exited"
                  (if stderr

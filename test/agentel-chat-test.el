@@ -34,17 +34,17 @@
   "Return the transcript of the current chat buffer as plain text."
   (buffer-substring-no-properties (point-min) agentel-chat--transcript-end))
 
-(agentel-store-define 'agentel-chat-test-counter
-                      (lambda (msg model)
-                        (pcase msg
-                          (`(add ,n) `((count . ,(+ n (or (alist-get 'count model) 0))))))))
+(agentel-conversation-define 'agentel-chat-test-counter
+  (lambda (msg model)
+    (pcase msg
+      (`(add ,n) `((count . ,(+ n (or (alist-get 'count model) 0))))))))
 (agentel-ui-define-view 'agentel-chat-test-counter
   (lambda (entry _options) (format "count %s" (agentel-store-get entry 'count))))
 
 (defun agentel-chat-test-count (session key n)
   "Send the counter under KEY in the transcript of SESSION the message to add N."
-  (agentel-store-dispatch (agentel-chat-transcript session) key 'agentel-chat-test-counter
-                          `(add ,n)))
+  (agentel-conversation-send session key 'agentel-chat-test-counter
+                             `(add ,n)))
 
 (ert-deftest agentel-chat-shows-a-changed-entry-in-place ()
   (agentel-chat-test-with-session
@@ -84,11 +84,10 @@
 
 (ert-deftest agentel-chat-stops-following-the-transcript-in-another-mode ()
   (agentel-chat-test-with-session
-    (let ((followers (length (agentel-store-subscribers
-                              (agentel-chat-transcript session)))))
-      (fundamental-mode)
-      (should (= (length (agentel-store-subscribers (agentel-chat-transcript session)))
-                 (1- followers))))))
+    (fundamental-mode)
+    (let ((text (buffer-string)))
+      (agentel-conversation-note session "later")
+      (should (equal (buffer-string) text)))))
 
 (ert-deftest agentel-chat-open-shows-an-empty-input ()
   (agentel-chat-test-with-session
@@ -275,13 +274,13 @@
         (should (equal changed (list message)))
         (agentel-chat-test-chunk "agent_message_chunk" "lo")
         (should (equal changed (list message message))))
-      (agentel-chat-finish-message session)
+      (agentel-conversation-finish-message session)
       (setq changed nil)
       (agentel-chat-test-update '((sessionUpdate . "tool_call") (toolCallId . "t1")
                                   (title . "Read") (status . "pending")))
       (should changed)
-      (should (seq-every-p (lambda (e) (eq e (agentel-store-find (agentel-chat-transcript session)
-                                                                 '(tool . "t1"))))
+      (should (seq-every-p (lambda (e) (eq e (agentel-conversation-find session
+                                                                        '(tool . "t1"))))
                            changed))
       (setq changed nil)
       (goto-char (point-max))
@@ -324,7 +323,7 @@
 
 (ert-deftest agentel-chat-notice-appears-in-transcript ()
   (agentel-chat-test-with-session
-    (agentel-chat-notice session "Agent exited" 'error)
+    (agentel-conversation-note session "Agent exited" 'error)
     (should (string-match-p "Agent exited" (agentel-chat-test-transcript)))))
 
 (defun agentel-chat-test-shown ()

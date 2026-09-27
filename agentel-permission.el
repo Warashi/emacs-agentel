@@ -15,6 +15,7 @@
 (require 'cl-lib)
 (require 'agentel-session)
 (require 'agentel-connection)
+(require 'agentel-conversation)
 (require 'agentel-chat)
 
 (defface agentel-permission-face
@@ -47,17 +48,17 @@
         (alist-get 'options (plist-get item :params))
         " ")))))
 
-(agentel-store-define 'permission
-                      (lambda (message _data)
-                        (pcase message
-                          (`(show ,item) `((item . ,item))))))
+(agentel-conversation-define 'permission
+  (lambda (message _data)
+    (pcase message
+      (`(show ,item) `((item . ,item))))))
 (agentel-ui-define-view 'permission #'agentel-permission--render)
 
 (defun agentel-permission--show (item)
   "Show the state of the permission request ITEM in its session buffer."
-  (agentel-store-dispatch (agentel-chat-transcript (plist-get item :session))
-                          (cons 'permission (plist-get item :id))
-                          'permission `(show ,item)))
+  (agentel-conversation-send (plist-get item :session)
+                             (cons 'permission (plist-get item :id))
+                             'permission `(show ,item)))
 
 (defun agentel-permission--close (item outcome)
   "Stop waiting for ITEM, recording OUTCOME as its answer."

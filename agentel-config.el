@@ -27,6 +27,7 @@
 (require 'subr-x)
 (require 'agentel-session)
 (require 'agentel-connection)
+(require 'agentel-conversation)
 (require 'agentel-chat)
 
 (defvar agentel-session-started-functions)
@@ -84,10 +85,10 @@ CALLBACK is called without arguments once the agent answered."
                  (agentel-config--store session (alist-get 'configOptions result))
                  (when callback (funcall callback)))
    :on-failure (lambda (error)
-                 (agentel-chat-notice session
-                                      (format "Could not set %s: %s" id
-                                              (alist-get 'message error))
-                                      'error)
+                 (agentel-conversation-note session
+                                            (format "Could not set %s: %s" id
+                                                    (alist-get 'message error))
+                                            'error)
                  (when callback (funcall callback)))))
 
 (defun agentel-config--value (option value)
@@ -112,9 +113,10 @@ category of the option it sets."
             (next (lambda () (agentel-config--apply session (cdr requests)))))
         (cond
          ((not option)
-          (agentel-chat-notice session (format "%s is not available for this session"
-                                               (substring (symbol-name (car request)) 1))
-                               'error)
+          (agentel-conversation-note
+           session (format "%s is not available for this session"
+                           (substring (symbol-name (car request)) 1))
+           'error)
           (funcall next))
          (t (agentel-config-set session (alist-get 'id option)
                                 (agentel-config--value option (cddr request))

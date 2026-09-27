@@ -61,7 +61,7 @@
              '((sessionId . "s1")
                (update . ((sessionUpdate . "agent_message_chunk")
                           (content . ((type . "text") (text . "Use `ls`.")))))))
-            (agentel-chat-finish-message session)
+            (agentel-conversation-finish-message session)
             (goto-char (point-min))
             (search-forward "ls")
             (should (memq 'agentel-markdown-code-face
@@ -82,7 +82,7 @@
                `((sessionId . "s1")
                  (update . ((sessionUpdate . "agent_message_chunk")
                             (content . ((type . "text") (text . ,text)))))))
-              (agentel-chat-finish-message session))
+              (agentel-conversation-finish-message session))
             (goto-char (point-min))
             (search-forward "ls")
             (should (memq 'agentel-markdown-code-face

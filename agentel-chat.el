@@ -145,23 +145,6 @@ transcript grows above them, so the undo history is dropped."
        (unless (eq buffer-undo-list t)
          (setq buffer-undo-list nil)))))
 
-;;;; Transcript
-
-(defun agentel-chat-transcript (session)
-  "Return the store of the conversation of SESSION."
-  (agentel-conversation--store session))
-
-(defun agentel-chat-finish-message (session)
-  "Mark the agent message at the end of the conversation of SESSION as complete."
-  (agentel-conversation-finish-message session))
-
-(defun agentel-chat-notice (session text &optional type)
-  "Add the notice TEXT to the conversation of SESSION.
-TYPE is `error' for errors and `stop' for why a turn ended early."
-  (agentel-conversation-note session text type))
-
-;;;; Entries
-
 (defun agentel-chat-entry-start (entry)
   "Return the marker at the start of the text of ENTRY in this buffer."
   (gethash entry agentel-chat--starts))

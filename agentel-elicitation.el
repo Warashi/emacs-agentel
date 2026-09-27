@@ -23,6 +23,7 @@
 (require 'crm)
 (require 'agentel-session)
 (require 'agentel-connection)
+(require 'agentel-conversation)
 (require 'agentel-chat)
 
 (defface agentel-elicitation-face
@@ -127,17 +128,17 @@
        " "
        (buttonize "[Decline]" (lambda (_) (agentel-elicitation-decline item)))))))
 
-(agentel-store-define 'elicitation
-                      (lambda (message _data)
-                        (pcase message
-                          (`(show ,item) `((item . ,item))))))
+(agentel-conversation-define 'elicitation
+  (lambda (message _data)
+    (pcase message
+      (`(show ,item) `((item . ,item))))))
 (agentel-ui-define-view 'elicitation #'agentel-elicitation--render)
 
 (defun agentel-elicitation--show (item)
   "Show the state of the form ITEM in its session buffer."
-  (agentel-store-dispatch (agentel-chat-transcript (plist-get item :session))
-                          (cons 'elicitation (plist-get item :id))
-                          'elicitation `(show ,item)))
+  (agentel-conversation-send (plist-get item :session)
+                             (cons 'elicitation (plist-get item :id))
+                             'elicitation `(show ,item)))
 
 ;;;; Answering
 

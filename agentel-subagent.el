@@ -24,6 +24,7 @@
 (require 'subr-x)
 (require 'agentel-session)
 (require 'agentel-connection)
+(require 'agentel-conversation)
 (require 'agentel-chat)
 (require 'agentel-ui)
 
@@ -103,17 +104,17 @@ subagents of the session read from the minibuffer."
   "Return the pinned lines of the running subagents of SESSION."
   (mapcar #'agentel-subagent--pin-line (agentel-subagent--running session)))
 
-(agentel-store-define 'subagent
-                      (lambda (message _data)
-                        (pcase message
-                          (`(show ,child) `((child . ,child))))))
+(agentel-conversation-define 'subagent
+  (lambda (message _data)
+    (pcase message
+      (`(show ,child) `((child . ,child))))))
 (agentel-ui-define-view 'subagent #'agentel-subagent--render)
 
 (defun agentel-subagent--show (child)
   "Show the state of CHILD as an item of its parent's transcript."
-  (agentel-store-dispatch (agentel-chat-transcript (agentel-session-parent child))
-                          (cons 'subagent (agentel-session-id child))
-                          'subagent `(show ,child)))
+  (agentel-conversation-send (agentel-session-parent child)
+                             (cons 'subagent (agentel-session-id child))
+                             'subagent `(show ,child)))
 
 (defun agentel-subagent--spawn (parent update)
   "Create the subagent announced by UPDATE under PARENT."
@@ -130,7 +131,7 @@ subagents of the session read from the minibuffer."
         (agentel-session-set-busy child t)
         (with-current-buffer (agentel-chat-open child)
           (setq default-directory (or (agentel-session-cwd parent) default-directory))
-          (agentel-chat-notice child (concat "Task: " (or .task ""))))
+          (agentel-conversation-note child (concat "Task: " (or .task ""))))
         (agentel-subagent--show child)))))
 
 (defun agentel-subagent--finish (parent update)
