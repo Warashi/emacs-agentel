@@ -86,6 +86,12 @@ sees half of a construct, such as a code block, that spans chunks.")
 Each function is called with the entry, once it was added, rendered
 again or extended.")
 
+(defvar-local agentel-chat-transcript-function #'identity
+  "Function choosing the entries the transcript of this buffer shows.
+It is called with the items of the conversation, oldest first, and
+returns those to show in the order to show them.  After changing it,
+call `agentel-chat-render'.")
+
 (defvar agentel-chat-prompt-string "❯ "
   "String in front of the input area.")
 
@@ -154,21 +160,25 @@ transcript grows above them, so the undo history is dropped."
         (agentel-chat--with-transcript
           (put-text-property end (+ end 2) 'invisible empty))))))
 
-(defun agentel-chat--render ()
-  "Show the conversation of the session of this buffer in its transcript."
-  (dolist (entry (agentel-ui-region-render
-                  agentel-chat--region
-                  (agentel-conversation-items agentel-chat--session)))
-    (run-hook-with-args 'agentel-chat-entry-changed-functions entry))
-  (agentel-chat--fit-gap))
+(defun agentel-chat-render ()
+  "Show the conversation of the session of this buffer in its transcript.
+The entries shown are those `agentel-chat-transcript-function' chooses.
+Before the buffer shows a session, nothing is shown."
+  (when agentel-chat--session
+    (dolist (entry (agentel-ui-region-render
+                    agentel-chat--region
+                    (funcall agentel-chat-transcript-function
+                             (agentel-conversation-items agentel-chat--session))))
+      (run-hook-with-args 'agentel-chat-entry-changed-functions entry))
+    (agentel-chat--fit-gap)))
 
 (defun agentel-chat--show (session)
   "Show the conversation of SESSION in this buffer and follow its changes."
-  (agentel-chat--render)
+  (agentel-chat-render)
   (let* ((buffer (current-buffer))
          (subscriber (lambda (_entry _added)
                        (with-current-buffer buffer
-                         (agentel-chat--render))))
+                         (agentel-chat-render))))
          (unsubscribe (lambda () (agentel-conversation-unsubscribe session subscriber))))
     (agentel-conversation-subscribe session subscriber)
     ;; Changing the major mode forgets the entries of the buffer.
@@ -455,8 +465,8 @@ and send it with \\[agentel-chat-send]."
 
 (defun agentel-chat--fit-width ()
   "Render the entries and pinned lines that fit the line width again."
+  (agentel-chat-render)
   (when agentel-chat--session
-    (agentel-chat--render)
     (agentel-chat-refresh-pin agentel-chat--session)))
 
 (defun agentel-chat-refresh-pin (session)

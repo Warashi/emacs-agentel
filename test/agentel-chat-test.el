@@ -53,6 +53,26 @@
     (agentel-chat-test-count session 'c 2)
     (should (equal (agentel-chat-test-transcript) "count 3\n\ncount 1"))))
 
+(ert-deftest agentel-chat-shows-the-entries-the-buffer-chooses ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-count session 'c 1)
+    (agentel-chat-test-count session 'd 2)
+    (setq-local agentel-chat-transcript-function (lambda (items) (last items)))
+    (agentel-chat-render)
+    (should (equal (agentel-chat-test-transcript) "count 2"))
+    (agentel-chat-test-count session 'e 3)
+    (should (equal (agentel-chat-test-transcript) "count 3"))
+    (kill-local-variable 'agentel-chat-transcript-function)
+    (agentel-chat-render)
+    (should (equal (agentel-chat-test-transcript) "count 1\n\ncount 2\n\ncount 3"))))
+
+(ert-deftest agentel-chat-hides-the-gap-before-the-prompt-when-nothing-is-chosen ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-chunk "agent_message_chunk" "Hello")
+    (setq-local agentel-chat-transcript-function #'ignore)
+    (agentel-chat-render)
+    (should (equal (agentel-chat-test-shown) "❯ "))))
+
 (ert-deftest agentel-chat-shows-the-transcript-in-the-buffer-of-the-session ()
   (agentel-chat-test-with-session
     (with-temp-buffer
