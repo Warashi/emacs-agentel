@@ -65,8 +65,7 @@ the session waits while it does."
 (defun agentel-conversation--waiting-p (session)
   "Return non-nil if an item of the conversation of SESSION waits for an answer."
   (when-let* ((store (agentel-session-data session 'conversation)))
-    (seq-some (lambda (item) (agentel-store-get item 'waiting))
-              (agentel-store-models store))))
+    (agentel-store-find-if store (lambda (item) (agentel-store-get item 'waiting)))))
 
 (add-hook 'agentel-session-waiting-functions #'agentel-conversation--waiting-p)
 

@@ -24,6 +24,17 @@
     (should (equal (agentel-store-test-counts store) '(3)))
     (should (eq (agentel-store-find store 'c) (agentel-store-last store)))))
 
+(ert-deftest agentel-store-find-if-returns-the-newest-model-that-matches ()
+  (let ((store (agentel-store-create)))
+    (agentel-store-dispatch store nil 'agentel-store-test-counter '(add 1))
+    (agentel-store-dispatch store nil 'agentel-store-test-counter '(add 2))
+    (agentel-store-dispatch store nil 'agentel-store-test-counter '(add 3))
+    (should (equal (agentel-store-get
+                    (agentel-store-find-if store (lambda (m) (< (agentel-store-get m 'count) 3)))
+                    'count)
+                   2))
+    (should-not (agentel-store-find-if store (lambda (m) (> (agentel-store-get m 'count) 3))))))
+
 (ert-deftest agentel-store-dispatch-without-a-key-adds-a-model-each-time ()
   (let ((store (agentel-store-create)))
     (agentel-store-dispatch store nil 'agentel-store-test-counter '(add 1))

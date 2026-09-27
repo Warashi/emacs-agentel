@@ -64,6 +64,10 @@ the data changed compares this instead."))
   "Return the model of STORE under KEY."
   (gethash key (agentel-store--index store)))
 
+(defun agentel-store-find-if (store predicate)
+  "Return the newest model of STORE for which PREDICATE returns non-nil."
+  (cl-find-if predicate (agentel-store--newest store)))
+
 (defun agentel-store-subscribers (store)
   "Return the functions told of the changes of STORE."
   (agentel-store--subscribers store))
