@@ -129,10 +129,22 @@ METHOD and PARAMS are those of the notification."
       (dolist (item withdrawn)
         (agentel-permission--close item '(withdraw))))))
 
+(defun agentel-permission--forget (session)
+  "Forget the requests of SESSION once it is removed from the registry."
+  (unless (memq session (agentel-session-list))
+    (let (gone)
+      (maphash (lambda (item request)
+                 (when (eq (plist-get request :session) session)
+                   (push item gone)))
+               agentel-permission--requests)
+      (dolist (item gone)
+        (remhash item agentel-permission--requests)))))
+
 (setf (alist-get "session/request_permission" agentel-connection-request-handlers
                  nil nil #'equal)
       #'agentel-permission--handle)
 (add-hook 'agentel-connection-notification-functions #'agentel-permission--withdraw)
+(add-hook 'agentel-session-changed-functions #'agentel-permission--forget)
 
 (provide 'agentel-permission)
 ;;; agentel-permission.el ends here

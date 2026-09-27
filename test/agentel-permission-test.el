@@ -71,6 +71,14 @@
       (agentel-chat-cancel)
       (agentel-test-wait-until (lambda () (not (agentel-store-get item 'waiting)))))))
 
+(ert-deftest agentel-permission-is-forgotten-with-its-session ()
+  (agentel-test-with-started session nil
+    (agentel-permission-test-ask)
+    (let ((item (seq-find (lambda (item) (eq (agentel-store-model-type item) 'permission))
+                          (agentel-conversation-items session))))
+      (agentel-session-remove session)
+      (should-not (gethash item agentel-permission--requests)))))
+
 (ert-deftest agentel-permission-is-withdrawn-when-the-turn-is-cancelled ()
   (agentel-test-with-started session nil
     (agentel-permission-test-ask)
