@@ -36,6 +36,21 @@
     (should (equal (agentel-config-test-value session "thought_level") "high"))
     (should (equal (agentel-config-test-value session "mode") "plan"))))
 
+(ert-deftest agentel-config-runs-the-session-until-start-options-are-applied ()
+  (let ((agentel-session--registry nil)
+        (agentel-session-changed-functions nil)
+        answer)
+    (cl-letf (((symbol-function 'agentel-config-set)
+               (lambda (_session _id _value callback) (setq answer callback))))
+      (let ((session (agentel-session-create)))
+        (agentel-session-register session "s1")
+        (agentel-config--on-started
+         session '((configOptions . [((id . "model") (category . "model"))]))
+         '(:model "opus"))
+        (should (eq (agentel-session-state session) 'running))
+        (funcall answer)
+        (should (eq (agentel-session-state session) 'idle))))))
+
 (ert-deftest agentel-config-applies-start-options-to-the-options-of-their-category ()
   (agentel-config-test-with-copilot session '(:model "gpt-5.5" :effort "high")
     (agentel-config-test-settled session)

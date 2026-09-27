@@ -121,7 +121,7 @@ category of the option it sets."
          (t (agentel-config-set session (alist-get 'id option)
                                 (agentel-config--value option (cddr request))
                                 next))))
-    (agentel-session-set-busy session nil)))
+    (setf (agentel-session-data session 'config-applying) nil)))
 
 (defun agentel-config--on-started (session result options)
   "Record the config options in RESULT and apply the start OPTIONS to SESSION."
@@ -131,8 +131,12 @@ category of the option it sets."
                                         `(,(car entry) ,(cdr entry) . ,value)))
                                     agentel-config--start-options))))
     (when requests
-      (agentel-session-set-busy session t)
+      (setf (agentel-session-data session 'config-applying) t)
       (agentel-config--apply session requests))))
+
+(defun agentel-config--applying-p (session)
+  "Return non-nil while SESSION applies its start options."
+  (agentel-session-data session 'config-applying))
 
 (defun agentel-config--restart-options (session)
   "Return the start options that give a new session the settings of SESSION.
@@ -201,6 +205,7 @@ not report them as unavailable."
 (keymap-set agentel-chat-mode-map "C-c C-o" #'agentel-config-set-option)
 (keymap-set agentel-chat-mode-map "C-c C-m" #'agentel-config-set-mode)
 (add-hook 'agentel-session-started-functions #'agentel-config--on-started)
+(add-hook 'agentel-session-running-functions #'agentel-config--applying-p)
 (add-hook 'agentel-session-restart-options-functions #'agentel-config--restart-options)
 (add-hook 'agentel-session-update-functions #'agentel-config--on-update)
 (add-hook 'agentel-chat-header-functions #'agentel-config--header)
