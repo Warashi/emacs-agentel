@@ -111,6 +111,12 @@ of SESSION."
   (agentel-conversation-note session message 'error)
   (agentel-session-set-ended session 'failed))
 
+(defun agentel--loading-p (session)
+  "Return non-nil while SESSION loads an earlier session."
+  (agentel-session-data session 'loading))
+
+(add-hook 'agentel-session-running-functions #'agentel--loading-p)
+
 (defun agentel--open-session (session options)
   "Create or load the ACP session for SESSION as OPTIONS say."
   (let* ((connection (agentel-session-connection session))
@@ -120,7 +126,7 @@ of SESSION."
       ;; The agent replays the history before it answers, so the session
       ;; must be found by id before the request is sent.
       (agentel-session-register session session-id)
-      (agentel-session-set-busy session t)
+      (setf (agentel-session-data session 'loading) t)
       (push (cons 'sessionId session-id) params))
     (agentel-connection-request
      connection (if session-id "session/load" "session/new") params
@@ -128,7 +134,7 @@ of SESSION."
      (lambda (result)
        (if session-id
            (progn
-             (agentel-session-set-busy session nil)
+             (setf (agentel-session-data session 'loading) nil)
              ;; The replayed history ends without a turn ending it.
              (agentel-conversation-finish-message session))
          (agentel-session-register session (alist-get 'sessionId result)))

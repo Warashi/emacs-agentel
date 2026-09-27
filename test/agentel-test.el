@@ -147,6 +147,17 @@
     (should-not (save-excursion (goto-char (point-min))
                                 (search-forward "Replayed subagent" nil t)))))
 
+(ert-deftest agentel-start-runs-the-session-while-it-loads ()
+  (let* ((states nil)
+         (agentel-session-changed-functions
+          (cons (lambda (session)
+                  (unless (agentel-session-parent session)
+                    (push (agentel-session-state session) states)))
+                agentel-session-changed-functions)))
+    (agentel-test-with-started session '(:session-id "old-1")
+      (should (memq 'running states))
+      (should (eq (car states) 'idle)))))
+
 (ert-deftest agentel-restart-options-recreate-the-session ()
   (let ((agentel-session--registry nil)
         (agentel-session-restart-options-functions
