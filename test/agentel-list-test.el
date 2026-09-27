@@ -12,7 +12,7 @@
   "Run BODY with a parent `parent', its child `child' and another `other'."
   (declare (indent 0))
   `(let ((agentel-session--registry nil)
-         (agentel-list--store (agentel-ui-store-create))
+         (agentel-list--store (agentel-store-create))
          (agentel-session-changed-functions (list #'agentel-list--on-changed)))
      (let* ((parent (agentel-session-create :cwd "/tmp/one/" :project "repo-one"))
             (other (agentel-session-create :cwd "/tmp/two/"))
@@ -97,7 +97,7 @@
 (defun agentel-list-test-view (&rest messages)
   "Return the lines of the list after MESSAGES, starting with no session."
   (split-string (substring-no-properties
-                 (agentel-ui-view (agentel-ui-model--make
+                 (agentel-ui-view (agentel-store-model--make
                                    :type 'agentel-list
                                    :data (apply #'agentel-list-test-after messages))))
                 "\n" t))
@@ -120,7 +120,7 @@
 
 (ert-deftest agentel-list-view-marks-each-line-with-its-session ()
   (let ((text (agentel-ui-view
-               (agentel-ui-model--make
+               (agentel-store-model--make
                 :type 'agentel-list
                 :data (agentel-list-test-after
                        (agentel-list-test-seen 'p :state 'idle :project "repo"
@@ -249,10 +249,10 @@
 (ert-deftest agentel-list-stops-following-the-sessions-in-another-mode ()
   (agentel-list-test-with-sessions
     (should (memq #'agentel-list--schedule-refresh
-                  (agentel-ui-store-subscribers agentel-list--store)))
+                  (agentel-store-subscribers agentel-list--store)))
     (fundamental-mode)
     (should-not (memq #'agentel-list--schedule-refresh
-                      (agentel-ui-store-subscribers agentel-list--store)))))
+                      (agentel-store-subscribers agentel-list--store)))))
 
 (ert-deftest agentel-list-visits-the-session-on-its-title-line ()
   (agentel-list-test-with-sessions

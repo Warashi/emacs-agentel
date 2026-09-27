@@ -39,28 +39,30 @@
 
 (defun agentel-focus-test-prompt (session text)
   "Show TEXT as a prompt sent to SESSION, which starts a turn."
-  (agentel-ui-dispatch (agentel-chat-transcript session) nil 'user `(chunk ,text))
+  (agentel-store-dispatch (agentel-chat-transcript session) nil 'user `(chunk ,text))
   (agentel-session-set-busy session t))
 
-(agentel-ui-define 'agentel-focus-test-question
-  :update (lambda (message _data)
-            (pcase message
-              (`(show ,item ,text) `((item . ,item) (text . ,text)))))
-  :view (lambda (entry _options) (agentel-ui-get entry 'text)))
+(agentel-store-define 'agentel-focus-test-question
+                      (lambda (message _data)
+                        (pcase message
+                          (`(show ,item ,text) `((item . ,item) (text . ,text))))))
+(agentel-ui-define-view 'agentel-focus-test-question
+  (lambda (entry _options) (agentel-store-get entry 'text)))
 
 (defun agentel-focus-test-question (session text)
   "Add a pending question of SESSION shown as TEXT and return it."
   (let ((item (list :kind 'test)))
-    (agentel-ui-dispatch (agentel-chat-transcript session)
-                         nil 'agentel-focus-test-question `(show ,item ,text))
+    (agentel-store-dispatch (agentel-chat-transcript session)
+                            nil 'agentel-focus-test-question `(show ,item ,text))
     (agentel-session-add-pending session item)
     item))
 
-(agentel-ui-define 'agentel-focus-test-subagent
-  :update (lambda (message _data)
-            (pcase message
-              (`(show ,child) `((child . ,child)))))
-  :view (lambda (_entry _options) "the subagent"))
+(agentel-store-define 'agentel-focus-test-subagent
+                      (lambda (message _data)
+                        (pcase message
+                          (`(show ,child) `((child . ,child))))))
+(agentel-ui-define-view 'agentel-focus-test-subagent
+  (lambda (_entry _options) "the subagent"))
 
 (defun agentel-focus-test-visible ()
   "Return the text of the current buffer that is shown."
@@ -122,8 +124,8 @@
       (agentel-session-register child "c1")
       (agentel-focus-test-prompt session "delegate")
       (agentel-focus-test-tool "t1" "Read a.el")
-      (agentel-ui-dispatch (agentel-chat-transcript session)
-                           nil 'agentel-focus-test-subagent `(show ,child))
+      (agentel-store-dispatch (agentel-chat-transcript session)
+                              nil 'agentel-focus-test-subagent `(show ,child))
       (let ((text (agentel-focus-test-visible)))
         (should (string-match-p "Read a\\.el" text))
         (should-not (string-match-p "the subagent" text))))))
@@ -159,8 +161,8 @@
     (let ((child (agentel-session-create :parent session)))
       (agentel-session-register child "c1")
       (agentel-focus-test-prompt session "delegate")
-      (agentel-ui-dispatch (agentel-chat-transcript session)
-                           nil 'agentel-focus-test-subagent `(show ,child))
+      (agentel-store-dispatch (agentel-chat-transcript session)
+                              nil 'agentel-focus-test-subagent `(show ,child))
       (agentel-focus-test-tool "t1" "Read a.el")
       (should-not (string-match-p "the subagent" (agentel-focus-test-visible)))
       (agentel-session-add-pending child (list :kind 'test))

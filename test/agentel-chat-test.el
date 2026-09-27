@@ -34,16 +34,17 @@
   "Return the transcript of the current chat buffer as plain text."
   (buffer-substring-no-properties (point-min) agentel-chat--transcript-end))
 
-(agentel-ui-define 'agentel-chat-test-counter
-  :update (lambda (msg model)
-            (pcase msg
-              (`(add ,n) `((count . ,(+ n (or (alist-get 'count model) 0)))))))
-  :view (lambda (entry _options) (format "count %s" (agentel-ui-get entry 'count))))
+(agentel-store-define 'agentel-chat-test-counter
+                      (lambda (msg model)
+                        (pcase msg
+                          (`(add ,n) `((count . ,(+ n (or (alist-get 'count model) 0))))))))
+(agentel-ui-define-view 'agentel-chat-test-counter
+  (lambda (entry _options) (format "count %s" (agentel-store-get entry 'count))))
 
 (defun agentel-chat-test-count (session key n)
   "Send the counter under KEY in the transcript of SESSION the message to add N."
-  (agentel-ui-dispatch (agentel-chat-transcript session) key 'agentel-chat-test-counter
-                       `(add ,n)))
+  (agentel-store-dispatch (agentel-chat-transcript session) key 'agentel-chat-test-counter
+                          `(add ,n)))
 
 (ert-deftest agentel-chat-shows-a-changed-entry-in-place ()
   (agentel-chat-test-with-session
@@ -83,10 +84,10 @@
 
 (ert-deftest agentel-chat-stops-following-the-transcript-in-another-mode ()
   (agentel-chat-test-with-session
-    (let ((followers (length (agentel-ui-store-subscribers
+    (let ((followers (length (agentel-store-subscribers
                               (agentel-chat-transcript session)))))
       (fundamental-mode)
-      (should (= (length (agentel-ui-store-subscribers (agentel-chat-transcript session)))
+      (should (= (length (agentel-store-subscribers (agentel-chat-transcript session)))
                  (1- followers))))))
 
 (ert-deftest agentel-chat-open-shows-an-empty-input ()
@@ -203,14 +204,14 @@
     (should (string-match-p "\\`  ✓ ls\\'" (agentel-chat-test-transcript)))))
 
 (ert-deftest agentel-chat-fits-a-tool-in-the-width-it-is-shown-in ()
-  (let ((tool (agentel-ui-model--make
+  (let ((tool (agentel-store-model--make
                :type 'tool
                :data `((title . ,(make-string 100 ?t)) (status . "completed")))))
     (should (= (string-width (agentel-ui-view tool :width 20 :collapsed t)) 20))
     (should (= (string-width (agentel-ui-view tool :width 30 :collapsed t)) 30))))
 
 (ert-deftest agentel-chat-fits-a-folded-thought-in-the-width-it-is-shown-in ()
-  (let ((thought (agentel-ui-model--make
+  (let ((thought (agentel-store-model--make
                   :type 'thought :data `((text . ,(make-string 100 ?h))))))
     (should (= (string-width (agentel-ui-view thought :width 20 :collapsed t)) 20))))
 
@@ -279,7 +280,9 @@
       (agentel-chat-test-update '((sessionUpdate . "tool_call") (toolCallId . "t1")
                                   (title . "Read") (status . "pending")))
       (should changed)
-      (should (seq-every-p (lambda (e) (eq e (agentel-ui-find (agentel-chat-transcript session) '(tool . "t1")))) changed))
+      (should (seq-every-p (lambda (e) (eq e (agentel-store-find (agentel-chat-transcript session)
+                                                                 '(tool . "t1"))))
+                           changed))
       (setq changed nil)
       (goto-char (point-max))
       (insert "typing")

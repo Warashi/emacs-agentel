@@ -60,7 +60,7 @@
     (agentel-test-wait-for-text "Working slowly")
     (agentel-chat-cancel)
     (agentel-test-wait-for-text "Turn ended: cancelled")
-    (should (eq (agentel-ui-model-type (agentel-chat-entry-at (match-beginning 0)))
+    (should (eq (agentel-store-model-type (agentel-chat-entry-at (match-beginning 0)))
                 'stop))))
 
 (ert-deftest agentel-killing-the-buffer-stops-the-agent ()
@@ -143,7 +143,7 @@
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
     (goto-char (point-min))
     (search-forward "The plan was")
-    (should (agentel-ui-get (agentel-chat-entry-at) 'finished))
+    (should (agentel-store-get (agentel-chat-entry-at) 'finished))
     (should-not (save-excursion (goto-char (point-min))
                                 (search-forward "Replayed subagent" nil t)))))
 

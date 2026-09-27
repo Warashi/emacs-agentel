@@ -44,7 +44,7 @@
 (defun agentel-subagent--render (entry options)
   "Render the subagent item ENTRY of a parent transcript.
 Its lines fit in the :width of OPTIONS."
-  (let* ((child (agentel-ui-get entry 'child))
+  (let* ((child (agentel-store-get entry 'child))
          (activity (agentel-session-data child 'subagent-activity))
          (width (plist-get options :width)))
     (propertize
@@ -103,17 +103,17 @@ subagents of the session read from the minibuffer."
   "Return the pinned lines of the running subagents of SESSION."
   (mapcar #'agentel-subagent--pin-line (agentel-subagent--running session)))
 
-(agentel-ui-define 'subagent
-  :update (lambda (message _data)
-            (pcase message
-              (`(show ,child) `((child . ,child)))))
-  :view #'agentel-subagent--render)
+(agentel-store-define 'subagent
+                      (lambda (message _data)
+                        (pcase message
+                          (`(show ,child) `((child . ,child))))))
+(agentel-ui-define-view 'subagent #'agentel-subagent--render)
 
 (defun agentel-subagent--show (child)
   "Show the state of CHILD as an item of its parent's transcript."
-  (agentel-ui-dispatch (agentel-chat-transcript (agentel-session-parent child))
-                       (cons 'subagent (agentel-session-id child))
-                       'subagent `(show ,child)))
+  (agentel-store-dispatch (agentel-chat-transcript (agentel-session-parent child))
+                          (cons 'subagent (agentel-session-id child))
+                          'subagent `(show ,child)))
 
 (defun agentel-subagent--spawn (parent update)
   "Create the subagent announced by UPDATE under PARENT."

@@ -60,8 +60,8 @@ The overlay is nil while the entry is shown.")
 
 (defun agentel-focus--waits-p (entry)
   "Return non-nil if ENTRY shows something owing an answer."
-  (let ((item (agentel-ui-get entry 'item))
-        (child (agentel-ui-get entry 'child)))
+  (let ((item (agentel-store-get entry 'item))
+        (child (agentel-store-get entry 'child)))
     (or (and item agentel-chat--session
              (memq item (agentel-session-pending agentel-chat--session)))
         (and child (agentel-session-pending-items child)))))
@@ -69,7 +69,7 @@ The overlay is nil while the entry is shown.")
 (defun agentel-focus--hidden-p (entry)
   "Return non-nil if ENTRY of the current turn is hidden."
   (not (or (memq entry agentel-focus--latest)
-           (memq (agentel-ui-model-type entry) '(user error stop))
+           (memq (agentel-store-model-type entry) '(user error stop))
            (agentel-focus--waits-p entry))))
 
 (defun agentel-focus--entry-end (entry)
@@ -99,11 +99,11 @@ MOVED means its text changed, so a hidden entry is covered again."
 (defun agentel-focus--add (entry)
   "Record ENTRY as the newest of the current turn."
   (puthash entry nil agentel-focus--overlays)
-  (pcase (agentel-ui-model-type entry)
+  (pcase (agentel-store-model-type entry)
     ('agent (setq agentel-focus--last-message entry))
     ((or 'thought 'tool) (setq agentel-focus--last-activity entry)))
-  (when (or (agentel-ui-get entry 'item)
-            (agentel-ui-get entry 'child))
+  (when (or (agentel-store-get entry 'item)
+            (agentel-store-get entry 'child))
     (push entry agentel-focus--askers)))
 
 (defun agentel-focus--refresh ()
@@ -136,7 +136,7 @@ The first of them is the last prompt, unless there is none."
   (agentel-focus--clear)
   (mapc #'agentel-focus--add entries)
   (when-let* ((prompt (car entries))
-              ((eq (agentel-ui-model-type prompt) 'user)))
+              ((eq (agentel-store-model-type prompt) 'user)))
     (setq agentel-focus--turn-start (agentel-chat-entry-start prompt))
     (when (> agentel-focus--turn-start (point-min))
       ;; The blank lines in front of the prompt are hidden too.
@@ -155,7 +155,7 @@ The first of them is the last prompt, unless there is none."
                                                  (point-min)))
       (when-let* ((entry (get-text-property pos 'agentel-chat-entry)))
         (push entry entries)
-        (when (eq (agentel-ui-model-type entry) 'user)
+        (when (eq (agentel-store-model-type entry) 'user)
           (setq pos (point-min)))))
     entries))
 
@@ -163,7 +163,7 @@ The first of them is the last prompt, unless there is none."
   "Show or hide ENTRY, which was added or changed."
   (cond ((not (eq (gethash entry agentel-focus--overlays 'absent) 'absent))
          (agentel-focus--fix entry t))
-        ((eq (agentel-ui-model-type entry) 'user)
+        ((eq (agentel-store-model-type entry) 'user)
          (agentel-focus--start-turn (list entry)))
         ((and agentel-focus--turn-start
               (< (agentel-chat-entry-start entry) agentel-focus--turn-start)))

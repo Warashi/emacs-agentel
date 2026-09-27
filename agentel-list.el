@@ -25,6 +25,7 @@
 (require 'agentel-session)
 (require 'agentel-connection)
 (require 'agentel-chat)
+(require 'agentel-store)
 (require 'agentel-ui)
 
 (defconst agentel-list-buffer-name "*agentel sessions*"
@@ -145,7 +146,7 @@ SEEN is what was seen of it and UNREAD the unread sessions."
   "Return the text of the list MODEL.
 Sessions waiting for the user come first, then the unread ones,
 oldest first within a rank."
-  (let-alist (agentel-ui-model-data model)
+  (let-alist (agentel-store-model-data model)
     (mapconcat (pcase-lambda (`(,session . ,seen))
                  (agentel-list--session-lines session seen .sessions .unread 0))
                (seq-sort-by (pcase-lambda (`(,session . ,seen))
@@ -155,21 +156,20 @@ oldest first within a rank."
                                         .sessions))
                "")))
 
-(agentel-ui-define 'agentel-list
-  :update #'agentel-list--update
-  :view #'agentel-list--view)
+(agentel-store-define 'agentel-list #'agentel-list--update)
+(agentel-ui-define-view 'agentel-list #'agentel-list--view)
 
-(defvar agentel-list--store (agentel-ui-store-create)
+(defvar agentel-list--store (agentel-store-create)
   "Store of the list, whose one model is under the key `sessions'.")
 
 (defun agentel-list--data (key)
   "Return the value the data of the list has under KEY."
-  (when-let* ((model (agentel-ui-find agentel-list--store 'sessions)))
-    (agentel-ui-get model key)))
+  (when-let* ((model (agentel-store-find agentel-list--store 'sessions)))
+    (agentel-store-get model key)))
 
 (defun agentel-list--send (message)
   "Send MESSAGE to the model of the list."
-  (agentel-ui-dispatch agentel-list--store 'sessions 'agentel-list message))
+  (agentel-store-dispatch agentel-list--store 'sessions 'agentel-list message))
 
 (defun agentel-list--on-changed (session)
   "Tell the list what is seen of SESSION now that it changed."
@@ -228,7 +228,7 @@ of the same session, since the lines are drawn again from scratch."
                          (get-buffer-window-list nil nil t)))
         (inhibit-read-only t))
     (erase-buffer)
-    (when-let* ((model (agentel-ui-find agentel-list--store 'sessions)))
+    (when-let* ((model (agentel-store-find agentel-list--store 'sessions)))
       (insert (agentel-ui-view model)))
     (pcase-dolist (`(,window . ,position) windows)
       (set-window-point window (agentel-list--goto position)))
@@ -325,9 +325,9 @@ of the list."
   (setq truncate-lines t)
   (let* ((store agentel-list--store)
          (unsubscribe (lambda ()
-                        (agentel-ui-unsubscribe store #'agentel-list--schedule-refresh))))
+                        (agentel-store-unsubscribe store #'agentel-list--schedule-refresh))))
     (funcall unsubscribe)
-    (agentel-ui-subscribe store #'agentel-list--schedule-refresh)
+    (agentel-store-subscribe store #'agentel-list--schedule-refresh)
     (add-hook 'change-major-mode-hook unsubscribe nil t)
     (add-hook 'kill-buffer-hook unsubscribe nil t))
   (setq-local revert-buffer-function

@@ -30,7 +30,7 @@
 
 (defun agentel-permission--render (entry _options)
   "Render the permission request ENTRY."
-  (let* ((item (agentel-ui-get entry 'item))
+  (let* ((item (agentel-store-get entry 'item))
          (answer (plist-get item :outcome)))
     (if answer
         (propertize (format "%s → %s" (agentel-permission--title item) answer)
@@ -47,17 +47,17 @@
         (alist-get 'options (plist-get item :params))
         " ")))))
 
-(agentel-ui-define 'permission
-  :update (lambda (message _data)
-            (pcase message
-              (`(show ,item) `((item . ,item)))))
-  :view #'agentel-permission--render)
+(agentel-store-define 'permission
+                      (lambda (message _data)
+                        (pcase message
+                          (`(show ,item) `((item . ,item))))))
+(agentel-ui-define-view 'permission #'agentel-permission--render)
 
 (defun agentel-permission--show (item)
   "Show the state of the permission request ITEM in its session buffer."
-  (agentel-ui-dispatch (agentel-chat-transcript (plist-get item :session))
-                       (cons 'permission (plist-get item :id))
-                       'permission `(show ,item)))
+  (agentel-store-dispatch (agentel-chat-transcript (plist-get item :session))
+                          (cons 'permission (plist-get item :id))
+                          'permission `(show ,item)))
 
 (defun agentel-permission--close (item outcome)
   "Stop waiting for ITEM, recording OUTCOME as its answer."
