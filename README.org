@@ -140,6 +140,11 @@ subagent there, or =C-c C-j=, visits its buffer.  Background tasks are
 reported through the =asyncTasks= capability of the JetBrains AIR
 extension, which agentel advertises.
 
+When Claude resumes a finished subagent with =SendMessage= in the same
+session, its new work continues in the original subagent buffer.  The
+message sent to it appears as another =Task: …= note before its new
+output; the parent keeps one item for that subagent.
+
 =agentel-focus-mode= shows only what the next input needs: the last
 prompt, the questions still open, errors and why the turn ended,
 together with the last agent message and the latest thought or tool

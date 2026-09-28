@@ -102,6 +102,62 @@
                          :key #'agentel-store-model-type)
                1))))
 
+(ert-deftest agentel-subagent-resumes-in-the-same-session ()
+  (agentel-test-with-started session nil
+    (let* ((child (agentel-subagent-test-run session))
+           (buffer (agentel-session-buffer child))
+           (id (agentel-session-id child)))
+      (dotimes (generation 2)
+        (agentel-test-send "resume subagent")
+        (agentel-test-wait-until
+         (lambda () (and (eq (agentel-session-state session) 'idle)
+                         (= (cl-count "Task: Check the new files."
+                                      (split-string (agentel-subagent-test-text buffer)
+                                                    "\n")
+                                      :test #'string=)
+                            (1+ generation)))))
+        (should (equal (agentel-session-children session) (list child)))
+        (should (eq (agentel-session-buffer child) buffer))
+        (should (equal (agentel-session-id child) id))
+        (should (eq (agentel-session-state child) 'completed))
+        (should (= (cl-count 'subagent (agentel-conversation-items session)
+                             :key #'agentel-store-model-type)
+                   1)))
+      (let ((text (agentel-subagent-test-text buffer)))
+        (should (= (cl-count "Task: Check the new files."
+                              (split-string text "\n") :test #'string=)
+                   2))
+        (should (= (cl-count "I am checking the new files."
+                              (split-string text "\n") :test #'string=)
+                   2))
+        (should (string-match-p "Task: List the files" text))
+        (should (string-match-p "Read README\\.org" text))))))
+
+(ert-deftest agentel-subagent-resume-shows-running-and-ignores-older-finish ()
+  (agentel-test-with-started session nil
+    (let* ((child (agentel-subagent-test-run session))
+           (id (agentel-session-id child))
+           (generation (concat id ":generation:2"))
+           (connection (agentel-session-connection session)))
+      (agentel-subagent--spawn
+       session `((subagentSessionId . ,generation)
+                 (name . "Explore the repository") (task . "Check the new files.")))
+      (should (eq (agentel-session-get generation connection) child))
+      (should-not (agentel-session-get generation 'another-connection))
+      (should (eq (agentel-session-state child) 'running))
+      (should (string-match-p "⎇ Explore the repository 🏃"
+                              (agentel-subagent-test-pin)))
+      (should-not (agentel-store-get
+                   (agentel-conversation-find session (cons 'subagent id))
+                   'activity))
+      (agentel-subagent--finish
+       session `((subagentSessionId . ,id) (state . "completed")))
+      (should (eq (agentel-session-state child) 'running))
+      (agentel-subagent--finish
+       session `((subagentSessionId . ,generation) (state . "completed")))
+      (should (eq (agentel-session-state child) 'completed))
+      (should-not (agentel-subagent-test-pin)))))
+
 (ert-deftest agentel-subagent-item-waits-while-the-child-does ()
   (let* ((agentel-session--registry nil)
          (parent (agentel-session-create))

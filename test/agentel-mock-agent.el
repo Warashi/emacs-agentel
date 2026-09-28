@@ -14,6 +14,7 @@
 ;;   ask         an AskUserQuestion form elicitation
 ;;   subagent    a subagent that works in its own session when negotiated,
 ;;               otherwise its output stays in the parent
+;;   resume subagent  send work to the last finished subagent
 ;;   background  a subagent that keeps working until the client cancels
 ;;   async       a background shell command, announced like the adapter
 ;;               only to a client with the AIR asyncTasks capability; it
@@ -312,6 +313,8 @@ KIND is the session update name and defaults to an agent message."
          (target (or child session-id)))
     (agentel-mock--say session-id "Delegating to a subagent.")
     (when child
+      (setf (alist-get 'subagent-id (gethash session-id agentel-mock--sessions))
+            child)
       (agentel-mock--update
        session-id `((sessionUpdate . "subagent_spawned")
                     (subagentSessionId . ,child)
@@ -331,6 +334,30 @@ KIND is the session update name and defaults to an agent message."
                     (toolCallId . "toolu_agent_orphan")
                     (_meta . ((claudeCode . ((toolName . "Agent"))))))))
     (agentel-mock--say session-id "The subagent reported a README.")
+    (agentel-mock--finish id session-id)))
+
+(defun agentel-mock--resume-subagent (id session-id)
+  "Resume the last subagent of SESSION-ID and end prompt ID."
+  (let* ((state (gethash session-id agentel-mock--sessions))
+         (base (alist-get 'subagent-id state))
+         (generation (1+ (or (alist-get 'subagent-generation state) 1)))
+         (child (format "%s:generation:%d" base generation)))
+    (unless base
+      (error "No subagent to resume"))
+    (setf (alist-get 'subagent-generation state) generation)
+    (puthash session-id state agentel-mock--sessions)
+    (agentel-mock--update
+     session-id `((sessionUpdate . "subagent_spawned")
+                  (subagentSessionId . ,child)
+                  (name . "Explore the repository")
+                  (task . "Check the new files.")
+                  (capabilities . ,(make-hash-table))))
+    (agentel-mock--say child "I am checking the new files.")
+    (agentel-mock--tool child)
+    (agentel-mock--update
+     session-id `((sessionUpdate . "subagent_state_update")
+                  (subagentSessionId . ,child) (state . "completed")))
+    (agentel-mock--say session-id "The resumed subagent checked the files.")
     (agentel-mock--finish id session-id)))
 
 (defun agentel-mock--copilot-subagent (id session-id background)
@@ -443,6 +470,8 @@ Like the adapter, the turn stays open while the subagent lives."
      ((and (eq agentel-mock-flavor 'copilot) (string-match-p "subagent" text))
       (agentel-mock--copilot-subagent id session-id
                                       (string-match-p "background" text)))
+     ((string-match-p "resume subagent" text)
+      (agentel-mock--resume-subagent id session-id))
      ((string-match-p "permission" text) (agentel-mock--permission id session-id))
      ((string-match-p "ask" text) (agentel-mock--ask id session-id))
      ((string-match-p "background" text) (agentel-mock--background id session-id))

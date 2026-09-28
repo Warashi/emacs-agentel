@@ -208,30 +208,62 @@ the session changes and the item tells otherwise."
                 (agentel-store-get item 'waiting))
       (agentel-subagent--show session))))
 
+(defun agentel-subagent--resolve (id connection)
+  "Return a subagent active under generation ID on CONNECTION."
+  (seq-find
+   (lambda (child)
+     (and (agentel-session-parent child)
+          (or (not connection)
+              (eq (agentel-session-connection child) connection))
+          (equal id (agentel-session-data child 'subagent-current-id))))
+   (agentel-session-list)))
+
+(defun agentel-subagent--resumed-child (parent id)
+  "Return the finished child of PARENT resumed under generation ID."
+  (when (and (stringp id)
+             (string-match "\\`\\(.*\\):generation:\\([0-9]+\\)\\'" id)
+             (> (string-to-number (match-string 2 id)) 1))
+    (let ((child (agentel-session-get (match-string 1 id)
+                                      (agentel-session-connection parent))))
+      (when (and child (eq (agentel-session-parent child) parent)
+                 (agentel-session-ended child))
+        child))))
+
 (defun agentel-subagent--spawn (parent update)
-  "Create the subagent announced by UPDATE under PARENT."
+  "Create or resume the subagent announced by UPDATE under PARENT."
   (let-alist update
     (unless (agentel-session-get .subagentSessionId
                                  (agentel-session-connection parent))
-      (let ((child (agentel-session-create
-                    :connection (agentel-session-connection parent)
-                    :parent parent
-                    :cwd (agentel-session-cwd parent))))
-        (agentel-subagent--follow child)
-        (agentel-session-send child `(retitle ,.name))
-        (agentel-session-register child .subagentSessionId)
-        (agentel-subagent--send child `(assign ,.task))
-        (with-current-buffer (agentel-chat-open child)
-          (setq default-directory (or (agentel-session-cwd parent) default-directory))
-          (agentel-conversation-note child (concat "Task: " (or .task ""))))
-        (agentel-subagent--show child)))))
+      (if-let* ((child (agentel-subagent--resumed-child parent .subagentSessionId)))
+          (progn
+            (setf (alist-get 'subagent-current-id (agentel-session-alist child))
+                  .subagentSessionId)
+            (agentel-subagent--send child '(act nil))
+            (agentel-session-send child '(resume))
+            (agentel-conversation-note child (concat "Task: " (or .task ""))))
+        (let ((child (agentel-session-create
+                      :connection (agentel-session-connection parent)
+                      :parent parent
+                      :cwd (agentel-session-cwd parent))))
+          (agentel-subagent--follow child)
+          (agentel-session-send child `(retitle ,.name))
+          (agentel-session-register child .subagentSessionId)
+          (agentel-subagent--send child `(assign ,.task))
+          (with-current-buffer (agentel-chat-open child)
+            (setq default-directory (or (agentel-session-cwd parent) default-directory))
+            (agentel-conversation-note child (concat "Task: " (or .task ""))))
+          (agentel-subagent--show child))))))
 
 (defun agentel-subagent--finish (parent update)
   "Record the end of the subagent of PARENT reported by UPDATE."
   (let-alist update
     (when-let* ((child (agentel-session-get .subagentSessionId
                                             (agentel-session-connection parent))))
-      (agentel-session-send child `(end ,(intern .state))))))
+      (when (and (eq (agentel-session-parent child) parent)
+                 (equal .subagentSessionId
+                        (or (agentel-session-data child 'subagent-current-id)
+                            (agentel-session-id child))))
+        (agentel-session-send child `(end ,(intern .state)))))))
 
 (defun agentel-subagent--running-p (child)
   "Return non-nil if CHILD was given a task, which it works on until it ends."
@@ -261,6 +293,7 @@ the session changes and the item tells otherwise."
        (agentel-subagent--note-activity session update)))))
 
 (add-hook 'agentel-connection-capability-functions #'agentel-subagent--capabilities)
+(add-hook 'agentel-session-resolve-functions #'agentel-subagent--resolve)
 (add-hook 'agentel-session-withhold-functions #'agentel-subagent--withhold-p)
 (add-hook 'agentel-session-running-functions #'agentel-subagent--running-p)
 (add-hook 'agentel-session-update-functions #'agentel-subagent--on-update)

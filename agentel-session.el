@@ -48,7 +48,7 @@ DATA has the `id' the agent gave it, its `title', `in-turn' while the
 agent works on a prompt, `loading' while an earlier session is loaded
 into it, and `ended' with the reason once it ended.  MESSAGE is one of
 \\=(register ID), (retitle TITLE), (start-turn), (finish-turn),
-\\=(start-loading), (finish-loading) and (end REASON)."
+\\=(start-loading), (finish-loading), (end REASON) and (resume)."
   (pcase-let ((`(,field . ,value)
                (pcase message
                  (`(register ,id) `(id . ,id))
@@ -58,6 +58,7 @@ into it, and `ended' with the reason once it ended.  MESSAGE is one of
                  ('(start-loading) '(loading . t))
                  ('(finish-loading) '(loading))
                  (`(end ,reason) `(ended . ,reason))
+                 ('(resume) '(ended))
                  (_ (agentel-store-reject message)))))
     (cons (cons field value) (assq-delete-all field (copy-alist data)))))
 
@@ -95,6 +96,11 @@ into it, and `ended' with the reason once it ended.  MESSAGE is one of
 
 (defvar agentel-session--registry nil
   "Live sessions, oldest first.")
+
+(defvar agentel-session-resolve-functions nil
+  "Abnormal hook resolving alternate session ids.
+Functions receive an id and a connection and return a registered session
+or nil.  Consulted only when no session has that id directly.")
 
 (defvar agentel-session-update-functions nil
   "Abnormal hook run for each `session/update' of a registered session.
@@ -153,10 +159,12 @@ name of the agent that runs it.  The session has no id until
 With CONNECTION, only a session of that connection matches: ids are
 chosen by each agent, so two agents may use the same one."
   (and id
-       (seq-find (lambda (s) (and (equal (agentel-session-id s) id)
-                                  (or (not connection)
-                                      (eq (agentel-session-connection s) connection))))
-                 agentel-session--registry)))
+       (or (seq-find (lambda (s) (and (equal (agentel-session-id s) id)
+                                      (or (not connection)
+                                          (eq (agentel-session-connection s) connection))))
+                     agentel-session--registry)
+           (run-hook-with-args-until-success 'agentel-session-resolve-functions
+                                             id connection))))
 
 (defun agentel-session-list ()
   "Return all sessions, oldest first."
