@@ -71,6 +71,11 @@
     (should (equal (nth 0 shown) "| 名前   | b |"))
     (should (equal (nth 2 shown) "| abcdef | x |"))))
 
+(ert-deftest agentel-markdown-extends-the-delimiter-row-of-a-table ()
+  (let ((shown (agentel-markdown-test-shown
+                (agentel-markdown-format "| a | b |\n|---|---|\n| long | x |"))))
+    (should (equal (nth 1 shown) "|------|---|"))))
+
 (defun agentel-markdown-test-copy-at (text substring)
   "Return what copying the code at SUBSTRING of TEXT formatted puts in the kill ring."
   (let ((kill-ring nil))

@@ -227,6 +227,10 @@ A row is the list of its cells, as (START . END)."
   "Return the width of CELL, which is (START . END)."
   (string-width (buffer-substring-no-properties (car cell) (cdr cell))))
 
+(defun agentel-markdown--delimiter-row-p (index)
+  "Return non-nil if the row at INDEX of a table is its delimiter row."
+  (= index 1))
+
 (defun agentel-markdown--align-table (rows)
   "Show the cells of ROWS padded to the widest of their column.
 The padding is displayed on the pipe that ends a cell, so the text
@@ -238,15 +242,18 @@ stays as it was written."
           (aset widths column (max (aref widths column)
                                    (agentel-markdown--cell-width cell)))
           (setq column (1+ column)))))
-    (dolist (row rows)
-      (let ((column 0))
-        (dolist (cell row)
-          (let ((pad (- (aref widths column) (agentel-markdown--cell-width cell)))
-                (pipe (cdr cell)))
-            (when (and (> pad 0) (eq (char-after pipe) ?|))
-              (put-text-property pipe (1+ pipe) 'display
-                                 (concat (make-string pad ?\s) "|"))))
-          (setq column (1+ column)))))))
+    (let ((index 0))
+      (dolist (row rows)
+        (let ((column 0)
+              (fill (if (agentel-markdown--delimiter-row-p index) ?- ?\s)))
+          (dolist (cell row)
+            (let ((pad (- (aref widths column) (agentel-markdown--cell-width cell)))
+                  (pipe (cdr cell)))
+              (when (and (> pad 0) (eq (char-after pipe) ?|))
+                (put-text-property pipe (1+ pipe) 'display
+                                   (concat (make-string pad fill) "|"))))
+            (setq column (1+ column))))
+        (setq index (1+ index))))))
 
 (defun agentel-markdown--tables ()
   "Align the columns of the tables of the current buffer."
