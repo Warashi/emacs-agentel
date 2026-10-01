@@ -174,11 +174,90 @@ start and end of the code, and the end of the closing fence."
                          'action (lambda (_) (browse-url url))
                          'help-echo url)))))
 
+;;;; Tables
+
+(defconst agentel-markdown--delimiter-regexp
+  "[ \t]*|?\\(?:[ \t]*:?-+:?[ \t]*|\\)*[ \t]*:?-+:?[ \t]*|?[ \t]*$"
+  "Regexp matching the delimiter row under the header of a table.")
+
+(defun agentel-markdown--table-line-p ()
+  "Return non-nil if the current line can be a row of a table."
+  (and (not (eobp))
+       (not (get-text-property (point) 'agentel-markdown-code))
+       (string-search "|" (buffer-substring-no-properties (pos-bol) (pos-eol)))))
+
+(defun agentel-markdown--table-cells ()
+  "Return the cells of the table row at point as (START . END).
+A cell ends at the pipe after it, or at the end of the line for a last
+cell without one."
+  (let ((end (pos-eol))
+        (cell (pos-bol))
+        cells)
+    (save-excursion
+      (skip-chars-forward " \t")
+      (when (eq (char-after) ?|)
+        (setq cell (1+ (point))))
+      (goto-char cell)
+      (while (search-forward "|" end t)
+        (unless (eq (char-before (1- (point))) ?\\)
+          (push (cons cell (1- (point))) cells)
+          (setq cell (point))))
+      (unless (string-blank-p (buffer-substring-no-properties cell end))
+        (push (cons cell end) cells)))
+    (nreverse cells)))
+
+(defun agentel-markdown--each-table (function)
+  "Call FUNCTION on the rows of each table of the current buffer.
+A row is the list of its cells, as (START . END)."
+  (goto-char (point-min))
+  (while (not (eobp))
+    (if (and (agentel-markdown--table-line-p)
+             (save-excursion
+               (forward-line)
+               (and (agentel-markdown--table-line-p)
+                    (looking-at-p agentel-markdown--delimiter-regexp))))
+        (let (rows)
+          (while (agentel-markdown--table-line-p)
+            (push (agentel-markdown--table-cells) rows)
+            (forward-line))
+          (funcall function (nreverse rows)))
+      (forward-line))))
+
+(defun agentel-markdown--cell-width (cell)
+  "Return the width of CELL, which is (START . END)."
+  (string-width (buffer-substring-no-properties (car cell) (cdr cell))))
+
+(defun agentel-markdown--align-table (rows)
+  "Show the cells of ROWS padded to the widest of their column.
+The padding is displayed on the pipe that ends a cell, so the text
+stays as it was written."
+  (let ((widths (make-vector (apply #'max (mapcar #'length rows)) 0)))
+    (dolist (row rows)
+      (let ((column 0))
+        (dolist (cell row)
+          (aset widths column (max (aref widths column)
+                                   (agentel-markdown--cell-width cell)))
+          (setq column (1+ column)))))
+    (dolist (row rows)
+      (let ((column 0))
+        (dolist (cell row)
+          (let ((pad (- (aref widths column) (agentel-markdown--cell-width cell)))
+                (pipe (cdr cell)))
+            (when (and (> pad 0) (eq (char-after pipe) ?|))
+              (put-text-property pipe (1+ pipe) 'display
+                                 (concat (make-string pad ?\s) "|"))))
+          (setq column (1+ column)))))))
+
+(defun agentel-markdown--tables ()
+  "Align the columns of the tables of the current buffer."
+  (agentel-markdown--each-table #'agentel-markdown--align-table))
+
 (defun agentel-markdown-format (text)
   "Return TEXT with its Markdown highlighted."
   (with-temp-buffer
     (insert text)
     (agentel-markdown--code-blocks)
+    (agentel-markdown--tables)
     (agentel-markdown--inline)
     (remove-text-properties (point-min) (point-max) '(agentel-markdown-code nil))
     (buffer-string)))

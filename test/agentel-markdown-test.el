@@ -48,6 +48,23 @@
     (should-not (agentel-markdown-test-has-face s "not bold" 'bold))
     (should (agentel-markdown-test-has-face s "not bold" 'agentel-markdown-code-block-face))))
 
+(defun agentel-markdown-test-shown (string)
+  "Return the lines of STRING as shown, with display strings in place."
+  (let ((pos 0) shown)
+    (while (< pos (length string))
+      (let ((next (next-single-property-change pos 'display string (length string)))
+            (display (get-text-property pos 'display string)))
+        (push (if (stringp display) display (substring-no-properties string pos next))
+              shown)
+        (setq pos next)))
+    (split-string (apply #'concat (nreverse shown)) "\n")))
+
+(ert-deftest agentel-markdown-aligns-the-columns-of-a-table ()
+  (let ((shown (agentel-markdown-test-shown
+                (agentel-markdown-format "| a | b |\n|---|---|\n| long | x |"))))
+    (should (equal (nth 0 shown) "| a    | b |"))
+    (should (equal (nth 2 shown) "| long | x |"))))
+
 (defun agentel-markdown-test-copy-at (text substring)
   "Return what copying the code at SUBSTRING of TEXT formatted puts in the kill ring."
   (let ((kill-ring nil))
