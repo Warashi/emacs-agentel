@@ -299,6 +299,10 @@ full on top of the output."
 
 ;;;; Input
 
+(defun agentel-chat-input-start ()
+  "Return the position where the input area starts, or nil without one."
+  (and agentel-chat--input-start (marker-position agentel-chat--input-start)))
+
 (defun agentel-chat-input ()
   "Return the text of the input area."
   (if agentel-chat--input-start

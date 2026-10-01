@@ -114,6 +114,23 @@
     (should (equal (agentel-chat-input) ""))
     (should (equal (agentel-chat-test-transcript) ""))))
 
+(ert-deftest agentel-chat-input-start-is-where-the-input-begins ()
+  (agentel-chat-test-with-session
+    (goto-char (point-max))
+    (insert "draft")
+    (agentel-chat-test-chunk "agent_message_chunk" "Hello")
+    (should (equal (buffer-substring-no-properties (agentel-chat-input-start) (point-max))
+                   "draft"))))
+
+(ert-deftest agentel-chat-input-start-is-nil-without-an-input ()
+  (let* ((agentel-session--registry nil)
+         (agentel-session-changed-functions nil)
+         (buffer (agentel-chat-open (agentel-session-create))))
+    (unwind-protect
+        (with-current-buffer buffer
+          (should-not (agentel-chat-input-start)))
+      (kill-buffer buffer))))
+
 (ert-deftest agentel-chat-hides-the-gap-before-the-prompt-until-something-is-said ()
   (agentel-chat-test-with-session
     (should (invisible-p (point-min)))

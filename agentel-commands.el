@@ -72,7 +72,7 @@ COMMANDS), which replaces the commands."
 (defun agentel-commands-completion-at-point ()
   "Complete a slash command at the start of the input."
   (when-let* ((session (agentel-session-current))
-              (start agentel-chat--input-start)
+              (start (agentel-chat-input-start))
               ((>= (point) start))
               ((save-excursion
                  (goto-char start)
