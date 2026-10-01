@@ -8,6 +8,7 @@
 ;; Agents answer in Markdown.  Once a message is complete, its headings,
 ;; emphasis, inline code, links and fenced code blocks are highlighted;
 ;; code blocks are fontified with the major mode of their language.
+;; The columns of tables are aligned by padding displayed on their pipes.
 ;; The markup itself stays in the text, so copying a message gives back
 ;; what the agent wrote.  `agentel-markdown-copy-code' copies the code
 ;; of a block without its fences.
