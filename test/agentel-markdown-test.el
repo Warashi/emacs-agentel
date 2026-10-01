@@ -18,7 +18,7 @@
     (memq face faces)))
 
 (ert-deftest agentel-markdown-keeps-the-text ()
-  (let ((text "# Title\n\nSome **bold** and `code`.\n\n```sh\nls -l\n```"))
+  (let ((text "# Title\n\nSome **bold** and `code`.\n\n```sh\nls -l\n```\n\n| a | b |\n|---|---|\n| long | x |"))
     (should (equal (substring-no-properties (agentel-markdown-format text)) text))))
 
 (ert-deftest agentel-markdown-highlights-headings-bold-and-inline-code ()
@@ -75,6 +75,16 @@
   (let ((shown (agentel-markdown-test-shown
                 (agentel-markdown-format "| a | b |\n|---|---|\n| long | x |"))))
     (should (equal (nth 1 shown) "|------|---|"))))
+
+(ert-deftest agentel-markdown-does-not-split-a-cell-at-an-escaped-pipe ()
+  (let ((shown (agentel-markdown-test-shown
+                (agentel-markdown-format "| a\\|b | c |\n|---|---|\n| d | e |"))))
+    (should (equal (nth 2 shown) "| d    | e |"))))
+
+(ert-deftest agentel-markdown-leaves-tables-in-code-blocks-alone ()
+  (let ((text "```\n| a | b |\n|---|---|\n| long | x |\n```"))
+    (should (equal (agentel-markdown-test-shown (agentel-markdown-format text))
+                   (split-string text "\n")))))
 
 (defun agentel-markdown-test-copy-at (text substring)
   "Return what copying the code at SUBSTRING of TEXT formatted puts in the kill ring."
