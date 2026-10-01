@@ -106,6 +106,7 @@ text.
 | =C-c C-l=     | list the sessions                                    |
 | =C-c C-f=     | toggle =agentel-focus-mode=                          |
 | =C-c C-j=     | visit a running subagent                             |
+| =C-c C-w=     | copy the code of a code block                        |
 | =TAB=         | complete a slash command, or fold the entry at point |
 | =M-p= / =M-n= | previous / next sent prompt                          |
 
@@ -117,6 +118,11 @@ windows change.  A tool call leads
 with the reason the agent gives for it, such as the description of a
 Bash command, then its title; unfolding it shows the whole title and
 the output.
+
+=C-c C-w= copies the code of a fenced code block, without its fences
+and last newline: the block at point, or else one the agent wrote
+since the last prompt.  When there are several, it asks which, by
+language and first line, defaulting to the last.
 
 States of sessions, subagents and background tasks show as one icon
 in the header line, the transcript, the pinned lines and the session
