@@ -123,6 +123,28 @@ A tool call separates the messages."
       (should (equal default "make"))
       (should (equal (car kill-ring) "ls -l\nls -a")))))
 
+(ert-deftest agentel-markdown-copies-the-chosen-one-of-blocks-alike ()
+  (agentel-markdown-test-with-session
+    (agentel-markdown-test-turn session "new"
+                                "```\nmake\n# a\n```" "```\nmake\n# b\n```")
+    (goto-char (point-max))
+    (let (offered)
+      (cl-letf (((symbol-function 'completing-read)
+                 (lambda (_prompt table &optional _pred _req _init _hist def)
+                   (setq offered (all-completions "" table))
+                   def)))
+        (agentel-markdown-copy-code))
+      (should (equal (length (delete-dups (copy-sequence offered))) 2))
+      (should (equal (car kill-ring) "make\n# b")))))
+
+(ert-deftest agentel-markdown-copies-the-block-at-point-in-the-transcript ()
+  (agentel-markdown-test-with-session
+    (agentel-markdown-test-turn session "new" "```\nfirst\n```" "```\nsecond\n```")
+    (goto-char (point-min))
+    (search-forward "firs")
+    (agentel-markdown-copy-code)
+    (should (equal (car kill-ring) "first"))))
+
 (ert-deftest agentel-markdown-tells-when-the-last-turn-has-no-code-block ()
   (agentel-markdown-test-with-session
     (agentel-markdown-test-turn session "old" "```\nold\n```")

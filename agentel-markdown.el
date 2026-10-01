@@ -202,17 +202,27 @@ all of them without a prompt."
                    (agentel-markdown-code-blocks (agentel-store-get item 'text))))
             turn)))
 
+(defun agentel-markdown--choices (blocks)
+  "Return BLOCKS, which are (LANGUAGE . CODE), as (LABEL . CODE).
+A label is the language and the first line of the code, numbered by
+position when an earlier block has the same."
+  (let ((index 0) choices)
+    (dolist (block blocks)
+      (let* ((line (car (split-string (cdr block) "\n")))
+             (label (if (string-empty-p (car block))
+                        line
+                      (format "%s: %s" (car block) line))))
+        (setq index (1+ index))
+        (when (assoc label choices)
+          (setq label (format "%s (%d)" label index)))
+        (push (cons label (cdr block)) choices)))
+    (nreverse choices)))
+
 (defun agentel-markdown--choose-block (blocks)
   "Return the code of one of BLOCKS, asking which when there are several.
 BLOCKS are (LANGUAGE . CODE); the last one is the default."
   (if (cdr blocks)
-      (let* ((choices (mapcar (lambda (block)
-                                (let ((line (car (split-string (cdr block) "\n"))))
-                                  (cons (if (string-empty-p (car block))
-                                            line
-                                          (format "%s: %s" (car block) line))
-                                        (cdr block))))
-                              blocks))
+      (let* ((choices (agentel-markdown--choices blocks))
              (choice (completing-read "Copy code block: "
                                       (agentel-chat-ordered-completion
                                        (mapcar #'car choices))
