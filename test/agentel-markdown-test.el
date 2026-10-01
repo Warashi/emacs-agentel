@@ -68,6 +68,68 @@
   (should-not (text-properties-at
                0 (agentel-markdown-test-copy-at "```emacs-lisp\n(defun f ())\n```" "def"))))
 
+(defmacro agentel-markdown-test-with-session (&rest body)
+  "Run BODY in a chat buffer of a session bound to `session', at its input."
+  (declare (indent 0))
+  `(let ((agentel-session--registry nil)
+         (agentel-session-changed-functions nil)
+         (agentel-session-update-functions (list #'agentel-conversation--on-update))
+         (kill-ring nil))
+     (let* ((session (agentel-session-create))
+            (buffer (agentel-chat-open session :input t)))
+       (agentel-session-register session "s1")
+       (unwind-protect
+           (with-current-buffer buffer
+             ,@body)
+         (kill-buffer buffer)))))
+
+(defun agentel-markdown-test-turn (session prompt &rest messages)
+  "Show PROMPT sent to SESSION and the finished agent MESSAGES answering it.
+A tool call separates the messages."
+  (agentel-conversation-send session nil 'user `(chunk ,prompt))
+  (dolist (text messages)
+    (agentel-session-dispatch
+     `((sessionId . "s1")
+       (update . ((sessionUpdate . "tool_call") (toolCallId . ,text)
+                  (title . "Tool") (status . "completed")))))
+    (agentel-session-dispatch
+     `((sessionId . "s1")
+       (update . ((sessionUpdate . "agent_message_chunk")
+                  (content . ((type . "text") (text . ,text)))))))
+    (agentel-conversation-finish-message session)))
+
+(ert-deftest agentel-markdown-copies-the-only-code-block-of-the-last-turn ()
+  (agentel-markdown-test-with-session
+    (agentel-markdown-test-turn session "old" "```\nold\n```")
+    (agentel-markdown-test-turn session "new" "Run:\n\n```sh\nls -l\n```")
+    (goto-char (point-max))
+    (agentel-markdown-copy-code)
+    (should (equal (car kill-ring) "ls -l"))))
+
+(ert-deftest agentel-markdown-asks-which-code-block-of-the-last-turn-to-copy ()
+  (agentel-markdown-test-with-session
+    (agentel-markdown-test-turn session "old" "```\nold\n```")
+    (agentel-markdown-test-turn session "new"
+                                "```sh\nls -l\nls -a\n```" "```\nmake\n```")
+    (goto-char (point-max))
+    (let (offered default)
+      (cl-letf (((symbol-function 'completing-read)
+                 (lambda (_prompt table &optional _pred _req _init _hist def)
+                   (setq offered (all-completions "" table)
+                         default def)
+                   (car offered))))
+        (agentel-markdown-copy-code))
+      (should (equal offered '("sh: ls -l" "make")))
+      (should (equal default "make"))
+      (should (equal (car kill-ring) "ls -l\nls -a")))))
+
+(ert-deftest agentel-markdown-tells-when-the-last-turn-has-no-code-block ()
+  (agentel-markdown-test-with-session
+    (agentel-markdown-test-turn session "old" "```\nold\n```")
+    (agentel-markdown-test-turn session "new" "No code.")
+    (goto-char (point-max))
+    (should-error (agentel-markdown-copy-code) :type 'user-error)))
+
 (ert-deftest agentel-markdown-formats-finished-agent-messages ()
   (let ((agentel-session--registry nil)
         (agentel-session-changed-functions nil)

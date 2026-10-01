@@ -85,26 +85,47 @@
   (add-face-text-property start end 'agentel-markdown-code-block-face t)
   (put-text-property start end 'agentel-markdown-code t))
 
-(defun agentel-markdown--code-blocks ()
-  "Highlight the fenced code blocks of the current buffer."
+(defun agentel-markdown--each-block (function)
+  "Call FUNCTION on each fenced code block of the current buffer.
+It is called with the language, the start of the opening fence, the
+start and end of the code, and the end of the closing fence."
   (goto-char (point-min))
   (while (re-search-forward "^[ \t]*```\\([^`\n]*\\)\n" nil t)
     (let ((language (string-trim (match-string 1)))
           (fence (match-beginning 0))
           (start (point)))
       (if (re-search-forward "^[ \t]*```[ \t]*$" nil t)
-          ;; Fontifying the code runs a major mode, which clobbers the match data.
+          ;; FUNCTION may run a major mode, which clobbers the match data.
           (let ((end (match-beginning 0))
                 (close (match-end 0)))
-            (agentel-markdown--fontify-code start end language)
-            (add-face-text-property fence start 'agentel-markdown-markup-face)
-            (add-face-text-property end close 'agentel-markdown-markup-face)
-            (put-text-property fence close 'agentel-markdown-code t)
-            (put-text-property fence close 'agentel-markdown-code-block
-                               (string-remove-suffix
-                                "\n" (buffer-substring-no-properties start end)))
+            (funcall function language fence start end close)
             (goto-char close))
         (goto-char (point-max))))))
+
+(defun agentel-markdown--code (start end)
+  "Return the code between START and END without its last newline."
+  (string-remove-suffix "\n" (buffer-substring-no-properties start end)))
+
+(defun agentel-markdown--code-blocks ()
+  "Highlight the fenced code blocks of the current buffer."
+  (agentel-markdown--each-block
+   (lambda (language fence start end close)
+     (agentel-markdown--fontify-code start end language)
+     (add-face-text-property fence start 'agentel-markdown-markup-face)
+     (add-face-text-property end close 'agentel-markdown-markup-face)
+     (put-text-property fence close 'agentel-markdown-code t)
+     (put-text-property fence close 'agentel-markdown-code-block
+                        (agentel-markdown--code start end)))))
+
+(defun agentel-markdown-code-blocks (text)
+  "Return the fenced code blocks of TEXT as (LANGUAGE . CODE), in order."
+  (with-temp-buffer
+    (insert text)
+    (let (blocks)
+      (agentel-markdown--each-block
+       (lambda (language _fence start end _close)
+         (push (cons language (agentel-markdown--code start end)) blocks)))
+      (nreverse blocks))))
 
 (defun agentel-markdown--each (regexp function)
   "Call FUNCTION after each match of REGEXP outside code."
@@ -165,12 +186,53 @@
 
 ;;;; Copying code
 
+(defun agentel-markdown--turn-blocks (items)
+  "Return the code blocks of the finished agent messages of the last turn.
+The turn is the ITEMS of a conversation from the last prompt on, or
+all of them without a prompt."
+  (let ((turn items))
+    (let ((tail items))
+      (while tail
+        (when (eq (agentel-store-model-type (car tail)) 'user)
+          (setq turn tail))
+        (setq tail (cdr tail))))
+    (mapcan (lambda (item)
+              (and (eq (agentel-store-model-type item) 'agent)
+                   (agentel-store-get item 'finished)
+                   (agentel-markdown-code-blocks (agentel-store-get item 'text))))
+            turn)))
+
+(defun agentel-markdown--choose-block (blocks)
+  "Return the code of one of BLOCKS, asking which when there are several.
+BLOCKS are (LANGUAGE . CODE); the last one is the default."
+  (if (cdr blocks)
+      (let* ((choices (mapcar (lambda (block)
+                                (let ((line (car (split-string (cdr block) "\n"))))
+                                  (cons (if (string-empty-p (car block))
+                                            line
+                                          (format "%s: %s" (car block) line))
+                                        (cdr block))))
+                              blocks))
+             (choice (completing-read "Copy code block: "
+                                      (agentel-chat-ordered-completion
+                                       (mapcar #'car choices))
+                                      nil t nil nil (car (car (last choices))))))
+        (cdr (assoc choice choices)))
+    (cdr (car blocks))))
+
 (defun agentel-markdown-copy-code ()
-  "Copy the code of the code block at point, without its fences."
+  "Copy the code of a code block, without its fences.
+The block is the one at point, or else one the agent wrote in the
+last turn, asked for when there are several."
   (interactive)
-  (let ((code (get-text-property (point) 'agentel-markdown-code-block)))
+  (let ((code (or (get-text-property (point) 'agentel-markdown-code-block)
+                  (when-let* ((blocks (and agentel-chat--session
+                                           (agentel-markdown--turn-blocks
+                                            (agentel-conversation-items
+                                             agentel-chat--session)))))
+                    (agentel-markdown--choose-block blocks)))))
     (unless code
-      (user-error "No code block at point"))
+      (user-error "No code block in the last turn"))
     (kill-new code)
     (message "Copied the code block")))
 
