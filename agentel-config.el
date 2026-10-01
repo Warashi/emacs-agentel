@@ -231,15 +231,15 @@ not report them as unavailable."
   "Change the config option ID of the session of this buffer."
   (interactive
    (list (let ((options (mapcar (lambda (o) (cons (alist-get 'name o) (alist-get 'id o)))
-                                (agentel-config--options agentel-chat--session))))
+                                (agentel-config--options (agentel-session-current)))))
            (cdr (assoc (completing-read "Option: " options nil t) options)))))
-  (let ((session agentel-chat--session))
+  (let ((session (agentel-session-current)))
     (agentel-config-set session id (agentel-config--read session id))))
 
 (defun agentel-config--set-category (category)
   "Change the config option of CATEGORY in the session of this buffer."
   (agentel-config-set-option
-   (alist-get 'id (or (agentel-config-option agentel-chat--session category)
+   (alist-get 'id (or (agentel-config-option (agentel-session-current) category)
                       (user-error "This agent has no %s option" category)))))
 
 (defun agentel-config-set-model ()

@@ -70,6 +70,25 @@
       (agentel-test-wait-until (lambda () (not (process-live-p process))))
       (should-not (memq session (agentel-session-list))))))
 
+(ert-deftest agentel-killing-the-buffer-closes-the-other-sessions-of-the-agent ()
+  (agentel-test-with-started session nil
+    (let* ((connection (agentel-session-connection session))
+           (process (agentel-connection-process connection))
+           (other (agentel-session-create :connection connection :parent session))
+           (buffer (agentel-chat-open other)))
+      (kill-buffer (current-buffer))
+      (agentel-test-wait-until (lambda () (not (process-live-p process))))
+      (should-not (buffer-live-p buffer))
+      (should-not (agentel-session-list)))))
+
+(ert-deftest agentel-killing-a-subagent-buffer-keeps-the-agent ()
+  (agentel-test-with-started session nil
+    (let* ((connection (agentel-session-connection session))
+           (other (agentel-session-create :connection connection :parent session)))
+      (kill-buffer (agentel-chat-open other))
+      (should (process-live-p (agentel-connection-process connection)))
+      (should (memq session (agentel-session-list))))))
+
 (ert-deftest agentel-command-prefix-wraps-the-agent ()
   (let ((agentel-command-prefix '("env" "AGENTEL_WRAPPED=1")))
     (agentel-test-with-started session nil

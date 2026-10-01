@@ -16,6 +16,7 @@
 
 (require 'subr-x)
 (require 'button)
+(require 'agentel-session)
 (require 'agentel-chat)
 
 (defface agentel-markdown-heading-face
@@ -236,10 +237,9 @@ The block is the one at point, or else one the agent wrote in the
 last turn, asked for when there are several."
   (interactive)
   (let ((code (or (get-text-property (point) 'agentel-markdown-code-block)
-                  (when-let* ((blocks (and agentel-chat--session
-                                           (agentel-markdown--turn-blocks
-                                            (agentel-conversation-items
-                                             agentel-chat--session)))))
+                  (when-let* ((session (agentel-session-current))
+                              (blocks (agentel-markdown--turn-blocks
+                                       (agentel-conversation-items session))))
                     (agentel-markdown--choose-block blocks)))))
     (unless code
       (user-error "No code block in the last turn"))

@@ -92,8 +92,8 @@ Its lines fit in the :width of OPTIONS."
 (defun agentel-subagent--read-running ()
   "Ask for a running subagent of this buffer's session and return it."
   (let ((children (mapcar (lambda (child) (cons (agentel-session-name child) child))
-                          (and agentel-chat--session
-                               (agentel-subagent--running agentel-chat--session)))))
+                          (when-let* ((session (agentel-session-current)))
+                            (agentel-subagent--running session)))))
     (unless children
       (user-error "No subagent at point or running"))
     (cdr (assoc (completing-read "Subagent: "

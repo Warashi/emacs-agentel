@@ -158,7 +158,7 @@ of SESSION."
 
 (defun agentel--kill-sessions ()
   "Stop the agent of the session in the buffer being killed."
-  (when-let* ((session agentel-chat--session)
+  (when-let* ((session (agentel-session-current))
               ((not (agentel-session-parent session)))
               (connection (agentel-session-connection session)))
     (agentel-connection-shutdown connection)
