@@ -40,6 +40,25 @@
       (should-not (agentel-session-get "s1"))
       (should-not (agentel-session-list)))))
 
+(ert-deftest agentel-session-current-is-the-one-the-current-buffer-shows ()
+  (agentel-session-test-with-registry
+    (let ((a (agentel-session-create))
+          (b (agentel-session-create)))
+      (with-temp-buffer
+        (setf (agentel-session-buffer b) (current-buffer))
+        (should (eq (agentel-session-current) b))
+        (with-temp-buffer
+          (should-not (agentel-session-current))))
+      (ignore a))))
+
+(ert-deftest agentel-session-current-forgets-a-removed-session ()
+  (agentel-session-test-with-registry
+    (let ((session (agentel-session-create)))
+      (with-temp-buffer
+        (setf (agentel-session-buffer session) (current-buffer))
+        (agentel-session-remove session)
+        (should-not (agentel-session-current))))))
+
 (ert-deftest agentel-session-dispatch-passes-update-to-hook ()
   (agentel-session-test-with-registry
     (let ((session (agentel-session-create))

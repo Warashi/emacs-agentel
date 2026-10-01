@@ -170,6 +170,12 @@ chosen by each agent, so two agents may use the same one."
   "Return all sessions, oldest first."
   agentel-session--registry)
 
+(defun agentel-session-current ()
+  "Return the session the current buffer shows, or nil."
+  (let ((buffer (current-buffer)))
+    (seq-find (lambda (s) (eq (agentel-session-buffer s) buffer))
+              agentel-session--registry)))
+
 (defun agentel-session-roots ()
   "Return the sessions that are not subagents, oldest first."
   (seq-remove #'agentel-session-parent agentel-session--registry))
