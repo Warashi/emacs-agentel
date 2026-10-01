@@ -65,6 +65,12 @@
     (should (equal (nth 0 shown) "| a    | b |"))
     (should (equal (nth 2 shown) "| long | x |"))))
 
+(ert-deftest agentel-markdown-aligns-wide-characters-by-their-width ()
+  (let ((shown (agentel-markdown-test-shown
+                (agentel-markdown-format "| 名前 | b |\n|---|---|\n| abcdef | x |"))))
+    (should (equal (nth 0 shown) "| 名前   | b |"))
+    (should (equal (nth 2 shown) "| abcdef | x |"))))
+
 (defun agentel-markdown-test-copy-at (text substring)
   "Return what copying the code at SUBSTRING of TEXT formatted puts in the kill ring."
   (let ((kill-ring nil))
