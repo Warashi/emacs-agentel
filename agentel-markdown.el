@@ -9,7 +9,8 @@
 ;; emphasis, inline code, links and fenced code blocks are highlighted;
 ;; code blocks are fontified with the major mode of their language.
 ;; The markup itself stays in the text, so copying a message gives back
-;; what the agent wrote.
+;; what the agent wrote.  `agentel-markdown-copy-code' copies the code
+;; of a block without its fences.
 
 ;;; Code:
 
@@ -99,6 +100,9 @@
             (add-face-text-property fence start 'agentel-markdown-markup-face)
             (add-face-text-property end close 'agentel-markdown-markup-face)
             (put-text-property fence close 'agentel-markdown-code t)
+            (put-text-property fence close 'agentel-markdown-code-block
+                               (string-remove-suffix
+                                "\n" (buffer-substring-no-properties start end)))
             (goto-char close))
         (goto-char (point-max))))))
 
@@ -158,6 +162,19 @@
     (buffer-string)))
 
 (setq agentel-chat-format-message-function #'agentel-markdown-format)
+
+;;;; Copying code
+
+(defun agentel-markdown-copy-code ()
+  "Copy the code of the code block at point, without its fences."
+  (interactive)
+  (let ((code (get-text-property (point) 'agentel-markdown-code-block)))
+    (unless code
+      (user-error "No code block at point"))
+    (kill-new code)
+    (message "Copied the code block")))
+
+(keymap-set agentel-chat-mode-map "C-c C-w" #'agentel-markdown-copy-code)
 
 (provide 'agentel-markdown)
 ;;; agentel-markdown.el ends here

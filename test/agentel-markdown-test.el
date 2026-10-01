@@ -48,6 +48,26 @@
     (should-not (agentel-markdown-test-has-face s "not bold" 'bold))
     (should (agentel-markdown-test-has-face s "not bold" 'agentel-markdown-code-block-face))))
 
+(defun agentel-markdown-test-copy-at (text substring)
+  "Return what copying the code at SUBSTRING of TEXT formatted puts in the kill ring."
+  (let ((kill-ring nil))
+    (with-temp-buffer
+      (insert (agentel-markdown-format text))
+      (goto-char (point-min))
+      (search-forward substring)
+      (agentel-markdown-copy-code)
+      (car kill-ring))))
+
+(ert-deftest agentel-markdown-copies-the-code-of-the-block-at-point ()
+  (let ((text "Run:\n\n```sh\nls -l\necho done\n```\n\nThen:\n\n```\nmake\n```\n"))
+    (should (equal (agentel-markdown-test-copy-at text "echo") "ls -l\necho done"))
+    (should (equal (agentel-markdown-test-copy-at text "```s") "ls -l\necho done"))
+    (should (equal (agentel-markdown-test-copy-at text "mak") "make"))))
+
+(ert-deftest agentel-markdown-copies-the-code-without-its-properties ()
+  (should-not (text-properties-at
+               0 (agentel-markdown-test-copy-at "```emacs-lisp\n(defun f ())\n```" "def"))))
+
 (ert-deftest agentel-markdown-formats-finished-agent-messages ()
   (let ((agentel-session--registry nil)
         (agentel-session-changed-functions nil)
