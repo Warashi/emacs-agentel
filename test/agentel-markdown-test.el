@@ -86,6 +86,60 @@
                 (agentel-markdown-format "a | b\n---|---\n`long` | x"))))
     (should (equal (nth 0 shown) "a      | b"))))
 
+(ert-deftest agentel-markdown-wraps-the-cells-of-a-table-wider-than-the-window ()
+  (let ((shown (agentel-markdown-test-shown
+                (agentel-markdown-format
+                 "| a | b |\n|---|---|\n| one two three | x |" 15))))
+    (should (equal shown '("| a       | b |"
+                           "|---------|---|"
+                           "| one two | x |"
+                           "| three   |   |")))))
+
+(defun agentel-markdown-test-column (lines column)
+  "Return the text of COLUMN in the body of the table shown in LINES."
+  (mapconcat (lambda (line) (string-trim (nth column (split-string line "|"))))
+             (cdr (seq-drop-while (lambda (line) (not (string-prefix-p "|-" line)))
+                                  lines))))
+
+(ert-deftest agentel-markdown-wraps-wide-characters-within-the-window ()
+  (let ((shown (agentel-markdown-test-shown
+                (agentel-markdown-format
+                 "| 項目 | 説明 |\n|---|---|\n| 幅 | 日本語の長い説明文がここに入ります |" 20))))
+    (dolist (line shown)
+      (should (<= (string-width line) 20)))
+    (should (equal (agentel-markdown-test-column shown 2)
+                   "日本語の長い説明文がここに入ります"))))
+
+(ert-deftest agentel-markdown-wraps-wide-characters-in-a-very-narrow-window ()
+  (let ((shown (agentel-markdown-test-shown
+                (agentel-markdown-format "| 項目 | 説明 |\n|---|---|\n| 幅 | 日本語の説明 |" 4))))
+    (should (equal (agentel-markdown-test-column shown 2) "日本語の説明"))))
+
+(ert-deftest agentel-markdown-breaks-a-word-longer-than-its-column ()
+  (let ((shown (agentel-markdown-test-shown
+                (agentel-markdown-format "| x |\n|---|\n| abcdefghij |" 8))))
+    (should (equal (nthcdr 2 shown) '("| abcd |" "| efgh |" "| ij   |")))))
+
+(ert-deftest agentel-markdown-keeps-a-table-fitting-the-window-as-it-is ()
+  (let ((text "| a | b |\n|---|---|\n| long | x |"))
+    (should (equal (agentel-markdown-test-shown (agentel-markdown-format text 12))
+                   (agentel-markdown-test-shown (agentel-markdown-format text))))))
+
+(ert-deftest agentel-markdown-keeps-the-text-of-a-wrapped-table ()
+  (let ((text "| a | b |\n|---|---|\n| one two three | x |"))
+    (should (equal (substring-no-properties (agentel-markdown-format text 15)) text))))
+
+(ert-deftest agentel-markdown-keeps-the-faces-of-a-wrapped-cell ()
+  (let* ((s (agentel-markdown-format "| a | b |\n|---|---|\n| one `two` three | x |" 15))
+         (row (get-text-property (string-search "one" s) 'display s)))
+    (should (agentel-markdown-test-has-face row "two" 'agentel-markdown-code-face))))
+
+(ert-deftest agentel-markdown-marks-a-table-as-fitting-the-width ()
+  (should (text-property-any 0 10 'agentel-ui-fits-width t
+                             (agentel-markdown-format "| a | b |\n|---|---|\n| c | d |")))
+  (let ((s (agentel-markdown-format "no table")))
+    (should-not (text-property-any 0 (length s) 'agentel-ui-fits-width t s))))
+
 (ert-deftest agentel-markdown-leaves-tables-in-code-blocks-alone ()
   (let ((text "```\n| a | b |\n|---|---|\n| long | x |\n```"))
     (should (equal (agentel-markdown-test-shown (agentel-markdown-format text))
