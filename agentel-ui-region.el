@@ -11,7 +11,7 @@
 ;; the whole list to `agentel-ui-region-render' whenever it may have
 ;; changed; the region finds what differs from what it shows and
 ;; changes only that text.  A model is drawn again when its revision or
-;; the line width it fits in changed, or when it became or stopped being
+;; the widths it fits in changed, or when it became or stopped being
 ;; the first one; folding it draws it again at once.  The models kept in
 ;; the order they were in are passed over first without looking them up,
 ;; so a change to one model or a new one at the end costs little more
@@ -43,7 +43,7 @@
 
 (cl-defstruct (agentel-ui-region--drawing (:copier nil))
   "How a model was drawn."
-  model start revision width fits first)
+  model start revision widths fits first)
 
 (defun agentel-ui-region-create (pos property)
   "Return an empty region at POS of the current buffer.
@@ -77,14 +77,20 @@ grows above them, so the undo history is dropped."
         (agentel-ui-view-property (agentel-store-model-type model) :collapsed)
       collapsed)))
 
-(defun agentel-ui-region--stale-p (drawing first width)
+(defun agentel-ui-region--widths ()
+  "Return the widths models fit in, as (LINE-WIDTH . WINDOW-WIDTH).
+They are `agentel-ui-line-width' and `agentel-ui-window-width'."
+  (cons (agentel-ui-line-width) (agentel-ui-window-width)))
+
+(defun agentel-ui-region--stale-p (drawing first widths)
   "Return non-nil if DRAWING has to be drawn again.
-FIRST says whether it is the first model now, WIDTH the line width."
+FIRST says whether it is the first model now, WIDTHS the widths it
+fits in."
   (not (and (= (agentel-ui-region--drawing-revision drawing)
                (agentel-store-model-revision (agentel-ui-region--drawing-model drawing)))
             (eq (agentel-ui-region--drawing-first drawing) first)
             (or (not (agentel-ui-region--drawing-fits drawing))
-                (= (agentel-ui-region--drawing-width drawing) width)))))
+                (equal (agentel-ui-region--drawing-widths drawing) widths)))))
 
 (defun agentel-ui-region--text-end (region drawing)
   "Return the position after the text of DRAWING in REGION."
@@ -92,14 +98,15 @@ FIRST says whether it is the first model now, WIDTH the line width."
                                (agentel-ui-region--property region) nil
                                (marker-position (agentel-ui-region--end region))))
 
-(defun agentel-ui-region--text (region drawing first width)
-  "Return the text of DRAWING of REGION, as the first model if FIRST, in WIDTH.
+(defun agentel-ui-region--text (region drawing first widths)
+  "Return the text of DRAWING of REGION, as the first model if FIRST, in WIDTHS.
 DRAWING records how it is drawn."
   (let* ((model (agentel-ui-region--drawing-model drawing))
          (text (concat (if first "" "\n\n")
                        (agentel-ui-view model
                                         :collapsed (agentel-ui-region--collapsed-p region model)
-                                        :width width))))
+                                        :width (car widths)
+                                        :window-width (cdr widths)))))
     (add-text-properties 0 (length text)
                          (list (agentel-ui-region--property region) model
                                'read-only t
@@ -107,7 +114,7 @@ DRAWING records how it is drawn."
                                'front-sticky '(read-only))
                          text)
     (setf (agentel-ui-region--drawing-revision drawing) (agentel-store-model-revision model)
-          (agentel-ui-region--drawing-width drawing) width
+          (agentel-ui-region--drawing-widths drawing) widths
           (agentel-ui-region--drawing-fits drawing)
           (text-property-any 0 (length text) 'agentel-ui-fits-width t text)
           (agentel-ui-region--drawing-first drawing) first)
@@ -132,22 +139,22 @@ DRAWING records how it is drawn."
   (delete-region (agentel-ui-region--drawing-start drawing)
                  (agentel-ui-region--text-end region drawing)))
 
-(defun agentel-ui-region--redraw (region drawing first width)
-  "Draw DRAWING of REGION again in place, as the first model if FIRST, in WIDTH.
+(defun agentel-ui-region--redraw (region drawing first widths)
+  "Draw DRAWING of REGION again in place, as the first model if FIRST, in WIDTHS.
 Point in its text stays where it was in the text."
   (let* ((start (marker-position (agentel-ui-region--drawing-start drawing)))
          (end (agentel-ui-region--text-end region drawing))
          (offset (and (<= start (point)) (< (point) end) (- (point) start)))
-         (text (agentel-ui-region--text region drawing first width)))
+         (text (agentel-ui-region--text region drawing first widths)))
     (agentel-ui-region--delete region drawing)
     (agentel-ui-region--insert (list drawing) (list text) start)
     (when offset
       (goto-char (min (+ start offset) (agentel-ui-region--text-end region drawing))))))
 
-(defun agentel-ui-region--rearrange (region drawings models first width)
+(defun agentel-ui-region--rearrange (region drawings models first widths)
   "Show MODELS in REGION in place of DRAWINGS, the rest of what it shows.
-FIRST says whether the first of them is the first model, WIDTH is the
-line width.  Return the drawings of MODELS.
+FIRST says whether the first of them is the first model, WIDTHS are
+the widths they fit in.  Return the drawings of MODELS.
 
 Every change of the buffer moves all its markers, so the models left
 out next to each other are removed at once, and so are the new models
@@ -190,8 +197,8 @@ next to each other inserted."
                 ((and drawing (eq drawing (car kept)))
                  (funcall flush)
                  (pop kept)
-                 (when (agentel-ui-region--stale-p drawing first width)
-                   (agentel-ui-region--redraw region drawing first width)))
+                 (when (agentel-ui-region--stale-p drawing first widths)
+                   (agentel-ui-region--redraw region drawing first widths)))
                 (t
                  (when drawing
                    ;; Drawn out of order, so it moves here.
@@ -200,7 +207,7 @@ next to each other inserted."
                  (setq drawing (or drawing (make-agentel-ui-region--drawing :model model)))
                  (puthash model drawing index)
                  (push drawing pending)
-                 (push (agentel-ui-region--text region drawing first width) texts)))
+                 (push (agentel-ui-region--text region drawing first widths) texts)))
                (setq first nil)
                drawing))
            models)
@@ -211,20 +218,20 @@ next to each other inserted."
 Only the models that are new to REGION or changed are drawn, and the
 text of the models left out is removed."
   (let ((drawings (agentel-ui-region--drawn region))
-        (width (agentel-ui-line-width))
+        (widths (agentel-ui-region--widths))
         (first t)
         same)
     (agentel-ui-region--changing
       (while (and drawings models
                   (eq (agentel-ui-region--drawing-model (car drawings)) (car models)))
-        (when (agentel-ui-region--stale-p (car drawings) first width)
-          (agentel-ui-region--redraw region (car drawings) first width))
+        (when (agentel-ui-region--stale-p (car drawings) first widths)
+          (agentel-ui-region--redraw region (car drawings) first widths))
         (setq first nil
               same drawings
               drawings (cdr drawings)
               models (cdr models)))
       (when (or drawings models)
-        (let ((rest (agentel-ui-region--rearrange region drawings models first width)))
+        (let ((rest (agentel-ui-region--rearrange region drawings models first widths)))
           (if same
               (setcdr same rest)
             (setf (agentel-ui-region--drawn region) rest)))))))
@@ -237,7 +244,7 @@ text of the models left out is removed."
     (agentel-ui-region--changing
       (agentel-ui-region--redraw region drawing
                                  (agentel-ui-region--drawing-first drawing)
-                                 (agentel-ui-line-width)))))
+                                 (agentel-ui-region--widths)))))
 
 (provide 'agentel-ui-region)
 ;;; agentel-ui-region.el ends here

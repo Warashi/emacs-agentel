@@ -27,6 +27,9 @@
       (cond ((plist-get options :collapsed) (concat text "…"))
             ((string-prefix-p "wide" text)
              (agentel-ui-one-line "" text (plist-get options :width)))
+            ((equal text "window")
+             (propertize (format "window %s" (plist-get options :window-width))
+                         'agentel-ui-fits-width t))
             (t text))))
   :collapsed nil)
 
@@ -228,6 +231,22 @@ The buffer ends with the text \"END\" after the region."
         (agentel-ui-region-render region (list a b)))
       (should (equal (agentel-ui-region-test-text) "widewwwwwww…\n\ntwoEND"))
       (should (equal (length agentel-ui-region-test-drawn) 1)))))
+
+(ert-deftest agentel-ui-region-fits-models-again-when-the-window-widens-beyond-the-line ()
+  (agentel-ui-region-test-with-region
+    (save-window-excursion
+      (delete-other-windows)
+      (split-window-right 21)
+      (set-window-buffer (selected-window) (current-buffer))
+      (let ((a (agentel-ui-region-test-note store 'a "window"))
+            (agentel-ui-max-line-width 10))
+        (agentel-ui-region-render region (list a))
+        (should (equal (agentel-ui-region-test-text)
+                       (format "window %dEND" (window-max-chars-per-line))))
+        (delete-other-windows)
+        (agentel-ui-region-render region (list a))
+        (should (equal (agentel-ui-region-test-text)
+                       (format "window %dEND" (window-max-chars-per-line))))))))
 
 (provide 'agentel-ui-region-test)
 ;;; agentel-ui-region-test.el ends here
