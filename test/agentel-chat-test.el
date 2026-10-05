@@ -152,6 +152,13 @@
     (should (equal (agentel-chat-input) "draft\nsecond line"))
     (should (equal (agentel-chat-test-transcript) "Hello"))))
 
+(ert-deftest agentel-chat-scrolls-the-prompt-to-the-bottom-instead-of-recentering ()
+  ;; Redisplay does not run in batch mode, so check the setting that
+  ;; makes it scroll only as far as point.
+  (agentel-chat-test-with-session
+    (should (local-variable-p 'scroll-conservatively))
+    (should (> scroll-conservatively 100))))
+
 (ert-deftest agentel-chat-separates-thoughts-from-messages ()
   (agentel-chat-test-with-session
     (agentel-chat-test-chunk "agent_thought_chunk" "Hmm")

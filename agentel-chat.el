@@ -504,6 +504,10 @@ and send it with \\[agentel-chat-send]."
   ;; redisplay.  The result of :eval is itself a mode line format, where
   ;; % is special.
   (setq-local header-line-format '(:eval agentel-chat--header-line))
+  ;; When the transcript grows past the window, scroll only until point
+  ;; is shown, which keeps the prompt at the bottom instead of
+  ;; recentering it.
+  (setq-local scroll-conservatively 101)
   (agentel-ui-follow-width #'agentel-chat--fit-width))
 
 (defun agentel-chat--fit-width ()
