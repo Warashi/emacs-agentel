@@ -56,6 +56,15 @@
   (with-temp-buffer
     (should (= (agentel-ui-line-width) agentel-ui-max-line-width))))
 
+(ert-deftest agentel-ui-window-width-is-the-narrow-window-beyond-the-largest-width ()
+  (agentel-ui-test-with-narrow-window
+    (let ((agentel-ui-max-line-width 10))
+      (should (= (agentel-ui-window-width) (window-max-chars-per-line))))))
+
+(ert-deftest agentel-ui-window-width-of-a-hidden-buffer-is-unknown ()
+  (with-temp-buffer
+    (should-not (agentel-ui-window-width))))
+
 (ert-deftest agentel-ui-line-width-keeps-point-away-from-an-unselected-window ()
   (save-window-excursion
     (delete-other-windows)
@@ -87,6 +96,16 @@
       (delete-other-windows)
       (agentel-ui--check-widths)
       (should (= calls 1))
+      (agentel-ui--check-widths)
+      (should (= calls 1)))))
+
+(ert-deftest agentel-ui-follow-width-reports-a-change-beyond-the-largest-width ()
+  (agentel-ui-test-with-narrow-window
+    (let* ((calls 0)
+           (agentel-ui-max-line-width 10)
+           (agentel-ui--followers nil))
+      (agentel-ui-follow-width (lambda () (setq calls (1+ calls))))
+      (delete-other-windows)
       (agentel-ui--check-widths)
       (should (= calls 1)))))
 

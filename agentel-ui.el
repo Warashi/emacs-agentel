@@ -51,16 +51,22 @@ presentations read with `agentel-ui-view-property'."
   :type 'natnum
   :group 'agentel)
 
+(defun agentel-ui-window-width ()
+  "Return the width of the narrowest window showing this buffer.
+Return nil when no window shows it."
+  ;; `window-max-chars-per-line' selects the window, which moves point
+  ;; to the point of that window.
+  (save-excursion
+    (when-let* ((widths (mapcar #'window-max-chars-per-line
+                                (get-buffer-window-list nil nil t))))
+      (apply #'min widths))))
+
 (defun agentel-ui-line-width ()
   "Return the width of a summary line in this buffer.
 It is the narrowest window showing the buffer, up to
 `agentel-ui-max-line-width'."
-  ;; `window-max-chars-per-line' selects the window, which moves point
-  ;; to the point of that window.
-  (save-excursion
-    (apply #'min agentel-ui-max-line-width
-           (mapcar #'window-max-chars-per-line
-                   (get-buffer-window-list nil nil t)))))
+  (min agentel-ui-max-line-width
+       (or (agentel-ui-window-width) agentel-ui-max-line-width)))
 
 (defun agentel-ui-one-line (prefix text &optional width)
   "Return PREFIX followed by the first line of TEXT as one summary line.
@@ -79,18 +85,19 @@ when the width changes can be found."
      'agentel-ui-fits-width t)))
 
 (defvar agentel-ui--followers nil
-  "Buffers told when their line width changes.")
+  "Buffers told when their window width changes.")
 
 (defvar-local agentel-ui--width nil
-  "Line width of this buffer when it was last checked.")
+  "Window width of this buffer when it was last checked.")
 
 (defvar-local agentel-ui--on-width-change nil
-  "Function called with no arguments when the line width changes.")
+  "Function called with no arguments when the window width changes.")
 
 (defun agentel-ui-follow-width (function)
-  "Call FUNCTION in this buffer whenever its line width changes.
-FUNCTION makes the text depending on `agentel-ui-line-width' again."
-  (setq agentel-ui--width (agentel-ui-line-width))
+  "Call FUNCTION in this buffer whenever its window width changes.
+FUNCTION makes the text depending on `agentel-ui-window-width' or
+`agentel-ui-line-width' again."
+  (setq agentel-ui--width (agentel-ui-window-width))
   (setq agentel-ui--on-width-change function)
   (cl-pushnew (current-buffer) agentel-ui--followers)
   ;; Window hooks local to a buffer miss a window that stops showing it.
@@ -98,7 +105,7 @@ FUNCTION makes the text depending on `agentel-ui-line-width' again."
   (add-hook 'window-buffer-change-functions #'agentel-ui--check-widths))
 
 (defun agentel-ui--check-widths (&rest _)
-  "Tell the followers whose line width changed."
+  "Tell the followers whose window width changed."
   (setq agentel-ui--followers
         (seq-filter (lambda (buffer)
                       ;; Changing the major mode kills the local function.
@@ -107,7 +114,7 @@ FUNCTION makes the text depending on `agentel-ui-line-width' again."
                     agentel-ui--followers))
   (dolist (buffer agentel-ui--followers)
     (with-current-buffer buffer
-      (let ((width (agentel-ui-line-width)))
+      (let ((width (agentel-ui-window-width)))
         (unless (eql width agentel-ui--width)
           (setq agentel-ui--width width)
           (funcall agentel-ui--on-width-change))))))
