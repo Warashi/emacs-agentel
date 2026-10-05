@@ -81,6 +81,11 @@
                 (agentel-markdown-format "| a\\|b | c |\n|---|---|\n| d | e |"))))
     (should (equal (nth 2 shown) "| d    | e |"))))
 
+(ert-deftest agentel-markdown-aligns-a-row-starting-with-inline-code ()
+  (let ((shown (agentel-markdown-test-shown
+                (agentel-markdown-format "a | b\n---|---\n`long` | x"))))
+    (should (equal (nth 0 shown) "a      | b"))))
+
 (ert-deftest agentel-markdown-leaves-tables-in-code-blocks-alone ()
   (let ((text "```\n| a | b |\n|---|---|\n| long | x |\n```"))
     (should (equal (agentel-markdown-test-shown (agentel-markdown-format text))

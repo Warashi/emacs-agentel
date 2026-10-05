@@ -184,7 +184,7 @@ start and end of the code, and the end of the closing fence."
 (defun agentel-markdown--table-line-p ()
   "Return non-nil if the current line can be a row of a table."
   (and (not (eobp))
-       (not (get-text-property (point) 'agentel-markdown-code))
+       (not (get-text-property (point) 'agentel-markdown-code-block))
        (string-search "|" (buffer-substring-no-properties (pos-bol) (pos-eol)))))
 
 (defun agentel-markdown--table-cells ()
@@ -265,8 +265,8 @@ stays as it was written."
   (with-temp-buffer
     (insert text)
     (agentel-markdown--code-blocks)
-    (agentel-markdown--tables)
     (agentel-markdown--inline)
+    (agentel-markdown--tables)
     (remove-text-properties (point-min) (point-max) '(agentel-markdown-code nil))
     (buffer-string)))
 
