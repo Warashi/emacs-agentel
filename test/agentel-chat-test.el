@@ -322,6 +322,27 @@
         (should (string-match-p "m\\{100\\}" (agentel-chat-test-transcript)))
         (should (string-match-p "p\\{40\\}" (agentel-chat-test-shown)))))))
 
+(ert-deftest agentel-chat-formats-a-message-for-the-window-width ()
+  (agentel-chat-test-with-session
+    (save-window-excursion
+      (delete-other-windows)
+      (split-window-right 21)
+      (set-window-buffer (selected-window) (current-buffer))
+      (let ((agentel-ui--followers nil)
+            (agentel-ui-max-line-width 10)
+            (agentel-chat-format-message-function
+             (lambda (text width)
+               (propertize (format "%s %s" text width) 'agentel-ui-fits-width t))))
+        (agentel-ui-follow-width #'agentel-chat--fit-width)
+        (agentel-chat-test-chunk "agent_message_chunk" "Done.")
+        (agentel-conversation-finish-message session)
+        (should (string-search (format "Done. %d" (window-max-chars-per-line))
+                               (agentel-chat-test-transcript)))
+        (delete-other-windows)
+        (agentel-ui--check-widths)
+        (should (string-search (format "Done. %d" (window-max-chars-per-line))
+                               (agentel-chat-test-transcript)))))))
+
 (ert-deftest agentel-chat-keeps-the-transcript-before-the-input-in-an-unselected-window ()
   (agentel-chat-test-with-session
     (save-window-excursion

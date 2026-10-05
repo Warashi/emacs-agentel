@@ -77,7 +77,10 @@ sent to the agent as a prompt.")
 (defvar agentel-chat-format-message-function nil
   "Function returning a finished agent message text formatted for display.
 It is called with the text once the message is complete, so it never
-sees half of a construct, such as a code block, that spans chunks.")
+sees half of a construct, such as a code block, that spans chunks, and
+with the width of the window it is shown in, or nil when it is not
+shown.  Text depending on the width carries the `agentel-ui-fits-width'
+property, so it is formatted again when the width changes.")
 
 (defvar-local agentel-chat-transcript-function #'identity
   "Function choosing the entries the transcript of this buffer shows.
@@ -197,15 +200,16 @@ pinned lines its models."
 
 ;;;; Rendering
 
-(defun agentel-chat--render-text (entry _options)
-  "Render the text message ENTRY."
+(defun agentel-chat--render-text (entry options)
+  "Render the text message ENTRY for the :window-width of OPTIONS."
   (let ((text (agentel-store-get entry 'text)))
     (pcase (agentel-store-model-type entry)
       ('user (propertize (concat agentel-chat-prompt-string text)
                          'face 'agentel-chat-user-face))
       ('agent (if (and (agentel-store-get entry 'finished)
                        agentel-chat-format-message-function)
-                  (funcall agentel-chat-format-message-function text)
+                  (funcall agentel-chat-format-message-function text
+                           (plist-get options :window-width))
                 text)))))
 
 (agentel-ui-define-view 'user #'agentel-chat--render-text)
