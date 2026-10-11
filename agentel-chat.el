@@ -121,6 +121,8 @@ call `agentel-chat-render'.")
   :doc "Keymap on foldable transcript entries."
   "TAB" #'agentel-chat-toggle
   "RET" #'agentel-chat-toggle
+  "n" #'agentel-chat-next-entry
+  "p" #'agentel-chat-previous-entry
   "<mouse-1>" #'agentel-chat-toggle)
 
 (defvar-keymap agentel-chat-mode-map
@@ -197,6 +199,45 @@ pinned lines its models."
   (interactive)
   (when-let* ((entry (agentel-chat-entry-at)))
     (agentel-ui-region-toggle agentel-chat--region entry)))
+
+;; Entries are apart by text without this keymap, so the run of text
+;; with it is the whole entry, unfolded or not.
+(defun agentel-chat--entry-run-p (pos)
+  "Return non-nil if the text at POS has `agentel-chat-entry-map'."
+  (eq (get-text-property pos 'keymap) agentel-chat-entry-map))
+
+(defun agentel-chat--next-entry-start ()
+  "Return the start of the next foldable entry, or nil without one."
+  (let ((limit (marker-position agentel-chat--transcript-end))
+        (pos (point)))
+    (while (and pos (< pos limit)
+                (progn (setq pos (next-single-char-property-change pos 'keymap nil limit))
+                       (and (< pos limit) (not (agentel-chat--entry-run-p pos))))))
+    (and (< pos limit) pos)))
+
+(defun agentel-chat--previous-entry-start ()
+  "Return the start of a foldable entry in front of point, or nil.
+It is the nearest one: the entry point is in, unless point is at its start."
+  (let ((pos (if (agentel-chat--entry-run-p (point))
+                 (previous-single-char-property-change (1+ (point)) 'keymap)
+               (point))))
+    (while (and pos (not (and (< pos (point)) (agentel-chat--entry-run-p pos))))
+      (setq pos (and (> pos (point-min))
+                     (previous-single-char-property-change pos 'keymap))))
+    pos))
+
+(defun agentel-chat-next-entry ()
+  "Move point to the start of the next foldable entry."
+  (interactive)
+  (goto-char (or (agentel-chat--next-entry-start)
+                 (user-error "No next entry"))))
+
+(defun agentel-chat-previous-entry ()
+  "Move point to the start of the previous foldable entry.
+From inside an unfolded entry, move to the start of that entry first."
+  (interactive)
+  (goto-char (or (agentel-chat--previous-entry-start)
+                 (user-error "No previous entry"))))
 
 ;;;; Rendering
 

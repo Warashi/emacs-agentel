@@ -110,6 +110,7 @@ transcript grows so that the prompt stays at the bottom.
 | =C-c C-w=     | copy the code of a code block                        |
 | =TAB=         | complete a slash command, or fold the entry at point |
 | =M-p= / =M-n= | previous / next sent prompt                          |
+| =p= / =n=     | on a tool call or thought, go to the previous / next |
 
 A tool call, a folded thought, the task and latest tool call of a
 subagent and a pinned line each keep to one line, cut with =…= at the

@@ -564,3 +564,65 @@
 
 (provide 'agentel-chat-test)
 ;;; agentel-chat-test.el ends here
+
+(defun agentel-chat-test-fill-with-entries ()
+  "Show a tool call with output, a thought and a tool call in this buffer."
+  (agentel-chat-test-update
+   '((sessionUpdate . "tool_call") (toolCallId . "t1")
+     (title . "first tool") (status . "completed")
+     (content . [((type . "content")
+                  (content . ((type . "text") (text . "output body"))))])))
+  (agentel-chat-test-chunk "agent_thought_chunk" "pondering")
+  (agentel-chat-test-update
+   '((sessionUpdate . "tool_call") (toolCallId . "t2")
+     (title . "second tool") (status . "completed"))))
+
+(defun agentel-chat-test-line-at-point ()
+  "Return the line at point."
+  (buffer-substring-no-properties (line-beginning-position) (line-end-position)))
+
+(ert-deftest agentel-chat-binds-n-and-p-on-entries ()
+  (should (eq (keymap-lookup agentel-chat-entry-map "n") #'agentel-chat-next-entry))
+  (should (eq (keymap-lookup agentel-chat-entry-map "p") #'agentel-chat-previous-entry)))
+
+(ert-deftest agentel-chat-moves-between-foldable-entries ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-fill-with-entries)
+    (goto-char (point-min))
+    (agentel-chat-next-entry)
+    (should (string-match-p "Thinking" (agentel-chat-test-line-at-point)))
+    (should (bolp))
+    (agentel-chat-next-entry)
+    (should (string-match-p "second tool" (agentel-chat-test-line-at-point)))
+    (agentel-chat-previous-entry)
+    (should (string-match-p "Thinking" (agentel-chat-test-line-at-point)))
+    (agentel-chat-previous-entry)
+    (should (string-match-p "first tool" (agentel-chat-test-line-at-point)))))
+
+(ert-deftest agentel-chat-moves-from-inside-an-unfolded-entry ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-fill-with-entries)
+    (goto-char (point-min))
+    (agentel-chat-toggle)
+    (search-forward "output body")
+    (agentel-chat-next-entry)
+    (should (string-match-p "Thinking" (agentel-chat-test-line-at-point)))
+    (end-of-line)
+    (agentel-chat-previous-entry)
+    (should (string-match-p "Thinking" (agentel-chat-test-line-at-point)))
+    (agentel-chat-previous-entry)
+    (should (= (point) (point-min)))
+    (search-forward "output body")
+    (agentel-chat-previous-entry)
+    (should (= (point) (point-min)))))
+
+(ert-deftest agentel-chat-stays-at-the-first-and-last-entry ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-fill-with-entries)
+    (goto-char (point-min))
+    (should-error (agentel-chat-previous-entry) :type 'user-error)
+    (should (= (point) (point-min)))
+    (search-forward "second tool")
+    (let ((pos (point)))
+      (should-error (agentel-chat-next-entry) :type 'user-error)
+      (should (= (point) pos)))))
