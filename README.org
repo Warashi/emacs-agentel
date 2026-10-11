@@ -10,7 +10,9 @@ GUI agent apps:
 - each tool call takes one line, led by why the agent calls it
 - running subagents and background tasks stay pinned above the prompt
 - slash commands complete at the start of the prompt, and file paths
-  after an =@=
+  after an =@=; the files are listed in the background and listed
+  again by a completion once =agentel-files-refresh-interval= seconds
+  have passed
 - the header line shows the state, project and title of the session,
   then model, effort, mode, context usage and cost
 - model, effort and mode are start options of a Lisp function
