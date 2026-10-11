@@ -61,6 +61,12 @@
     (should (equal (sort (agentel-files--list dir) #'string<)
                    '("a.el" "sub/b.el")))))
 
+(ert-deftest agentel-files-lists-nothing-for-a-repository-that-ignores-all-files ()
+  (agentel-files-test-with-dir t
+    (agentel-files-test-touch dir "a.log")
+    (write-region "*.log\n.gitignore\n" nil (expand-file-name ".gitignore" dir) nil 'silent)
+    (should-not (agentel-files--list dir))))
+
 (ert-deftest agentel-files-does-not-take-the-optional-locks-of-git ()
   (agentel-files-test-with-dir t
     (let ((calls nil)

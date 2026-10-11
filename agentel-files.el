@@ -17,25 +17,27 @@
 (require 'agentel-chat)
 
 (defun agentel-files--git-list (dir)
-  "Return the files under DIR that git tracks or does not ignore, or nil.
-Git must not take the optional locks, such as refreshing the index:
-completion runs while the agent runs git in the same directory, and
-a lock held here would fail its command."
+  "Return the files under DIR that git lists, wrapped in a list, or nil.
+The list wraps them so that a repository without a file differs from
+no repository.  Git must not take the optional locks, such as
+refreshing the index: completion runs while the agent runs git in the
+same directory, and a lock held here would fail its command."
   (let ((default-directory dir))
     (with-temp-buffer
       (when (zerop (call-process "git" nil '(t nil) nil "--no-optional-locks"
                                  "ls-files" "-z" "--cached" "--others"
                                  "--exclude-standard"))
-        (split-string (buffer-string) "\0" t)))))
+        (list (split-string (buffer-string) "\0" t))))))
 
 (defun agentel-files--list (dir)
   "Return the files under DIR, relative to it."
-  (or (agentel-files--git-list dir)
-      (mapcar (lambda (file) (file-relative-name file dir))
-              (directory-files-recursively
-               dir "" nil
-               (lambda (subdir)
-                 (not (string-prefix-p "." (file-name-nondirectory subdir))))))))
+  (if-let* ((listed (agentel-files--git-list dir)))
+      (car listed)
+    (mapcar (lambda (file) (file-relative-name file dir))
+            (directory-files-recursively
+             dir "" nil
+             (lambda (subdir)
+               (not (string-prefix-p "." (file-name-nondirectory subdir))))))))
 
 (defun agentel-files-completion-at-point ()
   "Complete the path of a file after an @ in the input."
