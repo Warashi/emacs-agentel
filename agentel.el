@@ -31,6 +31,7 @@
 (require 'agentel-permission)
 (require 'agentel-elicitation)
 (require 'agentel-commands)
+(require 'agentel-files)
 (require 'agentel-resume)
 (require 'agentel-clear)
 (require 'agentel-config)

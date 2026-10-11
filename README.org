@@ -9,7 +9,8 @@ GUI agent apps:
   per subagent with its state and latest tool call
 - each tool call takes one line, led by why the agent calls it
 - running subagents and background tasks stay pinned above the prompt
-- slash commands complete at the start of the prompt
+- slash commands complete at the start of the prompt, and file paths
+  after an =@=
 - the header line shows the state, project and title of the session,
   then model, effort, mode, context usage and cost
 - model, effort and mode are start options of a Lisp function
@@ -97,20 +98,20 @@ transcript is read-only; the prompt is edited below it like any other
 text.  While point is in the prompt, the window scrolls as the
 transcript grows so that the prompt stays at the bottom.
 
-| Key           | Command                                              |
-|---------------+------------------------------------------------------|
-| =C-c C-c=     | send the prompt                                      |
-| =C-c C-k=     | cancel the current turn                              |
-| =C-c C-a=     | answer the oldest question                           |
-| =C-c C-o=     | change a session option                              |
-| =C-c C-m=     | change the mode                                      |
-| =C-c C-l=     | list the sessions                                    |
-| =C-c C-f=     | toggle =agentel-focus-mode=                          |
-| =C-c C-j=     | visit a running subagent                             |
-| =C-c C-w=     | copy the code of a code block                        |
-| =TAB=         | complete a slash command, or fold the entry at point |
-| =M-p= / =M-n= | previous / next sent prompt                          |
-| =p= / =n=     | on a tool call or thought, go to the previous / next |
+| Key           | Command                                                             |
+|---------------+---------------------------------------------------------------------|
+| =C-c C-c=     | send the prompt                                                     |
+| =C-c C-k=     | cancel the current turn                                             |
+| =C-c C-a=     | answer the oldest question                                          |
+| =C-c C-o=     | change a session option                                             |
+| =C-c C-m=     | change the mode                                                     |
+| =C-c C-l=     | list the sessions                                                   |
+| =C-c C-f=     | toggle =agentel-focus-mode=                                         |
+| =C-c C-j=     | visit a running subagent                                            |
+| =C-c C-w=     | copy the code of a code block                                       |
+| =TAB=         | complete a slash command or an =@= path, or fold the entry at point |
+| =M-p= / =M-n= | previous / next sent prompt                                         |
+| =p= / =n=     | on a tool call or thought, go to the previous / next                |
 
 A tool call, a folded thought, the task and latest tool call of a
 subagent and a pinned line each keep to one line, cut with =…= at the
