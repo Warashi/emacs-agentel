@@ -21,6 +21,37 @@
     (agentel-test-wait-for-text "Allow rm -rf build\\?")
     (agentel-test-wait-for-text "\\[Yes\\] \\[Yes, and don't ask again for rm commands\\] \\[No\\]")))
 
+(ert-deftest agentel-permission-shows-the-plan-before-approval ()
+  (agentel-test-with-started session nil
+    (agentel-permission--handle
+     (agentel-session-connection session) 99
+     `((sessionId . ,(agentel-session-id session))
+       (toolCall . ((title . "Approve Plan")
+                    (rawInput . ((plan . "# Plan\nAdd a greeting.")))))
+       (options . [((optionId . "exit-plan-default")
+                    (name . "Yes, manually approve edits"))])))
+    (should (string-match-p "# Plan\nAdd a greeting." (buffer-string)))
+    (should (string-match-p "\\[Yes, manually approve edits\\]" (buffer-string)))
+    (let ((item (seq-find (lambda (item)
+                            (eq (agentel-store-model-type item) 'permission))
+                          (agentel-conversation-items session))))
+      (agentel-permission-choose item 0)
+      (should (string-match-p "# Plan\nAdd a greeting." (buffer-string))))))
+
+(ert-deftest agentel-permission-shows-display-content-without-repeating-the-plan ()
+  (agentel-test-with-started session nil
+    (agentel-permission--handle
+     (agentel-session-connection session) 99
+     `((sessionId . ,(agentel-session-id session))
+       (toolCall . ((title . "Approve Plan")
+                    (rawInput . ((plan . "Raw plan")))
+                    (content . [((type . "content")
+                                 (content . ((type . "text")
+                                             (text . "Display plan"))))])))
+       (options . [((optionId . "reject") (name . "No"))])))
+    (should (string-match-p "Display plan" (buffer-string)))
+    (should-not (string-match-p "Raw plan" (buffer-string)))))
+
 (ert-deftest agentel-permission-button-answers-the-agent ()
   (agentel-test-with-started session nil
     (agentel-permission-test-ask)

@@ -33,38 +33,44 @@ whose conversation holds the item.")
 (defun agentel-permission--render (entry _options)
   "Render the permission request ENTRY."
   (let-alist (agentel-store-model-data entry)
-    (cond
-     (.answer (propertize (format "%s → %s" .question .answer)
-                          'face 'agentel-chat-notice-face))
-     (.withdrawn (propertize (format "%s → withdrawn" .question)
-                             'face 'agentel-chat-notice-face))
-     (t
-      (concat
-       (propertize (concat "⚠ " .question) 'face 'agentel-permission-face)
-       "\n  "
-       (mapconcat
-        #'identity
-        (seq-map-indexed
-         (lambda (choice n)
-           (buttonize (format "[%s]" choice)
-                      (lambda (_) (agentel-permission-choose entry n))))
-         .choices)
-        " "))))))
+    (concat
+     (cond
+      (.answer (propertize (format "%s → %s" .question .answer)
+                           'face 'agentel-chat-notice-face))
+      (.withdrawn (propertize (format "%s → withdrawn" .question)
+                              'face 'agentel-chat-notice-face))
+      (t (propertize (concat "⚠ " .question) 'face 'agentel-permission-face)))
+     (when .details (concat "\n\n" .details))
+     (unless (or .answer .withdrawn)
+       (concat
+        "\n  "
+        (mapconcat
+         #'identity
+         (seq-map-indexed
+          (lambda (choice n)
+            (buttonize (format "[%s]" choice)
+                       (lambda (_) (agentel-permission-choose entry n))))
+          .choices)
+         " "))))))
 
 (defun agentel-permission--update (message data)
   "Return the DATA of a permission request changed by MESSAGE.
-MESSAGE is (ask QUESTION CHOICES) when the agent asks, with CHOICES a
-list of texts, (answer CHOICE) when the user answers and (withdraw)
-when the agent no longer asks."
+MESSAGE is (ask QUESTION CHOICES [DETAILS]) when the agent asks, with
+CHOICES a list of texts and optional DETAILS to read before answering,
+\(answer CHOICE) when the user answers and (withdraw) when the agent
+no longer asks."
   (pcase message
-    (`(ask ,question ,choices)
-     `((question . ,question) (choices . ,choices) (waiting . t)))
+    (`(ask ,question ,choices . ,details)
+     `((question . ,question) (choices . ,choices) (waiting . t)
+       ,@(when (car details) `((details . ,(car details))))))
     (`(answer ,choice)
      (let-alist data
-       `((question . ,.question) (choices . ,.choices) (answer . ,choice))))
+       `((question . ,.question) (choices . ,.choices) (answer . ,choice)
+         ,@(when .details `((details . ,.details))))))
     ('(withdraw)
      (let-alist data
-       `((question . ,.question) (choices . ,.choices) (withdrawn . t))))
+       `((question . ,.question) (choices . ,.choices) (withdrawn . t)
+         ,@(when .details `((details . ,.details))))))
     (_ (agentel-store-reject message))))
 
 (agentel-conversation-define 'permission #'agentel-permission--update)
@@ -102,6 +108,11 @@ when the agent no longer asks."
   "Handle the permission request ID with PARAMS on CONNECTION."
   (if-let* ((session (agentel-session-get (alist-get 'sessionId params) connection)))
       (let* ((options (append (alist-get 'options params) nil))
+             (tool (alist-get 'toolCall params))
+             (content (agentel-conversation--tool-output (alist-get 'content tool)))
+             (details (if (string-empty-p content)
+                          (alist-get 'plan (alist-get 'rawInput tool))
+                        content))
              (item (agentel-conversation-send
                     session (cons 'permission id) 'permission
                     `(ask ,(format "Allow %s?"
@@ -109,7 +120,9 @@ when the agent no longer asks."
                                        "this tool call"))
                           ,(mapcar (lambda (o) (or (alist-get 'name o)
                                                    (alist-get 'optionId o)))
-                                   options))))
+                                   options)
+                          ,(and (stringp details) (not (string-empty-p details))
+                                details))))
              (request (list :connection connection :id id :session session
                             :options (mapcar (lambda (o) (alist-get 'optionId o))
                                              options))))
