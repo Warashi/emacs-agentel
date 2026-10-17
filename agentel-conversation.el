@@ -164,18 +164,18 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
   "Statuses of tool calls and plan steps by their names in the protocol.")
 
 (defun agentel-conversation--tool-output (content)
-  "Return the tool call CONTENT list as text."
-  (string-join
-   (delq nil
-         (mapcar
-          (lambda (item)
-            (pcase (alist-get 'type item)
-              ("content" (alist-get 'text (alist-get 'content item)))
-              ("diff" (format "%s %s" (if (alist-get 'oldText item) "Edit" "Write")
-                              (alist-get 'path item)))
-              ("terminal" nil)))
-          content))
-   "\n"))
+  "Return the tool call CONTENT list as text, or nil without textual content."
+  (when-let* ((parts
+               (delq nil
+                     (mapcar
+                      (lambda (item)
+                        (pcase (alist-get 'type item)
+                          ("content" (alist-get 'text (alist-get 'content item)))
+                          ("diff" (format "%s %s" (if (alist-get 'oldText item) "Edit" "Write")
+                                          (alist-get 'path item)))
+                          ("terminal" nil)))
+                      content))))
+    (string-join parts "\n")))
 
 (defun agentel-conversation--tool-fields (update)
   "Return the fields of a tool call told by UPDATE."

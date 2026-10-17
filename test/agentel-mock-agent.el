@@ -7,7 +7,7 @@
 
 ;; Run with `emacs --batch -Q -l test/agentel-mock-agent.el'.  It speaks
 ;; ACP over stdio and mimics the message shapes of claude-agent-acp
-;; 0.81.0.  What it does for a prompt depends on words in the prompt:
+;; 0.93.0.  What it does for a prompt depends on words in the prompt:
 ;;
 ;;   tool        a finished Read tool call
 ;;   permission  a Bash tool call that asks for permission first
@@ -17,7 +17,7 @@
 ;;   resume subagent  send work to the last finished subagent
 ;;   background  a subagent that keeps working until the client cancels
 ;;   async       a background shell command, announced like the adapter
-;;               only to a client with the AIR asyncTasks capability; it
+;;               only to a client with terminal_output capability; it
 ;;               completes when the next prompt arrives
 ;;   slow        waits until the client cancels the turn
 ;;   fail        fails the prompt request
@@ -304,59 +304,64 @@ KIND is the session update name and defaults to an agent message."
 
 (defun agentel-mock--subagent (id session-id)
   "Run a subagent under SESSION-ID, then end prompt ID."
-  (let* ((air (alist-get 'air (alist-get 'jetbrains
-                                        (alist-get '_meta agentel-mock--client-capabilities))))
-         (native (and (vectorp (alist-get 'capabilities air))
-                      (seq-contains-p (alist-get 'capabilities air)
-                                      "nativeSubagentSessions")))
+  (let* ((native (assq 'subagents agentel-mock--client-capabilities))
          (child (and native (format "task-%d" (cl-incf agentel-mock--counter))))
          (target (or child session-id)))
     (agentel-mock--say session-id "Delegating to a subagent.")
+    (agentel-mock--update
+     session-id '((sessionUpdate . "tool_call") (toolCallId . "toolu_agent")
+                  (title . "Explore the repository") (status . "pending")
+                  (rawInput . ((description . "Explore the repository")))
+                  (_meta . ((claudeCode . ((toolName . "Agent")))))))
     (when child
       (setf (alist-get 'subagent-id (gethash session-id agentel-mock--sessions))
             child)
       (agentel-mock--update
-       session-id `((sessionUpdate . "subagent_spawned")
-                    (subagentSessionId . ,child)
-                    (name . "Explore the repository")
-                    (task . "List the files and summarize them.")
-                    (capabilities . ,(make-hash-table)))))
+       session-id `((sessionUpdate . "subagent_update")
+                    (sessionId . ,child) (title . "Explore the repository")
+                    (description . "List the files and summarize them.")
+                    (capabilities . ((cancel . ,(make-hash-table))))
+                    (state . ((state . "running")))))
+      (agentel-mock--session-message session-id child "List the files and summarize them."))
     (agentel-mock--say target "I will look at the files.")
     (agentel-mock--tool target)
     (agentel-mock--say target "The repository has a README.")
     (when child
       (agentel-mock--update
-       session-id `((sessionUpdate . "subagent_state_update")
-                    (subagentSessionId . ,child)
-                    (state . "completed")))
-      (agentel-mock--update
-       session-id '((sessionUpdate . "tool_call_update")
-                    (toolCallId . "toolu_agent_orphan")
-                    (_meta . ((claudeCode . ((toolName . "Agent"))))))))
+       session-id `((sessionUpdate . "subagent_update")
+                    (sessionId . ,child)
+                    (state . ((state . "idle") (stopReason . "end_turn"))))))
+    (agentel-mock--update
+     session-id '((sessionUpdate . "tool_call_update")
+                  (toolCallId . "toolu_agent") (status . "completed")
+                  (_meta . ((claudeCode . ((toolName . "Agent")))))))
     (agentel-mock--say session-id "The subagent reported a README.")
     (agentel-mock--finish id session-id)))
+
+(defun agentel-mock--session-message (parent child text)
+  "Deliver TEXT from PARENT to CHILD."
+  (agentel-mock--update
+   child `((sessionUpdate . "session_message")
+           (messageId . ,(format "message-%d" (cl-incf agentel-mock--counter)))
+           (senderSessionId . ,parent) (recipientSessionId . ,child)
+           (content . [((type . "text") (text . ,text))]))))
 
 (defun agentel-mock--resume-subagent (id session-id)
   "Resume the last subagent of SESSION-ID and end prompt ID."
   (let* ((state (gethash session-id agentel-mock--sessions))
-         (base (alist-get 'subagent-id state))
-         (generation (1+ (or (alist-get 'subagent-generation state) 1)))
-         (child (format "%s:generation:%d" base generation)))
-    (unless base
+         (child (alist-get 'subagent-id state)))
+    (unless child
       (error "No subagent to resume"))
-    (setf (alist-get 'subagent-generation state) generation)
-    (puthash session-id state agentel-mock--sessions)
     (agentel-mock--update
-     session-id `((sessionUpdate . "subagent_spawned")
-                  (subagentSessionId . ,child)
-                  (name . "Explore the repository")
-                  (task . "Check the new files.")
-                  (capabilities . ,(make-hash-table))))
+     session-id `((sessionUpdate . "subagent_update")
+                  (sessionId . ,child) (state . ((state . "running")))))
+    (agentel-mock--session-message session-id child "Check the new files.")
     (agentel-mock--say child "I am checking the new files.")
     (agentel-mock--tool child)
     (agentel-mock--update
-     session-id `((sessionUpdate . "subagent_state_update")
-                  (subagentSessionId . ,child) (state . "completed")))
+     session-id `((sessionUpdate . "subagent_update")
+                  (sessionId . ,child)
+                  (state . ((state . "idle") (stopReason . "end_turn")))))
     (agentel-mock--say session-id "The resumed subagent checked the files.")
     (agentel-mock--finish id session-id)))
 
@@ -410,11 +415,12 @@ as soon as the subagent starts and the session goes on meanwhile."
 Like the adapter, the turn stays open while the subagent lives."
   (let ((child (format "task-%d" (cl-incf agentel-mock--counter))))
     (agentel-mock--update
-     session-id `((sessionUpdate . "subagent_spawned")
-                  (subagentSessionId . ,child)
-                  (name . "Watch the build")
-                  (task . "Tell me when the build is green.")
-                  (capabilities . ,(make-hash-table))))
+     session-id `((sessionUpdate . "subagent_update")
+                  (sessionId . ,child)
+                  (title . "Watch the build")
+                  (description . "Tell me when the build is green.")
+                  (capabilities . ((cancel . ,(make-hash-table))))
+                  (state . ((state . "running")))))
     (agentel-mock--update
      child `((sessionUpdate . "tool_call") (toolCallId . "toolu_watch")
              (title . "make watch") (kind . "execute") (status . "in_progress")))
@@ -422,26 +428,29 @@ Like the adapter, the turn stays open while the subagent lives."
           agentel-mock--prompt-id (cons id session-id))))
 
 (defun agentel-mock--async-tasks-p ()
-  "Return non-nil if the client advertised the AIR asyncTasks capability."
-  (let ((air (alist-get 'air (alist-get 'jetbrains
-                                        (alist-get '_meta agentel-mock--client-capabilities)))))
-    (and (integerp (alist-get 'version air))
-         (>= (alist-get 'version air) 1)
-         (vectorp (alist-get 'capabilities air))
-         (seq-contains-p (alist-get 'capabilities air) "asyncTasks"))))
+  "Return non-nil if the client advertised terminal output."
+  (alist-get 'terminal_output (alist-get '_meta agentel-mock--client-capabilities)))
 
 (defun agentel-mock--async (id session-id)
   "Start a background command in SESSION-ID and end prompt ID."
   (when (agentel-mock--async-tasks-p)
     (let ((task (format "bash-%d" (cl-incf agentel-mock--counter))))
       (agentel-mock--update
-       session-id `((sessionUpdate . "async_task_spawned") (asyncTaskId . ,task)
-                    (name . "npm run dev") (taskType . "shell")
-                    (description . "npm run dev") (showInTranscript . t)
-                    (canStop . t)))
+       session-id `((sessionUpdate . "tool_call") (toolCallId . ,task)
+                    (title . "Terminal") (status . "pending") (rawInput . nil)
+                    (content . [((type . "terminal") (terminalId . ,task))])
+                    (_meta . ((terminal_info . ((terminal_id . ,task)))))))
       (agentel-mock--update
-       session-id `((sessionUpdate . "async_task_progress") (asyncTaskId . ,task)
-                    (summary . "Listening on port 3000")))
+       session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,task)
+                    (title . "npm run dev")
+                    (rawInput . ((command . "npm run dev") (run_in_background . t)))))
+      (agentel-mock--update
+       session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,task)
+                    (_meta . ((terminal_output . ((terminal_id . ,task)
+                                                 (data . "Listening on port 3000")))))))
+      (agentel-mock--update
+       session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,task)
+                    (status . "completed")))
       (setq agentel-mock--async (cons session-id task))))
   (agentel-mock--say session-id "Started a background command.")
   (agentel-mock--finish id session-id))
@@ -454,8 +463,10 @@ Like the adapter, the turn stays open while the subagent lives."
     (when agentel-mock--async
       (agentel-mock--update
        (car agentel-mock--async)
-       `((sessionUpdate . "async_task_state_update")
-         (asyncTaskId . ,(cdr agentel-mock--async)) (state . "completed")))
+       `((sessionUpdate . "tool_call_update")
+         (toolCallId . ,(cdr agentel-mock--async))
+         (_meta . ((terminal_exit . ((terminal_id . ,(cdr agentel-mock--async))
+                                     (exit_code) (signal)))))))
       (setq agentel-mock--async nil))
     (agentel-mock--update
      session-id `((sessionUpdate . "session_info_update")
@@ -511,17 +522,18 @@ unknown values are rejected."
   (let ((session-id (agentel-mock--new-session (alist-get 'sessionId params))))
     (agentel-mock--say session-id "What was the plan?" "user_message_chunk")
     (agentel-mock--say session-id "The plan was to write tests first.")
-    ;; Like the adapter, replayed subagents are announced under a replay id
-    ;; and their terminal state is sent after the history.
-    (let ((child (concat session-id ":replay-subagent:toolu_1")))
+    (let ((child "task-replayed"))
+      (setf (alist-get 'subagent-id (gethash session-id agentel-mock--sessions)) child)
       (agentel-mock--update
-       session-id `((sessionUpdate . "subagent_spawned") (subagentSessionId . ,child)
-                    (name . "Review the parser") (task . "Read the parser.")
-                    (capabilities . ,(make-hash-table))))
+       session-id `((sessionUpdate . "subagent_update") (sessionId . ,child)
+                    (title . "Review the parser") (description . "Read the parser.")
+                    (state . ((state . "running")))))
+      (agentel-mock--session-message session-id child "Read the parser.")
       (agentel-mock--say child "Replayed subagent text.")
       (agentel-mock--update
-       session-id `((sessionUpdate . "subagent_state_update")
-                    (subagentSessionId . ,child) (state . "completed"))))
+       session-id `((sessionUpdate . "subagent_update")
+                    (sessionId . ,child)
+                    (state . ((state . "idle") (stopReason . "end_turn"))))))
     (agentel-mock--respond
      id `((configOptions . ,(agentel-mock--config-options
                              (gethash session-id agentel-mock--sessions)))))
@@ -581,17 +593,31 @@ unknown values are rejected."
         (remhash agentel-mock--asking agentel-mock--waiting)
         (agentel-mock--send `((jsonrpc . "2.0") (method . "$/cancel_request")
                               (params . ((requestId . ,agentel-mock--asking))))))
-      (when agentel-mock--background
+      (when (and agentel-mock--background
+                 (equal (alist-get 'sessionId (alist-get 'params message))
+                        agentel-mock--background))
         (agentel-mock--update
          (cdr agentel-mock--prompt-id)
-         `((sessionUpdate . "subagent_state_update")
-           (subagentSessionId . ,agentel-mock--background)
-           (state . "cancelled")))
-        (setq agentel-mock--background nil))
+         `((sessionUpdate . "subagent_update")
+           (sessionId . ,agentel-mock--background)
+           (state . ((state . "idle") (stopReason . "cancelled")))))
+        (setq agentel-mock--background nil)
+        (agentel-mock--say (cdr agentel-mock--prompt-id) "Parent continued.")
+        (agentel-mock--finish (car agentel-mock--prompt-id)
+                              (cdr agentel-mock--prompt-id)))
       (when agentel-mock--prompt-id
         (agentel-mock--finish (car agentel-mock--prompt-id)
                               (cdr agentel-mock--prompt-id) "cancelled")
-        (setq agentel-mock--prompt-id nil))))))
+        (setq agentel-mock--prompt-id nil))
+      (when agentel-mock--background
+        (sleep-for 0.1)
+        (agentel-mock--say agentel-mock--background "Child continued after parent cancel.")
+        (agentel-mock--update
+         (alist-get 'sessionId (alist-get 'params message))
+         `((sessionUpdate . "subagent_update")
+           (sessionId . ,agentel-mock--background)
+           (state . ((state . "idle") (stopReason . "end_turn")))))
+        (setq agentel-mock--background nil))))))
 
 (defun agentel-mock-main ()
   "Serve ACP on stdio until stdin closes."

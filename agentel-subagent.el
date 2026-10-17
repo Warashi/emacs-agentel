@@ -7,15 +7,14 @@
 
 ;; With the `subagents' client capability, claude-agent-acp runs each
 ;; subagent in its own ACP session: it announces the child with
-;; `subagent_spawned' in the parent, sends the child's messages and tool
-;; calls with the child's session id, and reports the end with
-;; `subagent_state_update'.  The Agent/Task tool call itself is not sent
-;; to the parent.
+;; `subagent_update' in the parent and sends messages and tool calls
+;; with the child's session id.  An idle child can resume under the
+;; same id; its buffer and parent item stay with it.
 ;;
 ;; Each child gets a read-only buffer of its own, so its output never
 ;; mixes with the parent's.  The parent shows one item per child with
 ;; its state and latest tool call, from which the child buffer opens.
-;; Children that have not ended are also pinned above the parent's
+;; Children at work are also pinned above the parent's
 ;; prompt, since background subagents outlive the turn that spawned
 ;; them.
 
@@ -35,18 +34,18 @@
 
 (defun agentel-subagent--capabilities ()
   "Return the client capability of hosting subagent sessions."
-  '((subagents . nil)
-    (_meta . ((jetbrains . ((air . ((version . 1)
-                                     (capabilities . ["nativeSubagentSessions"])))))))))
+  '((subagents . nil)))
 
 (defun agentel-subagent--update-task (message data)
   "Return the DATA of what a subagent works on changed by MESSAGE.
 DATA has the `task' it was given and its latest `activity'.  MESSAGE
-is (assign TASK) or (act ACTIVITY)."
+is (assign TASK), (act ACTIVITY), (state STATE) or (capabilities VALUE)."
   (pcase-let ((`(,field . ,value)
                (pcase message
                  (`(assign ,task) `(task . ,task))
                  (`(act ,activity) `(activity . ,activity))
+                 (`(state ,state) `(state . ,state))
+                 (`(capabilities ,value) `(capabilities . ,value))
                  (_ (agentel-store-reject message)))))
     (cons (cons field value) (assq-delete-all field (copy-alist data)))))
 
@@ -86,8 +85,8 @@ Its lines fit in the :width of OPTIONS."
        'agentel-subagent .child))))
 
 (defun agentel-subagent--running (session)
-  "Return the subagents of SESSION that have not ended, oldest first."
-  (seq-remove #'agentel-session-ended (agentel-session-children session)))
+  "Return the subagents of SESSION at work, oldest first."
+  (seq-filter #'agentel-session-running-p (agentel-session-children session)))
 
 (defun agentel-subagent--read-running ()
   "Ask for a running subagent of this buffer's session and return it."
@@ -172,7 +171,7 @@ of CHILD.  CHILD is kept only to open its buffer."
 (defun agentel-subagent--show (child)
   "Show the state of CHILD in its parent, as an item and in the pin.
 The item is keyed by the id of CHILD, so it is not shown before CHILD
-has one.  The pin shows CHILD until it ends."
+has one.  The pin shows CHILD while it is at work."
   (let ((parent (agentel-session-parent child))
         (seen `((name . ,(agentel-session-name child))
                 (state . ,(agentel-session-state child))
@@ -184,9 +183,9 @@ has one.  The pin shows CHILD until it ends."
                                  `(show ,child ,seen)))
     (agentel-store-dispatch (agentel-session-store parent) 'subagents
                             'agentel-subagent-running
-                            (if (agentel-session-ended child)
-                                `(forget ,child)
-                              `(show ,child ,seen)))))
+                            (if (agentel-session-running-p child)
+                                `(show ,child ,seen)
+                              `(forget ,child)))))
 
 (defun agentel-subagent--follow (child)
   "Keep the item and the pin of CHILD in its parent in step with CHILD.
@@ -208,93 +207,79 @@ the session changes and the item tells otherwise."
                 (agentel-store-get item 'waiting))
       (agentel-subagent--show session))))
 
-(defun agentel-subagent--resolve (id connection)
-  "Return a subagent active under generation ID on CONNECTION."
-  (seq-find
-   (lambda (child)
-     (and (agentel-session-parent child)
-          (or (not connection)
-              (eq (agentel-session-connection child) connection))
-          (equal id (agentel-session-data child 'subagent-current-id))))
-   (agentel-session-list)))
+(defun agentel-subagent--change (parent update)
+  "Apply the subagent UPDATE announced under PARENT."
+  (let* ((id (alist-get 'sessionId update))
+         (connection (agentel-session-connection parent))
+         (child (agentel-session-get id connection)))
+    (unless child
+      (setq child (agentel-session-create
+                   :connection connection :parent parent
+                   :cwd (agentel-session-cwd parent)))
+      (agentel-subagent--follow child)
+      (agentel-session-register child id)
+      (with-current-buffer (agentel-chat-open child)
+        (setq default-directory (or (agentel-session-cwd parent) default-directory))))
+    (unless (eq (agentel-session-parent child) parent)
+      (error "Subagent %s belongs to another parent" id))
+    (when (assq 'title update)
+      (agentel-session-send child `(retitle ,(alist-get 'title update))))
+    (when (assq 'description update)
+      (agentel-subagent--send child `(assign ,(alist-get 'description update))))
+    (when (assq 'capabilities update)
+      (agentel-subagent--send child `(capabilities ,(alist-get 'capabilities update))))
+    (when-let* ((state (alist-get 'state update))
+                (name (alist-get 'state state)))
+      (when (and (equal name "running")
+                 (eq (agentel-subagent--get child 'state) 'idle))
+        (agentel-subagent--send child '(act nil)))
+      (agentel-subagent--send child `(state ,(intern name)))
+      (when (equal name "idle")
+        (agentel-conversation-finish-message child)
+        (when-let* ((reason (alist-get 'stopReason state))
+                    ((not (equal reason "end_turn"))))
+          (agentel-conversation-note child (format "Turn ended: %s" reason) 'stop))))
+    (agentel-session-waiting-changed child)))
 
-(defun agentel-subagent--resumed-child (parent id)
-  "Return the finished child of PARENT resumed under generation ID."
-  (when (and (stringp id)
-             (string-match "\\`\\(.*\\):generation:\\([0-9]+\\)\\'" id)
-             (> (string-to-number (match-string 2 id)) 1))
-    (let ((child (agentel-session-get (match-string 1 id)
-                                      (agentel-session-connection parent))))
-      (when (and child (eq (agentel-session-parent child) parent)
-                 (agentel-session-ended child))
-        child))))
-
-(defun agentel-subagent--spawn (parent update)
-  "Create or resume the subagent announced by UPDATE under PARENT."
-  (let-alist update
-    (unless (agentel-session-get .subagentSessionId
-                                 (agentel-session-connection parent))
-      (if-let* ((child (agentel-subagent--resumed-child parent .subagentSessionId)))
-          (progn
-            (setf (alist-get 'subagent-current-id (agentel-session-alist child))
-                  .subagentSessionId)
-            (agentel-subagent--send child '(act nil))
-            (agentel-session-send child '(resume))
-            (agentel-conversation-note child (concat "Task: " (or .task ""))))
-        (let ((child (agentel-session-create
-                      :connection (agentel-session-connection parent)
-                      :parent parent
-                      :cwd (agentel-session-cwd parent))))
-          (agentel-subagent--follow child)
-          (agentel-session-send child `(retitle ,.name))
-          (agentel-session-register child .subagentSessionId)
-          (agentel-subagent--send child `(assign ,.task))
-          (with-current-buffer (agentel-chat-open child)
-            (setq default-directory (or (agentel-session-cwd parent) default-directory))
-            (agentel-conversation-note child (concat "Task: " (or .task ""))))
-          (agentel-subagent--show child))))))
-
-(defun agentel-subagent--finish (parent update)
-  "Record the end of the subagent of PARENT reported by UPDATE."
-  (let-alist update
-    (when-let* ((child (agentel-session-get .subagentSessionId
-                                            (agentel-session-connection parent))))
-      (when (and (eq (agentel-session-parent child) parent)
-                 (equal .subagentSessionId
-                        (or (agentel-session-data child 'subagent-current-id)
-                            (agentel-session-id child))))
-        (agentel-session-send child `(end ,(intern .state)))))))
+(defun agentel-subagent--message (child update)
+  "Record the session message UPDATE in CHILD."
+  (let ((text (mapconcat (lambda (block) (or (alist-get 'text block) ""))
+                         (alist-get 'content update) "\n")))
+    (agentel-conversation-note child (concat "Task: " text))))
 
 (defun agentel-subagent--running-p (child)
-  "Return non-nil if CHILD was given a task, which it works on until it ends."
-  (agentel-store-find (agentel-session-store child) 'subagent))
+  "Return non-nil while CHILD runs or requires action."
+  (memq (agentel-subagent--get child 'state) '(running requires_action)))
+
+(defun agentel-subagent--waiting-p (child)
+  "Return non-nil when CHILD is reported as requiring action."
+  (eq (agentel-subagent--get child 'state) 'requires_action))
 
 (defun agentel-subagent--note-activity (child update)
   "Remember the tool call in UPDATE as the latest activity of CHILD."
   (when-let* ((title (alist-get 'title update)))
-    (agentel-subagent--send child `(act ,title))))
-
-(defun agentel-subagent--withhold-p (session update)
-  "Withhold an orphan Agent/Task control UPDATE from the parent SESSION."
-  (and (not (agentel-session-parent session))
-       (equal (alist-get 'sessionUpdate update) "tool_call_update")
-       (member (alist-get 'toolName (alist-get 'claudeCode (alist-get '_meta update)))
-               '("Agent" "Task"))
-       (not (agentel-conversation-find
-             session (cons 'tool (alist-get 'toolCallId update))))))
+    (agentel-subagent--send child `(act ,title)))
+  (when-let* (((equal (or (alist-get 'name update)
+                          (alist-get 'toolName
+                                     (alist-get 'claudeCode (alist-get '_meta update))))
+                      "SubagentHandback"))
+              (report (alist-get 'message (alist-get 'rawInput update))))
+    (agentel-conversation-send child (cons 'subagent-report (alist-get 'toolCallId update))
+                               'notice `(show ,report))))
 
 (defun agentel-subagent--on-update (session update)
   "Handle subagent related UPDATE of SESSION."
   (pcase (alist-get 'sessionUpdate update)
-    ("subagent_spawned" (agentel-subagent--spawn session update))
-    ("subagent_state_update" (agentel-subagent--finish session update))
+    ("subagent_update" (agentel-subagent--change session update))
+    ("session_message"
+     (when (agentel-session-parent session)
+       (agentel-subagent--message session update)))
     ((or "tool_call" "tool_call_update")
      (when (agentel-session-parent session)
        (agentel-subagent--note-activity session update)))))
 
 (add-hook 'agentel-connection-capability-functions #'agentel-subagent--capabilities)
-(add-hook 'agentel-session-resolve-functions #'agentel-subagent--resolve)
-(add-hook 'agentel-session-withhold-functions #'agentel-subagent--withhold-p)
+(add-hook 'agentel-session-waiting-functions #'agentel-subagent--waiting-p)
 (add-hook 'agentel-session-running-functions #'agentel-subagent--running-p)
 (add-hook 'agentel-session-update-functions #'agentel-subagent--on-update)
 (add-hook 'agentel-session-changed-functions #'agentel-subagent--follow-waiting)

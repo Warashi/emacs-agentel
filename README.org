@@ -24,11 +24,9 @@ GUI agent apps:
 agentel does not offer file system or terminal capabilities; the agent
 uses its own tools.
 
-For Claude subagent sessions, agentel advertises both the draft ACP
-=subagents= capability and the =nativeSubagentSessions= capability of
-the JetBrains AIR extension.  The latter is needed when the ACP SDK
-does not preserve the draft field; without negotiation the adapter
-puts child output in the parent's session instead.
+For Claude subagent sessions, agentel advertises the ACP =subagents=
+capability and uses the subagents RFD notifications of
+=claude-agent-acp= 0.93.0.  It does not advertise JetBrains AIR.
 
 [[https://docs.github.com/copilot/how-tos/copilot-cli][Copilot CLI]] (=copilot --acp=) runs too, with the same model, effort
 and mode options.  A subagent of Copilot CLI shows in the transcript of
@@ -148,17 +146,24 @@ same window, buffer name, directory, model, effort and mode, and stops
 the old agent, even in the middle of a turn; =/resume= still finds the
 old conversation.
 
-Subagents that have not ended and background tasks of the agent, such
-as a shell command left running, are pinned between the transcript and
+Running subagents and background tasks of the agent, such as a shell
+command left running, are pinned between the transcript and
 the prompt, so work that outlives a turn stays in view.  Clicking a
 subagent there, or =C-c C-j=, visits its buffer.  Background tasks are
-reported through the =asyncTasks= capability of the JetBrains AIR
-extension, which agentel advertises.
+tracked through the =_meta.terminal_output= extension.  A background
+Bash command stays pinned until its terminal exits, even after its
+tool call or the parent's turn completes.  Background workflows are
+not reported by the adapter without AIR and do not appear in the pin.
 
 When Claude resumes a finished subagent with =SendMessage= in the same
-session, its new work continues in the original subagent buffer.  The
+session, its new work continues in the original subagent buffer.  An
+idle child remains available for reuse under the same session id.  The
 message sent to it appears as another =Task: …= note before its new
-output; the parent keeps one item for that subagent.
+output; the parent keeps one item for that subagent alongside its
+Agent / Task tool call.  =C-c C-k= in a child buffer cancels only that
+child; cancelling the parent does not stop background subagents.
+Reports sent through =SubagentHandback= appear in the child's
+transcript too.
 
 =agentel-focus-mode= shows only what the next input needs: the last
 prompt, the questions still open, errors and why the turn ended,

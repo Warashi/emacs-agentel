@@ -22,9 +22,7 @@
 
 (ert-deftest agentel-subagent-is-advertised ()
   (should (equal (agentel-subagent--capabilities)
-                 '((subagents . nil)
-                   (_meta . ((jetbrains . ((air . ((version . 1)
-                                                    (capabilities . ["nativeSubagentSessions"])))))))))))
+                 '((subagents . nil)))))
 
 (ert-deftest agentel-subagent-and-async-task-capabilities-share-the-wire ()
   (agentel-test-with-started session nil
@@ -32,19 +30,18 @@
                                 (alist-get '_meta
                                            (agentel-connection-info
                                             (agentel-session-connection session)))))
-           (air (alist-get 'air (alist-get 'jetbrains (alist-get '_meta received))))
-           (capabilities (alist-get 'capabilities air)))
+           (meta (alist-get '_meta received)))
       (should (assq 'subagents received))
       (should (= (cl-count '_meta received :key #'car) 1))
-      (should (equal (sort (append capabilities nil) #'string<)
-                     '("asyncTasks" "nativeSubagentSessions"))))))
+      (should (eq (alist-get 'terminal_output meta) t))
+      (should-not (alist-get 'jetbrains meta)))))
 
 (ert-deftest agentel-subagent-gets-its-own-session-and-buffer ()
   (agentel-test-with-started session nil
     (let ((child (agentel-subagent-test-run session)))
       (should child)
       (should (equal (agentel-session-name child) "Explore the repository"))
-      (should (eq (agentel-session-state child) 'completed))
+      (should (eq (agentel-session-state child) 'idle))
       (let ((text (agentel-subagent-test-text (agentel-session-buffer child))))
         (should (string-match-p "List the files and summarize them" text))
         (should (string-match-p "I will look at the files\\." text))
@@ -58,25 +55,12 @@
       (should (string-match-p "Delegating to a subagent\\." text))
       (should (string-match-p "The subagent reported a README\\." text)))))
 
-(ert-deftest agentel-subagent-hides-orphan-agent-tool-update ()
+(ert-deftest agentel-subagent-keeps-parent-agent-tool-call ()
   (agentel-test-with-started session nil
     (agentel-subagent-test-run session)
-    (should-not (agentel-conversation-find
-                 session '(tool . "toolu_agent_orphan")))
-    (should-not (string-match-p "… Tool"
-                                (agentel-subagent-test-text (current-buffer))))))
-
-(ert-deftest agentel-subagent-keeps-an-existing-agent-tool-update ()
-  (let* ((agentel-session--registry nil)
-         (session (agentel-session-create))
-         (update '((sessionUpdate . "tool_call_update")
-                   (toolCallId . "failed-agent")
-                   (status . "failed")
-                   (_meta . ((claudeCode . ((toolName . "Agent"))))))))
-    (should (agentel-subagent--withhold-p session update))
-    (agentel-conversation-send session '(tool . "failed-agent") 'tool
-                               '(update ((title . "Agent failed"))))
-    (should-not (agentel-subagent--withhold-p session update))))
+    (should (eq (agentel-store-get
+                 (agentel-conversation-find session '(tool . "toolu_agent")) 'status)
+                'done))))
 
 (ert-deftest agentel-subagent-without-negotiation-stays-in-parent ()
   (let ((agentel-connection-capability-functions
@@ -92,7 +76,7 @@
 (ert-deftest agentel-subagent-is-one-item-in-the-parent ()
   (agentel-test-with-started session nil
     (agentel-subagent-test-run session)
-    (agentel-test-wait-for-text "⎇ Explore the repository ✅")
+    (agentel-test-wait-for-text "⎇ Explore the repository 💤")
     (agentel-test-wait-for-text "Read README\\.org")))
 
 (ert-deftest agentel-subagent-has-one-item-in-the-conversation-of-the-parent ()
@@ -119,7 +103,7 @@
         (should (equal (agentel-session-children session) (list child)))
         (should (eq (agentel-session-buffer child) buffer))
         (should (equal (agentel-session-id child) id))
-        (should (eq (agentel-session-state child) 'completed))
+        (should (eq (agentel-session-state child) 'idle))
         (should (= (cl-count 'subagent (agentel-conversation-items session)
                              :key #'agentel-store-model-type)
                    1)))
@@ -133,29 +117,27 @@
         (should (string-match-p "Task: List the files" text))
         (should (string-match-p "Read README\\.org" text))))))
 
-(ert-deftest agentel-subagent-resume-shows-running-and-ignores-older-finish ()
+(ert-deftest agentel-subagent-resume-keeps-metadata-and-clears-old-activity ()
   (agentel-test-with-started session nil
     (let* ((child (agentel-subagent-test-run session))
            (id (agentel-session-id child))
-           (generation (concat id ":generation:2"))
            (connection (agentel-session-connection session)))
-      (agentel-subagent--spawn
-       session `((subagentSessionId . ,generation)
-                 (name . "Explore the repository") (task . "Check the new files.")))
-      (should (eq (agentel-session-get generation connection) child))
-      (should-not (agentel-session-get generation 'another-connection))
+      (agentel-subagent--change
+       session `((sessionId . ,id) (state . ((state . "running")))))
+      (should (eq (agentel-session-get id connection) child))
+      (should-not (agentel-session-get id 'another-connection))
       (should (eq (agentel-session-state child) 'running))
       (should (string-match-p "⎇ Explore the repository 🏃"
                               (agentel-subagent-test-pin)))
       (should-not (agentel-store-get
                    (agentel-conversation-find session (cons 'subagent id))
                    'activity))
-      (agentel-subagent--finish
-       session `((subagentSessionId . ,id) (state . "completed")))
-      (should (eq (agentel-session-state child) 'running))
-      (agentel-subagent--finish
-       session `((subagentSessionId . ,generation) (state . "completed")))
-      (should (eq (agentel-session-state child) 'completed))
+      (should (equal (agentel-subagent--get child 'task)
+                     "List the files and summarize them."))
+      (agentel-subagent--change
+       session `((sessionId . ,id)
+                 (state . ((state . "idle") (stopReason . "end_turn")))))
+      (should (eq (agentel-session-state child) 'idle))
       (should-not (agentel-subagent-test-pin)))))
 
 (ert-deftest agentel-subagent-item-waits-while-the-child-does ()
@@ -195,7 +177,7 @@
   (agentel-test-with-started session nil
     (let ((child (agentel-subagent-test-run session)))
       (goto-char (point-min))
-      (search-forward "Explore the repository")
+      (search-forward "⎇ Explore the repository")
       (agentel-subagent-open)
       (should (eq (window-buffer (selected-window)) (agentel-session-buffer child))))))
 
@@ -204,7 +186,7 @@
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
     (let ((child (car (agentel-session-children session))))
       (should (equal (agentel-session-name child) "Review the parser"))
-      (should (eq (agentel-session-state child) 'completed))
+      (should (eq (agentel-session-state child) 'idle))
       (should (string-match-p "Replayed subagent text\\."
                               (agentel-subagent-test-text (agentel-session-buffer child)))))))
 
@@ -245,7 +227,50 @@
                             (substring-no-properties (agentel-subagent-test-pin))))
     (agentel-chat-cancel)
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
+    (agentel-test-wait-until (lambda () (not (agentel-subagent-test-pin))))
     (should-not (agentel-subagent-test-pin))))
+
+(ert-deftest agentel-subagent-continues-after-parent-cancel ()
+  (agentel-test-with-started session nil
+    (let* ((child (agentel-subagent-test-background session))
+           (continued nil)
+           (agentel-session-changed-functions
+            (cons (lambda (changed)
+                    (when (and (eq changed session)
+                               (eq (agentel-session-state session) 'idle)
+                               (eq (agentel-session-state child) 'running))
+                      (setq continued t)))
+                  agentel-session-changed-functions)))
+      (agentel-chat-cancel)
+      (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
+      (should continued)
+      (agentel-test-wait-until (lambda () (eq (agentel-session-state child) 'idle)))
+      (should (string-match-p "Child continued after parent cancel"
+                              (agentel-subagent-test-text (agentel-session-buffer child)))))))
+
+(ert-deftest agentel-subagent-cancel-does-not-cancel-parent ()
+  (agentel-test-with-started session nil
+    (let ((child (agentel-subagent-test-background session)))
+      (with-current-buffer (agentel-session-buffer child)
+        (agentel-chat-cancel))
+      (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
+      (should (eq (agentel-session-state child) 'idle))
+      (should-not (agentel-session-ended child))
+      (should (string-match-p "Parent continued"
+                              (agentel-subagent-test-text (current-buffer))))
+      (should-not (string-match-p "Turn ended: cancelled"
+                                  (agentel-subagent-test-text (current-buffer)))))))
+
+(ert-deftest agentel-subagent-replayed-child-resumes-in-same-buffer ()
+  (agentel-test-with-started session '(:session-id "old-1")
+    (let* ((child (car (agentel-session-children session)))
+           (buffer (agentel-session-buffer child)))
+      (agentel-test-send "resume subagent")
+      (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
+      (should (equal (agentel-session-children session) (list child)))
+      (should (eq (agentel-session-buffer child) buffer))
+      (should (string-match-p "I am checking the new files"
+                              (agentel-subagent-test-text buffer))))))
 
 (defun agentel-subagent-test-item (seen &optional width)
   "Return the text of a subagent item sent SEEN, shown WIDTH wide."
@@ -312,6 +337,7 @@ They are shown WIDTH wide."
     (agentel-subagent--follow child)
     (agentel-session-send child '(retitle "Build"))
     (agentel-session-register child "c1")
+    (agentel-subagent--send child '(state running))
     (agentel-subagent--send child '(act "make"))
     (let ((running (agentel-store-find (agentel-session-store parent) 'subagents)))
       (should (equal (substring-no-properties (agentel-ui-view running :width 80))
@@ -319,14 +345,18 @@ They are shown WIDTH wide."
       (agentel-session-send child '(end completed))
       (should (equal (agentel-ui-view running :width 80) "")))))
 
-(ert-deftest agentel-subagent-runs-once-it-is-assigned-a-task ()
+(ert-deftest agentel-subagent-runs-only-while-reported-running ()
   (let* ((agentel-session--registry nil)
          (agentel-session-changed-functions nil)
          (child (agentel-session-create)))
     (agentel-session-register child "c1")
     (should (eq (agentel-session-state child) 'idle))
     (agentel-subagent--send child '(assign "Build it"))
-    (should (eq (agentel-session-state child) 'running))))
+    (should (eq (agentel-session-state child) 'idle))
+    (agentel-subagent--send child '(state running))
+    (should (eq (agentel-session-state child) 'running))
+    (agentel-subagent--send child '(state idle))
+    (should (eq (agentel-session-state child) 'idle))))
 
 (ert-deftest agentel-subagent-finished-is-not-pinned ()
   (agentel-test-with-started session nil
@@ -376,6 +406,62 @@ They are shown WIDTH wide."
                         #'agentel-subagent--update))
     (should-error (funcall update '(forget) nil)
                   :type 'agentel-store-unknown-message)))
+
+(ert-deftest agentel-subagent-idle-can-resume-and-wait ()
+  (let* ((agentel-session--registry nil)
+         (parent (agentel-session-create :cwd temporary-file-directory))
+         child)
+    (agentel-session-register parent "parent")
+    (unwind-protect
+        (progn
+          (agentel-session-dispatch
+           '((sessionId . "parent")
+             (update . ((sessionUpdate . "subagent_update") (sessionId . "child")
+                        (title . "Explore") (description . "Read files")
+                        (capabilities . ((cancel . nil)))
+                        (state . ((state . "running")))))))
+          (setq child (agentel-session-get "child"))
+          (should child)
+          (dolist (state '("idle" "running" "requires_action" "running" "idle"))
+            (agentel-session-dispatch
+             `((sessionId . "parent")
+               (update . ((sessionUpdate . "subagent_update") (sessionId . "child")
+                          (state . ((state . ,state) (stopReason . "end_turn")))))))
+            (should (eq (agentel-session-state child)
+                        (intern (if (equal state "requires_action") "waiting" state))))
+            (should (eq (and (agentel-session-waiting-p parent) t)
+                        (equal state "requires_action")))
+            (should-not (agentel-session-ended child))
+            (should (equal (agentel-session-name child) "Explore"))
+            (should (equal (agentel-subagent--get child 'task) "Read files"))
+            (should (assq 'cancel (agentel-subagent--get child 'capabilities))))
+          (should (equal (agentel-session-children parent) (list child))))
+      (when (and child (buffer-live-p (agentel-session-buffer child)))
+        (kill-buffer (agentel-session-buffer child))))))
+
+(ert-deftest agentel-subagent-handback-report-stays-in-the-child ()
+  (let* ((agentel-session--registry nil)
+         (parent (agentel-session-create))
+         (child (agentel-session-create :parent parent))
+         (update '((sessionUpdate . "tool_call") (toolCallId . "handback")
+                   (name . "SubagentHandback") (title . "SubagentHandback")
+                   (rawInput . ((message . "CHILD_RESUMED")))
+                   (_meta . ((claudeCode . ((toolName . "SubagentHandback"))))))))
+    (agentel-session-register child "child")
+    (dotimes (_ 2)
+      (agentel-session-dispatch `((sessionId . "child") (update . ,update))))
+    (agentel-session-dispatch
+     '((sessionId . "child")
+       (update . ((sessionUpdate . "tool_call_update") (toolCallId . "handback")
+                  (status . "completed")
+                  (content . [((type . "content")
+                               (content . ((type . "text") (text . "Report delivered"))))])))))
+    (should (= (cl-count-if (lambda (item)
+                             (string-match-p "CHILD_RESUMED"
+                                             (or (agentel-store-get item 'text) "")))
+                           (agentel-conversation-items child))
+               1))
+    (should-not (agentel-conversation-items parent))))
 
 (provide 'agentel-subagent-test)
 ;;; agentel-subagent-test.el ends here

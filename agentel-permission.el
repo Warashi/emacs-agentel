@@ -110,9 +110,9 @@ no longer asks."
       (let* ((options (append (alist-get 'options params) nil))
              (tool (alist-get 'toolCall params))
              (content (agentel-conversation--tool-output (alist-get 'content tool)))
-             (details (if (string-empty-p content)
-                          (alist-get 'plan (alist-get 'rawInput tool))
-                        content))
+             (details (if (and content (not (string-empty-p content)))
+                          content
+                        (alist-get 'plan (alist-get 'rawInput tool))))
              (item (agentel-conversation-send
                     session (cons 'permission id) 'permission
                     `(ask ,(format "Allow %s?"
