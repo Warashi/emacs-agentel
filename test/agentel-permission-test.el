@@ -52,6 +52,19 @@
     (should (string-match-p "Display plan" (buffer-string)))
     (should-not (string-match-p "Raw plan" (buffer-string)))))
 
+(ert-deftest agentel-permission-shows-the-diff-of-a-file-change ()
+  (agentel-test-with-started session nil
+    (agentel-permission--handle
+     (agentel-session-connection session) 99
+     `((sessionId . ,(agentel-session-id session))
+       (toolCall . ((title . "Edit a")
+                    (content . [((type . "diff") (path . "/tmp/a")
+                                 (oldText . "x") (newText . "y"))])))
+       (options . [((optionId . "reject") (name . "No"))])))
+    (goto-char (point-min))
+    (search-forward "+y")
+    (should (memq 'diff-added (ensure-list (get-text-property (1- (point)) 'face))))))
+
 (ert-deftest agentel-permission-button-answers-the-agent ()
   (agentel-test-with-started session nil
     (agentel-permission-test-ask)
