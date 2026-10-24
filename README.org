@@ -114,8 +114,8 @@ transcript grows so that the prompt stays at the bottom.
 | =M-p= / =M-n= | previous / next sent prompt                                         |
 | =p= / =n=     | on a tool call or thought, go to the previous / next                |
 
-A tool call, a folded thought, the task and latest tool call of a
-subagent and a pinned line each keep to one line, cut with =…= at the
+A tool call, a folded thought, the latest tool call of a subagent
+and a pinned line each keep to one line, cut with =…= at the
 narrowest window showing the buffer and at most at
 =agentel-ui-max-line-width= columns.  They are cut again when the
 windows change.  A tool call leads
