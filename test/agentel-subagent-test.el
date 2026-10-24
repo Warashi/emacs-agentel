@@ -40,7 +40,7 @@
   (agentel-test-with-started session nil
     (let ((child (agentel-subagent-test-run session)))
       (should child)
-      (should (equal (agentel-session-name child) "Explore the repository"))
+      (should (equal (agentel-session-name child) "Explore the repository (Explore)"))
       (should (eq (agentel-session-state child) 'idle))
       (let ((text (agentel-subagent-test-text (agentel-session-buffer child))))
         (should (string-match-p "List the files and summarize them" text))
@@ -76,7 +76,7 @@
 (ert-deftest agentel-subagent-is-one-item-in-the-parent ()
   (agentel-test-with-started session nil
     (agentel-subagent-test-run session)
-    (agentel-test-wait-for-text "⎇ Explore the repository 💤")
+    (agentel-test-wait-for-text "⎇ Explore the repository (Explore) 💤")
     (agentel-test-wait-for-text "Read README\\.org")))
 
 (ert-deftest agentel-subagent-has-one-item-in-the-conversation-of-the-parent ()
@@ -127,13 +127,13 @@
       (should (eq (agentel-session-get id connection) child))
       (should-not (agentel-session-get id 'another-connection))
       (should (eq (agentel-session-state child) 'running))
-      (should (string-match-p "⎇ Explore the repository 🏃"
+      (should (string-match-p "⎇ Explore the repository (Explore) 🏃"
                               (agentel-subagent-test-pin)))
       (should-not (agentel-store-get
                    (agentel-conversation-find session (cons 'subagent id))
                    'activity))
       (should (equal (agentel-subagent--get child 'task)
-                     "List the files and summarize them."))
+                     "Explore the repository"))
       (agentel-subagent--change
        session `((sessionId . ,id)
                  (state . ((state . "idle") (stopReason . "end_turn")))))
@@ -185,7 +185,7 @@
   (agentel-test-with-started session '(:session-id "old-1")
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
     (let ((child (car (agentel-session-children session))))
-      (should (equal (agentel-session-name child) "Review the parser"))
+      (should (equal (agentel-session-name child) "Review the parser (Explore)"))
       (should (eq (agentel-session-state child) 'idle))
       (should (string-match-p "Replayed subagent text\\."
                               (agentel-subagent-test-text (agentel-session-buffer child)))))))
@@ -223,7 +223,7 @@
 (ert-deftest agentel-subagent-running-is-pinned-above-the-prompt ()
   (agentel-test-with-started session nil
     (agentel-subagent-test-background session)
-    (should (string-match-p "\\`⎇ Watch the build 🏃 ↳ make watch\n\\'"
+    (should (string-match-p "\\`⎇ Watch the build (general-purpose) 🏃 ↳ make watch\n\\'"
                             (substring-no-properties (agentel-subagent-test-pin))))
     (agentel-chat-cancel)
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
@@ -281,15 +281,14 @@
                     :width width)))
 
 (defconst agentel-subagent-test-busy
-  `((name . "Build") (state . running) (task . "Build it")
+  `((name . "Build") (state . running)
     (activity . ,(concat "make all\n" (make-string 100 ?x))))
   "What is seen of a subagent whose latest tool call is a long command.")
 
 (ert-deftest agentel-subagent-item-shows-what-it-was-sent ()
   (should (equal (agentel-subagent-test-item
-                  '((name . "Build") (state . running) (task . "Build it")
-                    (activity . "make")))
-                 "⎇ Build 🏃\n    Build it\n    ↳ make")))
+                  '((name . "Build") (state . running) (activity . "make")))
+                 "⎇ Build 🏃\n    ↳ make")))
 
 (ert-deftest agentel-subagent-item-shows-the-activity-on-one-line ()
   (should (string-suffix-p "\n    ↳ make all…"
@@ -378,8 +377,8 @@ They are shown WIDTH wide."
       (cl-letf (((symbol-function 'completing-read)
                  (lambda (_prompt collection &rest _)
                    (should (equal (all-completions "" collection)
-                                  '("Watch the build")))
-                   "Watch the build")))
+                                  '("Watch the build (general-purpose)")))
+                   "Watch the build (general-purpose)")))
         (agentel-subagent-open))
       (should (eq (window-buffer (selected-window)) (agentel-session-buffer child)))
       (agentel-chat-cancel))))
@@ -432,10 +431,26 @@ They are shown WIDTH wide."
             (should (eq (and (agentel-session-waiting-p parent) t)
                         (equal state "requires_action")))
             (should-not (agentel-session-ended child))
-            (should (equal (agentel-session-name child) "Explore"))
+            (should (equal (agentel-session-name child) "Read files (Explore)"))
             (should (equal (agentel-subagent--get child 'task) "Read files"))
             (should (assq 'cancel (agentel-subagent--get child 'capabilities))))
           (should (equal (agentel-session-children parent) (list child))))
+      (when (and child (buffer-live-p (agentel-session-buffer child)))
+        (kill-buffer (agentel-session-buffer child))))))
+
+(ert-deftest agentel-subagent-is-named-by-its-task-and-role-told-apart ()
+  (let* ((agentel-session--registry nil)
+         (parent (agentel-session-create :cwd temporary-file-directory))
+         child)
+    (agentel-session-register parent "parent")
+    (unwind-protect
+        (progn
+          (agentel-subagent--change parent '((sessionId . "child") (title . "Explore")))
+          (setq child (agentel-session-get "child"))
+          (should (equal (agentel-session-name child) "Explore"))
+          (agentel-subagent--change parent '((sessionId . "child")
+                                             (description . "Read files")))
+          (should (equal (agentel-session-name child) "Read files (Explore)")))
       (when (and child (buffer-live-p (agentel-session-buffer child)))
         (kill-buffer (agentel-session-buffer child))))))
 

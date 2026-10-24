@@ -38,11 +38,13 @@
 
 (defun agentel-subagent--update-task (message data)
   "Return the DATA of what a subagent works on changed by MESSAGE.
-DATA has the `task' it was given and its latest `activity'.  MESSAGE
-is (assign TASK), (act ACTIVITY), (state STATE) or (capabilities VALUE)."
+DATA has the `task' it was given, its `role' and its latest
+`activity'.  MESSAGE is (assign TASK), (cast ROLE), (act ACTIVITY),
+\=(state STATE) or (capabilities VALUE)."
   (pcase-let ((`(,field . ,value)
                (pcase message
                  (`(assign ,task) `(task . ,task))
+                 (`(cast ,role) `(role . ,role))
                  (`(act ,activity) `(activity . ,activity))
                  (`(state ,state) `(state . ,state))
                  (`(capabilities ,value) `(capabilities . ,value))
@@ -62,6 +64,16 @@ See `agentel-subagent--update-task'."
   (when-let* ((model (agentel-store-find (agentel-session-store child) 'subagent)))
     (agentel-store-get model field)))
 
+(defun agentel-subagent--name (child)
+  "Return the name of the subagent CHILD from its task and role.
+The role alone is the same for every subagent of a kind, so the task
+leads to tell them apart."
+  (let ((task (agentel-subagent--get child 'task))
+        (role (agentel-subagent--get child 'role)))
+    (if (and task role)
+        (format "%s (%s)" task role)
+      (or task role))))
+
 (defvar-keymap agentel-subagent-item-map
   :doc "Keymap on subagent items of a parent transcript."
   "RET" #'agentel-subagent-open
@@ -76,8 +88,6 @@ Its lines fit in the :width of OPTIONS."
        (concat "⎇ "
                (propertize .name 'face 'agentel-subagent-face)
                " " (agentel-ui-state .state)
-               "\n"
-               (agentel-ui-one-line "    " .task width)
                (if .activity
                    (concat "\n" (agentel-ui-one-line "    ↳ " .activity width))
                  ""))
@@ -175,7 +185,6 @@ has one.  The pin shows CHILD while it is at work."
   (let ((parent (agentel-session-parent child))
         (seen `((name . ,(agentel-session-name child))
                 (state . ,(agentel-session-state child))
-                (task . ,(agentel-subagent--get child 'task))
                 (activity . ,(agentel-subagent--get child 'activity))
                 (waiting . ,(and (agentel-session-waiting-p child) t)))))
     (when-let* ((id (agentel-session-id child)))
@@ -223,9 +232,11 @@ the session changes and the item tells otherwise."
     (unless (eq (agentel-session-parent child) parent)
       (error "Subagent %s belongs to another parent" id))
     (when (assq 'title update)
-      (agentel-session-send child `(retitle ,(alist-get 'title update))))
+      (agentel-subagent--send child `(cast ,(alist-get 'title update))))
     (when (assq 'description update)
       (agentel-subagent--send child `(assign ,(alist-get 'description update))))
+    (when (or (assq 'title update) (assq 'description update))
+      (agentel-session-send child `(retitle ,(agentel-subagent--name child))))
     (when (assq 'capabilities update)
       (agentel-subagent--send child `(capabilities ,(alist-get 'capabilities update))))
     (when-let* ((state (alist-get 'state update))

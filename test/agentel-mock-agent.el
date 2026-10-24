@@ -318,8 +318,8 @@ KIND is the session update name and defaults to an agent message."
             child)
       (agentel-mock--update
        session-id `((sessionUpdate . "subagent_update")
-                    (sessionId . ,child) (title . "Explore the repository")
-                    (description . "List the files and summarize them.")
+                    (sessionId . ,child) (title . "Explore")
+                    (description . "Explore the repository")
                     (capabilities . ((cancel . ,(make-hash-table))))
                     (state . ((state . "running")))))
       (agentel-mock--session-message session-id child "List the files and summarize them."))
@@ -417,8 +417,8 @@ Like the adapter, the turn stays open while the subagent lives."
     (agentel-mock--update
      session-id `((sessionUpdate . "subagent_update")
                   (sessionId . ,child)
-                  (title . "Watch the build")
-                  (description . "Tell me when the build is green.")
+                  (title . "general-purpose")
+                  (description . "Watch the build")
                   (capabilities . ((cancel . ,(make-hash-table))))
                   (state . ((state . "running")))))
     (agentel-mock--update
@@ -526,7 +526,7 @@ unknown values are rejected."
       (setf (alist-get 'subagent-id (gethash session-id agentel-mock--sessions)) child)
       (agentel-mock--update
        session-id `((sessionUpdate . "subagent_update") (sessionId . ,child)
-                    (title . "Review the parser") (description . "Read the parser.")
+                    (title . "Explore") (description . "Review the parser")
                     (state . ((state . "running")))))
       (agentel-mock--session-message session-id child "Read the parser.")
       (agentel-mock--say child "Replayed subagent text.")

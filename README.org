@@ -6,7 +6,8 @@ It is written for [[https://github.com/agentclientprotocol/claude-agent-acp][cla
 GUI agent apps:
 
 - each subagent gets a buffer of its own, and the parent shows one item
-  per subagent with its state and latest tool call
+  per subagent with its state and latest tool call; a subagent is named
+  by its task, then its kind, such as =Read the parser (Explore)=
 - each tool call takes one line, led by why the agent calls it
 - running subagents and background tasks stay pinned above the prompt
 - slash commands complete at the start of the prompt, and file paths
