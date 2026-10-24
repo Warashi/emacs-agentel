@@ -317,9 +317,10 @@ full on top of the output."
     (propertize
      (if (or (not foldable) collapsed)
          header
-       (concat header "\n"
-               (propertize (agentel-chat--indent (string-trim-right body))
-                           'face 'agentel-chat-tool-body-face)))
+       (let ((text (agentel-chat--indent (string-trim-right body))))
+         ;; Appended, so the faces of a diff in the output stay on top.
+         (add-face-text-property 0 (length text) 'agentel-chat-tool-body-face t text)
+         (concat header "\n" text)))
      'keymap agentel-chat-entry-map)))
 
 (agentel-ui-define-view 'tool #'agentel-chat--render-tool :collapsed t)

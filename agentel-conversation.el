@@ -20,6 +20,7 @@
 (require 'subr-x)
 (require 'agentel-session)
 (require 'agentel-store)
+(require 'agentel-diff)
 
 (defun agentel-conversation-define (type update)
   "Let the conversation hold items of TYPE, changed by UPDATE.
@@ -171,8 +172,9 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
                       (lambda (item)
                         (pcase (alist-get 'type item)
                           ("content" (alist-get 'text (alist-get 'content item)))
-                          ("diff" (format "%s %s" (if (alist-get 'oldText item) "Edit" "Write")
-                                          (alist-get 'path item)))
+                          ("diff" (agentel-diff (alist-get 'path item)
+                                                (alist-get 'oldText item)
+                                                (alist-get 'newText item)))
                           ("terminal" nil)))
                       content))))
     (string-join parts "\n")))

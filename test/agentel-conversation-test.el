@@ -84,7 +84,9 @@
       (should (equal (alist-get 'why data) "List files"))
       (should (eq (alist-get 'status data) 'running))
       (should (equal (alist-get 'output data)
-                     "README.org\nEdit /tmp/a\nWrite /tmp/b")))))
+                     (concat "README.org\n"
+                             "--- /tmp/a\n+++ /tmp/a\n@@ -1 +1 @@\n-x\n+y\n"
+                             "--- /tmp/b\n+++ /tmp/b\n@@ -0,0 +1 @@\n+y"))))))
 
 (ert-deftest agentel-conversation-replaces-the-plan ()
   (agentel-conversation-test-with-session

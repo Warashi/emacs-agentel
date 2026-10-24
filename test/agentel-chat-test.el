@@ -189,6 +189,19 @@
     (agentel-chat-toggle)
     (should (string-match-p "file body" (agentel-chat-test-transcript)))))
 
+(ert-deftest agentel-chat-keeps-the-colors-of-a-diff-in-tool-output ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-update
+     '((sessionUpdate . "tool_call") (toolCallId . "t1") (title . "Edit the file a")
+       (status . "completed")
+       (content . [((type . "diff") (path . "/tmp/a") (oldText . "x") (newText . "y"))])))
+    (goto-char (point-min))
+    (search-forward "Edit the")
+    (agentel-chat-toggle)
+    (goto-char (point-min))
+    (search-forward "+y")
+    (should (memq 'diff-added (ensure-list (get-text-property (1- (point)) 'face))))))
+
 (ert-deftest agentel-chat-keeps-a-long-tool-title-on-one-line-until-toggled ()
   (agentel-chat-test-with-session
     (agentel-chat-test-update
