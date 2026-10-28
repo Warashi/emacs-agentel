@@ -196,7 +196,8 @@ first.  Next come the unread sessions, marked with =●=: their turn
 ended while their buffer was not shown, and the mark goes once it is.
 =n= and =p= move to the next and previous session, subagents included.
 =RET= visits a session, =a= answers its oldest question, =c= cancels
-its turn and =k= stops it.
+its turn and =k= stops it.  =TAB= hides the subagents of a session,
+leaving their count (=▸3=) on its line, or shows them again.
 
 * Design
 

@@ -110,6 +110,36 @@
                   (agentel-list-test-seen 'c :state 'idle :name "Explore" :parent 'p))
                  '("  💤 repo" "    Fix" "    └ 💤 Explore" "  🏃 two"))))
 
+(defun agentel-list-test-folded-view (folded &rest messages)
+  "Return the lines of the list after MESSAGES with the sessions FOLDED."
+  (let ((table (make-hash-table :test 'eq :weakness 'key)))
+    (dolist (session folded)
+      (puthash session t table))
+    (split-string (substring-no-properties
+                   (agentel-ui-view (agentel-store-model--make
+                                     :type 'agentel-list
+                                     :data (apply #'agentel-list-test-after messages))
+                                    :folded table))
+                  "\n" t)))
+
+(ert-deftest agentel-list-view-hides-the-subagents-of-a-folded-session-and-counts-them ()
+  (should (equal (agentel-list-test-folded-view
+                  '(p)
+                  (agentel-list-test-seen 'p :state 'idle :project "repo" :name "Fix"
+                                          :titled t)
+                  (agentel-list-test-seen 'c :state 'idle :name "Explore" :parent 'p)
+                  (agentel-list-test-seen 'g :state 'idle :name "Dig" :parent 'c)
+                  (agentel-list-test-seen 'o :state 'running :project "two" :name "two"))
+                 '("  💤 ▸2 repo" "    Fix" "  🏃 two"))))
+
+(ert-deftest agentel-list-view-folds-a-subagent-that-has-subagents ()
+  (should (equal (agentel-list-test-folded-view
+                  '(c)
+                  (agentel-list-test-seen 'p :state 'idle :project "repo")
+                  (agentel-list-test-seen 'c :state 'idle :name "Explore" :parent 'p)
+                  (agentel-list-test-seen 'g :state 'idle :name "Dig" :parent 'c))
+                 '("  💤 repo" "    └ 💤 ▸1 Explore"))))
+
 (ert-deftest agentel-list-view-puts-waiting-then-unread-sessions-first ()
   (should (equal (agentel-list-test-view
                   (agentel-list-test-seen 'a :state 'idle :project "a")
@@ -328,6 +358,40 @@
 (ert-deftest agentel-list-binds-n-and-p-to-the-next-and-previous-session ()
   (should (eq (keymap-lookup agentel-list-mode-map "n") #'agentel-list-next))
   (should (eq (keymap-lookup agentel-list-mode-map "p") #'agentel-list-previous)))
+
+(ert-deftest agentel-list-folds-and-unfolds-the-subagents-at-point ()
+  (agentel-list-test-with-sessions
+    (goto-char (point-min))
+    (agentel-list-toggle)
+    (should (equal (agentel-list-test-lines)
+                   '("  💤 ▸1 repo-one" "    Fix things" "  💤 two")))
+    (should (eq (agentel-list--session) parent))
+    (agentel-list-toggle)
+    (should (equal (agentel-list-test-lines)
+                   '("  💤 repo-one" "    Fix things"
+                     "    └ 💤 Explore"
+                     "  💤 two")))))
+
+(ert-deftest agentel-list-keeps-a-session-folded-across-refreshes ()
+  (agentel-list-test-with-sessions
+    (goto-char (point-min))
+    (agentel-list-toggle)
+    (agentel-session-send child '(start-turn))
+    (agentel-list--refresh)
+    (should (equal (agentel-list-test-lines)
+                   '("  💤 ▸1 repo-one" "    Fix things" "  💤 two")))))
+
+(ert-deftest agentel-list-does-nothing-to-fold-a-session-without-subagents ()
+  (agentel-list-test-with-sessions
+    (goto-char (point-min))
+    (search-forward "two")
+    (let ((lines (agentel-list-test-lines)))
+      (agentel-list-toggle)
+      (should (equal (agentel-list-test-lines) lines))
+      (should (eq (agentel-list--session) other)))))
+
+(ert-deftest agentel-list-binds-tab-to-fold-a-session ()
+  (should (eq (keymap-lookup agentel-list-mode-map "TAB") #'agentel-list-toggle)))
 
 (defun agentel-list-test-window ()
   "Return the window showing the list, or nil."
