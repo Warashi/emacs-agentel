@@ -53,7 +53,7 @@
 
 (defvar-local agentel-list--folded nil
   "Hash table of the sessions whose subagents the list hides.
-Its keys are weak, so a session that ended drops out of it.")
+Its keys are weak, so the table does not grow with the sessions gone.")
 
 (defvar agentel-list--refresh-timer nil
   "Timer that refreshes the list after sessions changed.")
@@ -121,12 +121,19 @@ their buffer was out of sight, until they are shown again."
                             (agentel-list--descendant-count (car entry) sessions))
                           children)))))
 
-(defun agentel-list--state (seen session sessions folded)
-  "Return the state of SESSION, SEEN, and the count of its hidden subagents.
-SESSIONS are all the sessions and FOLDED those hiding their subagents.
-The result ends with a space."
+(defun agentel-list--folded-p (session sessions folded)
+  "Return non-nil if SESSION hides its subagents in SESSIONS.
+FOLDED is the hash table of the sessions that are folded.  A session
+without subagents shows none to hide."
+  (and (gethash session folded)
+       (agentel-list--children session sessions)))
+
+(defun agentel-list--state (session seen sessions folded)
+  "Return the state of SESSION, with the count of the subagents it hides.
+SEEN is what was seen of SESSION, SESSIONS are all the sessions and
+FOLDED those folded.  The result ends with a space."
   (concat (agentel-ui-state (plist-get seen :state)) " "
-          (if (gethash session folded)
+          (if (agentel-list--folded-p session sessions folded)
               (format "▸%d " (agentel-list--descendant-count session sessions))
             "")))
 
@@ -147,9 +154,9 @@ project of its own and shows only its title."
             " "
             (if (> depth 0)
                 (concat (make-string (* 2 depth) ?\s) "└ "
-                        (agentel-list--state seen session sessions folded)
+                        (agentel-list--state session seen sessions folded)
                         (plist-get seen :name) "\n")
-              (concat (agentel-list--state seen session sessions folded)
+              (concat (agentel-list--state session seen sessions folded)
                       (plist-get seen :project) "\n"
                       (if (plist-get seen :titled)
                           (concat "    " (propertize (plist-get seen :name)
@@ -157,7 +164,7 @@ project of its own and shows only its title."
                                   "\n")
                         ""))))
     'agentel-list-session session)
-   (if (gethash session folded)
+   (if (agentel-list--folded-p session sessions folded)
        ""
      (mapconcat (pcase-lambda (`(,child . ,seen))
                   (agentel-list--session-lines child seen sessions unread
@@ -177,17 +184,18 @@ SEEN is what was seen of it and UNREAD the unread sessions."
 The option `:folded' is a hash table of the sessions hiding their
 subagents.  Sessions waiting for the user come first, then the unread ones,
 oldest first within a rank."
-  (let-alist (agentel-store-model-data model)
-    (mapconcat (pcase-lambda (`(,session . ,seen))
-                 (agentel-list--session-lines session seen .sessions .unread 0
-                                              (or (plist-get options :folded)
-                                                  (make-hash-table :test 'eq))))
-               (seq-sort-by (pcase-lambda (`(,session . ,seen))
-                              (agentel-list--rank session seen .unread))
-                            #'<
-                            (seq-remove (lambda (entry) (plist-get (cdr entry) :parent))
-                                        .sessions))
-               "")))
+  (let ((folded (or (plist-get options :folded)
+                    (make-hash-table :test 'eq))))
+    (let-alist (agentel-store-model-data model)
+      (mapconcat (pcase-lambda (`(,session . ,seen))
+                   (agentel-list--session-lines session seen .sessions .unread 0
+                                                folded))
+                 (seq-sort-by (pcase-lambda (`(,session . ,seen))
+                                (agentel-list--rank session seen .unread))
+                              #'<
+                              (seq-remove (lambda (entry) (plist-get (cdr entry) :parent))
+                                          .sessions))
+                 ""))))
 
 (agentel-store-define 'agentel-list #'agentel-list--update)
 (agentel-ui-define-view 'agentel-list #'agentel-list--view)
@@ -319,15 +327,15 @@ of the list."
 
 (defun agentel-list-toggle ()
   "Hide or show the subagents of the session at point.
-Do nothing if the session has none."
+Do nothing if the session has none and is not folded."
   (interactive)
   (let ((session (agentel-list--session)))
-    (when (agentel-list--children
-           session (agentel-list--data 'sessions))
-      (if (gethash session agentel-list--folded)
-          (remhash session agentel-list--folded)
-        (puthash session t agentel-list--folded))
-      (agentel-list--render))))
+    (cond ((gethash session agentel-list--folded)
+           (remhash session agentel-list--folded)
+           (agentel-list--render))
+          ((agentel-list--children session (agentel-list--data 'sessions))
+           (puthash session t agentel-list--folded)
+           (agentel-list--render)))))
 
 (defun agentel-list-visit ()
   "Show the buffer of the session at point."

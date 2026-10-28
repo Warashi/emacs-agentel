@@ -381,6 +381,47 @@
     (should (equal (agentel-list-test-lines)
                    '("  💤 ▸1 repo-one" "    Fix things" "  💤 two")))))
 
+(ert-deftest agentel-list-view-shows-no-count-for-a-folded-session-without-subagents ()
+  (should (equal (agentel-list-test-folded-view
+                  '(p)
+                  (agentel-list-test-seen 'p :state 'idle :project "repo"))
+                 '("  💤 repo"))))
+
+(ert-deftest agentel-list-unfolds-a-session-whose-subagents-are-gone ()
+  (agentel-list-test-with-sessions
+    (goto-char (point-min))
+    (agentel-list-toggle)
+    (agentel-list--send `(changed (:session ,child :live nil)))
+    (agentel-list--render)
+    (should (equal (agentel-list-test-lines)
+                   '("  💤 repo-one" "    Fix things" "  💤 two")))
+    (agentel-list-toggle)
+    (should-not (gethash parent agentel-list--folded))))
+
+(ert-deftest agentel-list-keeps-a-new-subagent-hidden-and-counts-it ()
+  (agentel-list-test-with-sessions
+    (goto-char (point-min))
+    (agentel-list-toggle)
+    (let ((new (agentel-session-create :parent parent :cwd "/tmp/one/")))
+      (agentel-session-register new "n")
+      (agentel-chat-open new)
+      (unwind-protect
+          (progn
+            (agentel-list--refresh)
+            (should (equal (agentel-list-test-lines)
+                           '("  💤 ▸2 repo-one" "    Fix things" "  💤 two")))
+            (should (eq (agentel-list--session) parent)))
+        (kill-buffer (agentel-session-buffer new))))))
+
+(ert-deftest agentel-list-shows-a-folded-session-waiting-for-a-subagent-first ()
+  (agentel-list-test-with-sessions
+    (goto-char (point-min))
+    (agentel-list-toggle)
+    (agentel-test-ask child)
+    (agentel-list--refresh)
+    (should (equal (agentel-list-test-lines)
+                   '("  🙋 ▸1 repo-one" "    Fix things" "  💤 two")))))
+
 (ert-deftest agentel-list-does-nothing-to-fold-a-session-without-subagents ()
   (agentel-list-test-with-sessions
     (goto-char (point-min))
