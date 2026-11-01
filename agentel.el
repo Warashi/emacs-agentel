@@ -74,9 +74,22 @@ depend on the project:
 (defcustom agentel-environment nil
   "Extra environment of the agent, as \"VAR=value\" strings.
 With `agentel-command-prefix' the variables are given to the first
-program of the prefix, which may not pass them on to the agent."
-  :type '(repeat string)
+program of the prefix, which may not pass them on to the agent.
+
+A function is called with the directory of the session and returns
+the list, so the variables can depend on the project:
+
+  (lambda (cwd)
+    (when-let* ((project (project-current nil cwd)))
+      (list (concat \"CLAUDE_CODE_SESSION_NAME=\" (project-name project)))))"
+  :type '(choice (repeat string) function)
   :group 'agentel)
+
+(defun agentel--environment (cwd)
+  "Return the extra environment of an agent started in CWD."
+  (if (functionp agentel-environment)
+      (funcall agentel-environment cwd)
+    agentel-environment))
 
 (defun agentel--command-line (agent cwd)
   "Return the program and arguments that start AGENT in CWD."
@@ -198,7 +211,7 @@ the features that handle them.
     (setf (agentel-session-connection session)
           (agentel-connection-start
            :command (car command-line) :args (cdr command-line)
-           :env agentel-environment :cwd cwd
+           :env (agentel--environment cwd) :cwd cwd
            :on-ready (lambda (_connection) (agentel--open-session session options))
            :on-failure (lambda (error)
                          (agentel--fail session

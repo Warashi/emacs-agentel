@@ -90,6 +90,16 @@ commands of all agents in =agentel-agents= that you start.
 
 =agentel-environment= goes to the first program of the prefix; pass
 the variables on yourself if the wrapper does not (=docker run -e=).
+It is a list of ="VAR=value"= strings, or a function that receives the
+session directory and returns one.  For example, to name each Claude
+Code session after its project:
+
+#+begin_src emacs-lisp
+(setq agentel-environment
+      (lambda (cwd)
+        (when-let* ((project (project-current nil cwd)))
+          (list (concat "CLAUDE_CODE_SESSION_NAME=" (project-name project))))))
+#+end_src
 
 ** Session buffer
 

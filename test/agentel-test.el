@@ -113,6 +113,20 @@
                                2)
                      '("env" "AGENTEL_WRAPPED=1"))))))
 
+(ert-deftest agentel-environment-function-gives-the-agent-variables-of-the-session-directory ()
+  (let* ((directories nil)
+         (agentel-environment (lambda (cwd)
+                                (push cwd directories)
+                                (list (concat "AGENTEL_CWD=" cwd))))
+         (agentel-command-prefix
+          (lambda (cwd)
+            (list "sh" "-c" "test \"$AGENTEL_CWD\" = \"$1\" && shift && exec \"$@\""
+                  "sh" cwd))))
+    (agentel-test-with-started session nil
+      (should (equal directories (list (agentel-session-cwd session))))
+      (agentel-test-send "hello")
+      (agentel-test-wait-for-text "Echo: hello"))))
+
 (ert-deftest agentel-start-runs-the-chosen-agent ()
   (let ((agentel-agents (list (cons 'other (append '("env" "AGENTEL_OTHER=1")
                                                    (agentel-test-mock-command))))))
