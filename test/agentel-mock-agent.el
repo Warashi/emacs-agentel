@@ -22,6 +22,8 @@
 ;;   slow        waits until the client cancels the turn
 ;;   fail        fails the prompt request
 ;;   markdown    answers with headings, emphasis, a list and code
+;;   wakeup      after the prompt ends, starts a turn of its own that
+;;               answers with markdown, as for a scheduled wakeup
 ;;
 ;; Anything else is echoed back.  The initialize response carries the
 ;; client capabilities it received under `_meta.receivedCapabilities'
@@ -488,6 +490,11 @@ Like the adapter, the turn stays open while the subagent lives."
      ((string-match-p "background" text) (agentel-mock--background id session-id))
      ((string-match-p "async" text) (agentel-mock--async id session-id))
      ((string-match-p "subagent" text) (agentel-mock--subagent id session-id))
+     ((string-match-p "wakeup" text)
+      (agentel-mock--say session-id "I will wait.")
+      (agentel-mock--finish id session-id)
+      (agentel-mock--say session-id agentel-mock--markdown)
+      (agentel-mock--usage session-id))
      ((string-match-p "markdown" text)
       (agentel-mock--say session-id agentel-mock--markdown)
       (agentel-mock--finish id session-id))

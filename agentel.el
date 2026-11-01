@@ -26,6 +26,7 @@
 (require 'agentel-session)
 (require 'agentel-connection)
 (require 'agentel-conversation)
+(require 'agentel-unprompted)
 (require 'agentel-chat)
 (require 'agentel-title)
 (require 'agentel-permission)
