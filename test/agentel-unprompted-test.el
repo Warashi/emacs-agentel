@@ -73,6 +73,14 @@
     (agentel-session-send session '(finish-turn))
     (should (eq (agentel-session-state session) 'idle))))
 
+(ert-deftest agentel-unprompted-gives-the-work-to-a-prompt-that-takes-it-over ()
+  (agentel-unprompted-test-with-session
+    (let ((agentel-session-changed-functions (list #'agentel-unprompted--on-changed)))
+      (agentel-unprompted-test-say "Woke up.")
+      (agentel-session-send session '(start-turn))
+      (agentel-session-send session '(finish-turn))
+      (should (eq (agentel-session-state session) 'idle)))))
+
 (ert-deftest agentel-unprompted-ignores-a-session-that-loads ()
   (agentel-unprompted-test-with-session
     (agentel-session-send session '(start-loading))
@@ -108,7 +116,7 @@
       (agentel-test-send "wakeup")
       (agentel-test-wait-until
        (lambda () (and (eq (agentel-session-state session) 'idle)
-                       (memq 'running (cdr (memq 'idle states))))))
+                       (memq 'running (cdr (memq 'idle (reverse states)))))))
       (let ((last (car (last (agentel-conversation-items session)))))
         (should (string-prefix-p "## Plan" (agentel-store-get last 'text)))
         (should (agentel-store-get last 'finished)))

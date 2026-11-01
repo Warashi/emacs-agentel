@@ -9,8 +9,8 @@
 ;; another session or a scheduled wakeup.  ACP v1 tells nothing of the
 ;; state of a session, so such a turn shows only as output of the agent
 ;; outside the turn of a prompt.  It ends at its result, whose usage the
-;; agent reports.  The session runs meanwhile, and its last message is
-;; complete at the end.
+;; agent reports, or when a prompt takes it over.  The session runs
+;; meanwhile, and its last message is complete at the end.
 
 ;;; Code:
 
@@ -38,15 +38,22 @@ without a turn.")
     (cond ((equal kind "usage_update")
            (when (agentel-unprompted--running-p session)
              (agentel-unprompted--set session nil)
-             (unless (agentel-session-in-turn session)
-               (agentel-conversation-finish-message session))))
+             (agentel-conversation-finish-message session)))
           ((and (member kind agentel-unprompted--work)
                 (not (agentel-session-parent session))
                 (not (agentel-session-in-turn session))
                 (not (agentel-session-loading session)))
            (agentel-unprompted--set session t)))))
 
+(defun agentel-unprompted--on-changed (session)
+  "Leave the work of SESSION to the turn of a prompt once it is in one.
+A prompt takes over a turn the agent started itself, so its usage may
+never come when the prompt fails first."
+  (when (agentel-session-in-turn session)
+    (agentel-unprompted--set session nil)))
+
 (add-hook 'agentel-session-update-functions #'agentel-unprompted--on-update)
+(add-hook 'agentel-session-changed-functions #'agentel-unprompted--on-changed)
 (add-hook 'agentel-session-running-functions #'agentel-unprompted--running-p)
 
 (provide 'agentel-unprompted)
