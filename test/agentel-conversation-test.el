@@ -60,6 +60,15 @@
     (agentel-conversation-finish-message session)
     (should (agentel-store-get (car (agentel-conversation-items session)) 'finished))))
 
+(ert-deftest agentel-conversation-starts-a-new-message-after-a-finished-one ()
+  (agentel-conversation-test-with-session
+    (agentel-conversation-test-chunk "agent_message_chunk" "Done.")
+    (agentel-conversation-finish-message session)
+    (agentel-conversation-test-chunk "agent_message_chunk" "Woke up.")
+    (should (equal (agentel-conversation-test-items session)
+                   '((agent (text . "Done.") (finished . t))
+                     (agent (text . "Woke up.")))))))
+
 (ert-deftest agentel-conversation-keeps-one-item-per-tool-call ()
   (agentel-conversation-test-with-session
     (agentel-conversation-test-update '((sessionUpdate . "tool_call") (toolCallId . "t1")

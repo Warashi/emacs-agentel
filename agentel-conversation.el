@@ -90,8 +90,7 @@ It is called with the item and non-nil when the item was added."
 ;;;; Items
 
 (defun agentel-conversation--update-text (message data)
-  "Return the DATA of a text message changed by MESSAGE.
-More text makes a finished message unfinished until it ends again."
+  "Return the DATA of a text message changed by MESSAGE."
   (pcase message
     (`(chunk ,text) `((text . ,(concat (alist-get 'text data) text))))
     ('(finish) `((text . ,(alist-get 'text data)) (finished . t)))
@@ -150,12 +149,14 @@ TYPE is `error' for errors and `stop' for why a turn ended early."
 ;;;; Updates from the agent
 
 (defun agentel-conversation--text-chunk (session type update)
-  "Add the text chunk UPDATE of SESSION to a message of TYPE."
+  "Add the text chunk UPDATE of SESSION to a message of TYPE.
+A chunk after a finished message starts another one."
   (let ((text (alist-get 'text (alist-get 'content update)))
         (store (agentel-conversation--store session)))
     (when (and text (not (string-empty-p text)))
       (if-let* ((last (agentel-store-last store))
-                ((eq (agentel-store-model-type last) type)))
+                ((eq (agentel-store-model-type last) type))
+                ((not (agentel-store-get last 'finished))))
           (agentel-store-update store last `(chunk ,text))
         (agentel-store-dispatch store nil type `(chunk ,text))))))
 
