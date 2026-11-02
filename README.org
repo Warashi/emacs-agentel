@@ -21,6 +21,8 @@ GUI agent apps:
 - model, effort and mode are start options of a Lisp function
 - a session list shows every running session, its subagents and
   whether it waits for an answer
+- the desktop is notified when a session needs the user, from a
+  terminal over SSH too
 - permission requests and AskUserQuestion forms are answered in the
   transcript or from the minibuffer
 
@@ -210,6 +212,16 @@ ended while their buffer was not shown, and the mark goes once it is.
 =RET= visits a session, =a= answers its oldest question, =c= cancels
 its turn and =k= stops it.  =TAB= hides the subagents of a session,
 leaving their count (=▸3=) on its line, or shows them again.
+
+** Notifications
+
+A session notifies the desktop each time it starts waiting for the
+user, becomes idle, fails or exits; =agentel-notify-states= narrows
+those.  Subagents notify through the session that started them.  Each
+text terminal showing a frame gets an OSC 777 notification, which
+terminal emulators such as Ghostty show on the desktop, so an Emacs
+over SSH notifies too.  Inside tmux it does not reach the terminal.
+Graphic frames on macOS notify through =osascript=.
 
 * Design
 
