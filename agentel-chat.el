@@ -129,6 +129,7 @@ call `agentel-chat-render'.")
   :doc "Keymap of `agentel-chat-mode'."
   "TAB" #'completion-at-point
   "C-c C-c" #'agentel-chat-send
+  "C-<return>" #'agentel-chat-send
   "C-c C-k" #'agentel-chat-cancel
   "C-c C-a" #'agentel-chat-answer
   "C-c C-i" #'agentel-chat-goto-input

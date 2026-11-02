@@ -113,20 +113,20 @@ transcript is read-only; the prompt is edited below it like any other
 text.  While point is in the prompt, the window scrolls as the
 transcript grows so that the prompt stays at the bottom.
 
-| Key           | Command                                                             |
-|---------------+---------------------------------------------------------------------|
-| =C-c C-c=     | send the prompt                                                     |
-| =C-c C-k=     | cancel the current turn                                             |
-| =C-c C-a=     | answer the oldest question                                          |
-| =C-c C-o=     | change a session option                                             |
-| =C-c C-m=     | change the mode                                                     |
-| =C-c C-l=     | list the sessions                                                   |
-| =C-c C-f=     | toggle =agentel-focus-mode=                                         |
-| =C-c C-j=     | visit a running subagent                                            |
-| =C-c C-w=     | copy the code of a code block                                       |
-| =TAB=         | complete a slash command or an =@= path, or fold the entry at point |
-| =M-p= / =M-n= | previous / next sent prompt                                         |
-| =p= / =n=     | on a tool call or thought, go to the previous / next                |
+| Key                 | Command                                                             |
+|---------------------+---------------------------------------------------------------------|
+| =C-c C-c= / =C-RET= | send the prompt                                                     |
+| =C-c C-k=           | cancel the current turn                                             |
+| =C-c C-a=           | answer the oldest question                                          |
+| =C-c C-o=           | change a session option                                             |
+| =C-c C-m=           | change the mode                                                     |
+| =C-c C-l=           | list the sessions                                                   |
+| =C-c C-f=           | toggle =agentel-focus-mode=                                         |
+| =C-c C-j=           | visit a running subagent                                            |
+| =C-c C-w=           | copy the code of a code block                                       |
+| =TAB=               | complete a slash command or an =@= path, or fold the entry at point |
+| =M-p= / =M-n=       | previous / next sent prompt                                         |
+| =p= / =n=           | on a tool call or thought, go to the previous / next                |
 
 A tool call, a folded thought, the latest tool call of a subagent
 and a pinned line each keep to one line, cut with =…= at the

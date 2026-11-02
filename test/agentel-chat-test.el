@@ -594,6 +594,10 @@
   "Return the line at point."
   (buffer-substring-no-properties (line-beginning-position) (line-end-position)))
 
+(ert-deftest agentel-chat-sends-the-input-with-c-return ()
+  (should (eq (keymap-lookup agentel-chat-mode-map "C-<return>") #'agentel-chat-send))
+  (should (eq (keymap-lookup agentel-chat-mode-map "C-c C-c") #'agentel-chat-send)))
+
 (ert-deftest agentel-chat-binds-n-and-p-on-entries ()
   (should (eq (keymap-lookup agentel-chat-entry-map "n") #'agentel-chat-next-entry))
   (should (eq (keymap-lookup agentel-chat-entry-map "p") #'agentel-chat-previous-entry)))
