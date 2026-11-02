@@ -43,6 +43,7 @@
 (require 'agentel-list)
 (require 'agentel-markdown)
 (require 'agentel-focus)
+(require 'agentel-notify)
 
 (defcustom agentel-agents
   '((claude "claude-agent-acp")
