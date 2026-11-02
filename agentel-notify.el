@@ -47,10 +47,11 @@
            (unless (eq state (gethash session agentel-notify--states))
              (puthash session state agentel-notify--states)
              (when (memq state agentel-notify-states)
-               (funcall agentel-notify-function
-                        (agentel-session-name session)
-                        (or (alist-get state agentel-notify--descriptions)
-                            (symbol-name state)))))))))
+               (with-demoted-errors "agentel-notify: %S"
+                 (funcall agentel-notify-function
+                          (agentel-session-name session)
+                          (or (alist-get state agentel-notify--descriptions)
+                              (symbol-name state))))))))))
 
 (defun agentel-notify--clean (text)
   "Return TEXT with each control character made a space."

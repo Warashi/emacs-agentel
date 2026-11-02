@@ -86,6 +86,12 @@
       (agentel-session-send child '(end exited))
       (should (equal notified '(("project" "Waiting for you")))))))
 
+(ert-deftest agentel-notify-keeps-a-failed-notification-from-the-session ()
+  (agentel-notify-test-with-sessions
+    (let ((agentel-notify-function (lambda (_title _body) (error "No notifier")))
+          (inhibit-message t))
+      (should (agentel-notify-test-session "s1")))))
+
 (ert-deftest agentel-notify-forgets-a-removed-session ()
   (agentel-notify-test-with-sessions
     (let ((session (agentel-notify-test-session "s1")))
