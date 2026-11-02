@@ -9,7 +9,8 @@
 ;; is notified through the terminals Emacs shows frames on.  A text
 ;; terminal gets an OSC 777 notification, which the terminal emulator
 ;; turns into one of the desktop, so a notification reaches the desktop
-;; from an Emacs over SSH too.  Subagents are left to their root
+;; from an Emacs over SSH too.  Graphic frames of macOS get one of macOS
+;; through osascript.  Subagents are left to their root
 ;; session, which waits while they do.
 
 ;;; Code:
@@ -62,12 +63,25 @@ The title ends at the first semicolon, so its own are made spaces."
           (string-replace ";" " " (agentel-notify--clean title))
           (agentel-notify--clean body)))
 
+(defun agentel-notify--macos (title body)
+  "Show a notification of macOS with TITLE and BODY."
+  ;; Passed as arguments, TITLE and BODY need no quoting in AppleScript.
+  (start-process "agentel-notify" nil "osascript"
+                 "-e" "on run argv"
+                 "-e" "display notification (item 2 of argv) with title (item 1 of argv)"
+                 "-e" "end run"
+                 title body))
+
 (defun agentel-notify-send (title body)
   "Notify the user with TITLE and BODY on each terminal showing frames."
-  (dolist (terminal (terminal-list))
-    (when (and (eq (terminal-live-p terminal) t)
-               (not (frame-initial-p terminal)))
-      (send-string-to-terminal (agentel-notify--osc title body) terminal))))
+  (let (macos)
+    (dolist (terminal (terminal-list))
+      (unless (frame-initial-p terminal)
+        (pcase (terminal-live-p terminal)
+          ('t (send-string-to-terminal (agentel-notify--osc title body) terminal))
+          ('ns (setq macos t)))))
+    (when macos
+      (agentel-notify--macos title body))))
 
 (add-hook 'agentel-session-changed-functions #'agentel-notify--on-changed)
 

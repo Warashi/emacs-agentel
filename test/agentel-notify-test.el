@@ -108,5 +108,17 @@
       (agentel-notify-send "title" "body"))
     (should (equal sent `((,(agentel-notify--osc "title" "body") tty))))))
 
+(ert-deftest agentel-notify-asks-macos-once-for-its-graphic-frames ()
+  (let (started)
+    (cl-letf (((symbol-function 'terminal-list) (lambda () '(ns ns)))
+              ((symbol-function 'frame-initial-p) #'ignore)
+              ((symbol-function 'terminal-live-p) (lambda (_terminal) 'ns))
+              ((symbol-function 'start-process)
+               (lambda (_name _buffer program &rest args) (push (cons program args) started))))
+      (agentel-notify-send "a \"b\"" "c\\d"))
+    (should (= (length started) 1))
+    (should (equal (car (car started)) "osascript"))
+    (should (equal (last (car started) 2) '("a \"b\"" "c\\d")))))
+
 (provide 'agentel-notify-test)
 ;;; agentel-notify-test.el ends here
