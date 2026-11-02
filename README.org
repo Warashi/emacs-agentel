@@ -220,8 +220,8 @@ user, becomes idle, fails or exits; =agentel-notify-states= narrows
 those.  Subagents notify through the session that started them.  Each
 text terminal showing a frame gets an OSC 777 notification, which
 terminal emulators such as Ghostty show on the desktop, so an Emacs
-over SSH notifies too.  Inside tmux it does not reach the terminal.
-Graphic frames on macOS notify through =osascript=.
+over SSH notifies too; an Emacs inside tmux is not handled.  Graphic
+frames on macOS notify through =osascript=.
 
 * Design
 
