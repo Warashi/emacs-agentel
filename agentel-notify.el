@@ -78,9 +78,10 @@ The title ends at the first semicolon, so its own are made spaces."
   (let (macos)
     (dolist (terminal (terminal-list))
       (unless (frame-initial-p terminal)
-        (pcase (terminal-live-p terminal)
-          ('t (send-string-to-terminal (agentel-notify--osc title body) terminal))
-          ('ns (setq macos t)))))
+        (cond ((eq (terminal-live-p terminal) t)
+               (send-string-to-terminal (agentel-notify--osc title body) terminal))
+              ((and (terminal-live-p terminal) (eq system-type 'darwin))
+               (setq macos t)))))
     (when macos
       (agentel-notify--macos title body))))
 
