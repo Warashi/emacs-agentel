@@ -144,21 +144,32 @@ the connection."
      :client client
      :on-request (lambda (request)
                    (agentel-connection--on-request connection request)))
-    (agentel-connection-request
-     connection "initialize"
-     `((protocolVersion . ,agentel-connection-protocol-version)
-       (clientInfo . ((name . "agentel")
-                      (version . ,(agentel-connection--version))))
-       (clientCapabilities . ,(agentel-connection--capabilities)))
-     :on-success (lambda (result)
-                   (setf (agentel-connection-info connection) result)
-                   (when on-ready (funcall on-ready connection)))
-     :on-failure (lambda (error)
-                   (when on-failure (funcall on-failure error))))
-    (add-function :after (process-sentinel (agentel-connection-process connection))
-                  (lambda (process _event)
-                    (unless (process-live-p process)
-                      (agentel-connection--on-exit connection))))
+    (let* ((failed nil)
+           (fail (lambda (error)
+                   ;; A request whose sending signalled stays pending, so
+                   ;; the exit of the agent fails it once more.
+                   (unless failed
+                     (setq failed t)
+                     (when on-failure (funcall on-failure error))))))
+      ;; The agent starts with the first request, so a missing command
+      ;; or an agent already gone signals here.
+      (condition-case err
+          (agentel-connection-request
+           connection "initialize"
+           `((protocolVersion . ,agentel-connection-protocol-version)
+             (clientInfo . ((name . "agentel")
+                            (version . ,(agentel-connection--version))))
+             (clientCapabilities . ,(agentel-connection--capabilities)))
+           :on-success (lambda (result)
+                         (setf (agentel-connection-info connection) result)
+                         (when on-ready (funcall on-ready connection)))
+           :on-failure fail)
+        (error (funcall fail `((message . ,(error-message-string err)))))))
+    (when-let* ((process (agentel-connection-process connection)))
+      (add-function :after (process-sentinel process)
+                    (lambda (process _event)
+                      (unless (process-live-p process)
+                        (agentel-connection--on-exit connection)))))
     connection))
 
 (defun agentel-connection-process (connection)

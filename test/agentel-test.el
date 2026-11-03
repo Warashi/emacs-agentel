@@ -162,6 +162,20 @@
           (agentel-test-wait-for-text "Not logged in"))
       (kill-buffer (agentel-session-buffer session)))))
 
+(ert-deftest agentel-shows-why-the-agent-could-not-start ()
+  (let* ((agentel-session--registry nil)
+         (agentel-agents '((missing "agentel-test-no-such-command")))
+         (agentel-default-agent 'missing)
+         (session (agentel-start :cwd temporary-file-directory :display nil))
+         (buffer (agentel-session-buffer session)))
+    (unwind-protect
+        (with-current-buffer buffer
+          (should (eq (agentel-session-state session) 'failed))
+          (agentel-test-wait-for-text "Could not start the agent")
+          (agentel-test-wait-for-text "agentel-test-no-such-command"))
+      (kill-buffer buffer))
+    (should-not (agentel-session-list))))
+
 (ert-deftest agentel-ended-session-refuses-input ()
   (agentel-test-with-started session nil
     (delete-process (agentel-connection-process (agentel-session-connection session)))
