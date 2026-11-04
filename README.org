@@ -23,6 +23,7 @@ GUI agent apps:
   whether it waits for an answer
 - the desktop is notified when a session needs the user, from a
   terminal over SSH too
+- macOS does not idle sleep while a session runs
 - permission requests and AskUserQuestion forms are answered in the
   transcript or from the minibuffer
 

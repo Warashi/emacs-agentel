@@ -44,6 +44,7 @@
 (require 'agentel-markdown)
 (require 'agentel-focus)
 (require 'agentel-notify)
+(require 'agentel-sleep)
 
 (defcustom agentel-agents
   '((claude "claude-agent-acp")
