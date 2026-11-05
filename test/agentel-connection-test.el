@@ -70,6 +70,36 @@
       (agentel-test-wait-until
        (lambda () (member "available_commands_update" updates))))))
 
+(ert-deftest agentel-connection-hands-updates-to-its-own-function ()
+  (let ((agentel-session--registry nil)
+        (agentel-session-update-functions nil)
+        (agentel-session-changed-functions nil)
+        routed own ready)
+    (add-hook 'agentel-session-update-functions
+              (lambda (_s _u) (setq routed t)))
+    (let* ((command (agentel-test-mock-command))
+           (conn (agentel-connection-start
+                  :command (car command) :args (cdr command)
+                  :cwd temporary-file-directory
+                  :on-ready (lambda (_c) (setq ready t))
+                  :on-update (lambda (params)
+                               (push (alist-get 'sessionUpdate
+                                                (alist-get 'update params))
+                                     own)))))
+      (unwind-protect
+          (progn
+            (agentel-test-wait-until (lambda () ready))
+            (agentel-connection-request
+             conn "session/new" `((cwd . ,temporary-file-directory) (mcpServers . []))
+             :on-success
+             (lambda (r)
+               (agentel-session-register (agentel-session-create :connection conn)
+                                         (alist-get 'sessionId r))))
+            (agentel-test-wait-until
+             (lambda () (member "available_commands_update" own)))
+            (should-not routed))
+        (agentel-connection-shutdown conn)))))
+
 (ert-deftest agentel-connection-dispatches-requests-to-handlers ()
   (let* (asked
          (agentel-connection-request-handlers

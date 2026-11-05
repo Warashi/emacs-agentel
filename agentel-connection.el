@@ -46,7 +46,7 @@ params, for example to withdraw a question on `$/cancel_request'.")
 (cl-defstruct (agentel-connection (:constructor agentel-connection--make)
                                   (:copier nil))
   "One agent process."
-  client info stderr stopping)
+  client info stderr stopping on-update)
 
 (defun agentel-connection--record-stderr (connection text)
   "Keep the last lines of the stderr TEXT of CONNECTION."
@@ -98,7 +98,9 @@ params, for example to withdraw a question on `$/cancel_request'.")
   "Handle NOTIFICATION from the agent on CONNECTION."
   (let-alist notification
     (if (equal .method "session/update")
-        (agentel-session-dispatch .params connection)
+        (if-let* ((on-update (agentel-connection-on-update connection)))
+            (funcall on-update .params)
+          (agentel-session-dispatch .params connection))
       (run-hook-with-args 'agentel-connection-notification-functions
                           connection .method .params))))
 
@@ -120,16 +122,19 @@ params, for example to withdraw a question on `$/cancel_request'.")
   (unless (agentel-connection-stopping connection)
     (run-hook-with-args 'agentel-connection-exit-functions connection)))
 
-(cl-defun agentel-connection-start (&key command args env cwd on-ready on-failure)
+(cl-defun agentel-connection-start (&key command args env cwd on-ready on-failure
+                                         on-update)
   "Start the agent COMMAND with ARGS in CWD and initialize it.
 ENV is a list of \"VAR=value\" strings added to the environment.
 ON-READY is called with the connection once the agent answered
-initialize, and ON-FAILURE with the error when it did not.  Return
-the connection."
+initialize, and ON-FAILURE with the error when it did not.  ON-UPDATE
+is called with the params of each `session/update' in place of the
+session registry, for a connection whose sessions are not shown.
+Return the connection."
   (let* ((client (acp-make-client :command command
                                   :command-params args
                                   :environment-variables env))
-         (connection (agentel-connection--make :client client))
+         (connection (agentel-connection--make :client client :on-update on-update))
          (default-directory (file-name-as-directory (or cwd default-directory))))
     (acp-subscribe-to-notifications
      :client client
