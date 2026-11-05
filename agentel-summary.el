@@ -135,10 +135,15 @@ not called once the returned connection was shut down."
          (session-id nil)
          (chunks nil)
          (connection nil)
+         (finished nil)
+         ;; An agent that cannot start fails before its connection is
+         ;; returned, with no process to stop.
          (finish (lambda (text)
-                   (unless (agentel-connection-stopping connection)
+                   (unless (or finished
+                               (and connection (agentel-connection-stopping connection)))
+                     (setq finished t)
                      (funcall callback text)
-                     (agentel-connection-shutdown connection))))
+                     (when connection (agentel-connection-shutdown connection)))))
          (fail (lambda (_error) (funcall finish nil)))
          (prompt
           (lambda ()

@@ -106,6 +106,15 @@
       (accept-process-output nil 0.5)
       (should-not answered))))
 
+(ert-deftest agentel-summary-run-answers-nil-when-the-agent-does-not-start ()
+  (agentel-summary-test-with-mock
+    (let ((agentel-agents '((mock "agentel-no-such-program")))
+          (done nil) (reply 'unset))
+      (agentel-summary-run temporary-file-directory "x"
+                           (lambda (text) (setq done t reply text)))
+      (agentel-test-wait-until (lambda () done))
+      (should-not reply))))
+
 (ert-deftest agentel-summary-run-needs-an-agent-and-a-model ()
   (let ((agentel-summary-agent '(:agent claude)))
     (should-error (agentel-summary-run temporary-file-directory "x" #'ignore)
