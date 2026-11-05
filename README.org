@@ -219,7 +219,8 @@ leaving their count (=▸3=) on its line, or shows them again.
 
 =M-x agentel-pending-next= (or =C-c C-n=) shows in the selected window
 the session after the current one among those the list puts first,
-waiting then unread, or the first of them from another buffer.  To
+waiting then unread, or the first of them from another buffer.  From
+the list, which keeps its window, it shows in another window.  To
 answer the sessions one after another from anywhere:
 
 #+begin_src emacs-lisp

@@ -20,8 +20,9 @@
 ;;;###autoload
 (defun agentel-pending-next ()
   "Show the next session that needs the user in the selected window.
-It is the one after the session of the current buffer in the order of
-`agentel-list-pending', or the first one from elsewhere."
+From the session list, which keeps its window, show it in another.
+It is the one after the session of the current buffer in the order
+of `agentel-list-pending', or the first one from elsewhere."
   (interactive)
   (let* ((pending (agentel-list-pending))
          (current (agentel-session-current))
