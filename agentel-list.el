@@ -174,10 +174,22 @@ project of its own and shows only its title."
 
 (defun agentel-list--rank (session seen unread)
   "Return where SESSION goes in the list, lower first.
-SEEN is what was seen of it and UNREAD the unread sessions."
+SEEN is what was seen of it and UNREAD the unread sessions.  Those
+that need the user rank below 2."
   (cond ((eq (plist-get seen :state) 'waiting) 0)
         ((memq session unread) 1)
         (t 2)))
+
+(defun agentel-list--ranked (data)
+  "Return the top-level entries of the list DATA in the order shown.
+Each entry is (SESSION . SEEN) with its rank, lower first, and
+sessions within a rank oldest first."
+  (let-alist data
+    (seq-sort-by #'cadr #'<
+                 (mapcar (pcase-lambda (`(,session . ,seen))
+                           (list session (agentel-list--rank session seen .unread) seen))
+                         (seq-remove (lambda (entry) (plist-get (cdr entry) :parent))
+                                     .sessions)))))
 
 (defun agentel-list--view (model options)
   "Return the text of the list MODEL shown with the plist OPTIONS.
@@ -185,16 +197,13 @@ The option `:folded' is a hash table of the sessions hiding their
 subagents.  Sessions waiting for the user come first, then the unread ones,
 oldest first within a rank."
   (let ((folded (or (plist-get options :folded)
-                    (make-hash-table :test 'eq))))
-    (let-alist (agentel-store-model-data model)
-      (mapconcat (pcase-lambda (`(,session . ,seen))
+                    (make-hash-table :test 'eq)))
+        (data (agentel-store-model-data model)))
+    (let-alist data
+      (mapconcat (pcase-lambda (`(,session ,_rank ,seen))
                    (agentel-list--session-lines session seen .sessions .unread 0
                                                 folded))
-                 (seq-sort-by (pcase-lambda (`(,session . ,seen))
-                                (agentel-list--rank session seen .unread))
-                              #'<
-                              (seq-remove (lambda (entry) (plist-get (cdr entry) :parent))
-                                          .sessions))
+                 (agentel-list--ranked data)
                  ""))))
 
 (agentel-store-define 'agentel-list #'agentel-list--update)
@@ -207,6 +216,14 @@ oldest first within a rank."
   "Return the value the data of the list has under KEY."
   (when-let* ((model (agentel-store-find agentel-list--store 'sessions)))
     (agentel-store-get model key)))
+
+(defun agentel-list-pending ()
+  "Return the top-level sessions that need the user, in the order listed.
+Those waiting for an answer come first, then the unread ones."
+  (when-let* ((model (agentel-store-find agentel-list--store 'sessions)))
+    (seq-keep (pcase-lambda (`(,session ,rank ,_seen))
+                (and (< rank 2) session))
+              (agentel-list--ranked (agentel-store-model-data model)))))
 
 (defun agentel-list--send (message)
   "Send MESSAGE to the model of the list."

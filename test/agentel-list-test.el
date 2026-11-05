@@ -223,6 +223,17 @@
     (agentel-list--refresh)
     (should (equal (car (agentel-list-test-lines)) "  🙋 repo-one"))))
 
+(ert-deftest agentel-list-pending-is-the-waiting-then-the-unread-sessions ()
+  (agentel-list-test-with-sessions
+    (agentel-session-send other '(start-turn))
+    (agentel-session-send other '(finish-turn))
+    (agentel-test-ask child)
+    (should (equal (agentel-list-pending) (list parent other)))))
+
+(ert-deftest agentel-list-pending-leaves-out-sessions-that-need-nothing ()
+  (agentel-list-test-with-sessions
+    (should-not (agentel-list-pending))))
+
 (ert-deftest agentel-list-does-not-mark-a-session-whose-turn-ended-in-sight ()
   (agentel-list-test-with-sessions
     (save-window-excursion
