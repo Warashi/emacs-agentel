@@ -120,4 +120,160 @@
     (should-error (agentel-summary-run temporary-file-directory "x" #'ignore)
                   :type 'user-error)))
 
+;;;; Summing up the sessions that need the user
+
+(defvar agentel-summary-test-runs nil
+  "Summaries asked of the fake summarizer, newest first.
+Each is a plist with the :excerpt, the :callback and :cancelled.")
+
+(defun agentel-summary-test-start (_cwd excerpt callback)
+  "Record a summary of EXCERPT to answer with CALLBACK and return its cancel."
+  (let ((run (list :excerpt excerpt :callback callback :cancelled nil)))
+    (push run agentel-summary-test-runs)
+    (lambda () (plist-put run :cancelled t))))
+
+(defun agentel-summary-test-answer (run text)
+  "Answer the summary RUN with TEXT."
+  (funcall (plist-get run :callback) text))
+
+(defmacro agentel-summary-test-with-sessions (&rest body)
+  "Run BODY with the sessions `one' and `two', none shown, summaries faked."
+  (declare (indent 0))
+  `(let ((agentel-session--registry nil)
+         (agentel-list--store (agentel-store-create))
+         (agentel-session-changed-functions (list #'agentel-list--on-changed))
+         (agentel-summary-agent '(:agent mock :model "haiku"))
+         (agentel-summary--start-function #'agentel-summary-test-start)
+         (agentel-summary--job nil)
+         (agentel-summary-test-runs nil))
+     (let ((one (agentel-session-create :cwd "/tmp/one/"))
+           (two (agentel-session-create :cwd "/tmp/two/")))
+       (agentel-session-register one "1")
+       (agentel-session-register two "2")
+       (agentel-chat-open one :input t)
+       (agentel-chat-open two :input t)
+       (agentel-conversation-prompt one "work on one")
+       (agentel-conversation-prompt two "work on two")
+       (unwind-protect
+           (save-window-excursion
+             (with-temp-buffer
+               (switch-to-buffer (current-buffer))
+               ,@body))
+         (kill-buffer (agentel-session-buffer one))
+         (kill-buffer (agentel-session-buffer two))))))
+
+(ert-deftest agentel-summary-is-off-by-default ()
+  (agentel-summary-test-with-sessions
+    (let ((agentel-summary-agent nil))
+      (agentel-test-ask one)
+      (agentel-summary--reconcile)
+      (should-not agentel-summary-test-runs))))
+
+(ert-deftest agentel-summary-sums-up-a-session-that-waits-for-the-user ()
+  (agentel-summary-test-with-sessions
+    (agentel-test-ask one)
+    (agentel-summary--reconcile)
+    (should (= (length agentel-summary-test-runs) 1))
+    (should (string-match-p "work on one" (plist-get (car agentel-summary-test-runs)
+                                                     :excerpt)))
+    (agentel-summary-test-answer (car agentel-summary-test-runs) "Goal: one")
+    (should (equal (agentel-summary-text one) "Goal: one"))))
+
+(ert-deftest agentel-summary-sums-up-a-session-whose-turn-ended-out-of-sight ()
+  (agentel-summary-test-with-sessions
+    (agentel-session-send two '(start-turn))
+    (agentel-session-send two '(finish-turn))
+    (agentel-summary--reconcile)
+    (should (string-match-p "work on two" (plist-get (car agentel-summary-test-runs)
+                                                     :excerpt)))))
+
+(ert-deftest agentel-summary-sums-up-one-session-at-a-time-in-the-order-listed ()
+  (agentel-summary-test-with-sessions
+    (agentel-session-send one '(start-turn))
+    (agentel-session-send one '(finish-turn))
+    (agentel-test-ask two)
+    (agentel-summary--reconcile)
+    (should (= (length agentel-summary-test-runs) 1))
+    (should (string-match-p "work on two" (plist-get (car agentel-summary-test-runs)
+                                                     :excerpt)))
+    (agentel-summary-test-answer (car agentel-summary-test-runs) "Goal: two")
+    (should (= (length agentel-summary-test-runs) 2))
+    (should (string-match-p "work on one" (plist-get (car agentel-summary-test-runs)
+                                                     :excerpt)))))
+
+(ert-deftest agentel-summary-keeps-the-summary-once-the-session-is-shown ()
+  (agentel-summary-test-with-sessions
+    (agentel-session-send two '(start-turn))
+    (agentel-session-send two '(finish-turn))
+    (agentel-summary--reconcile)
+    (agentel-summary-test-answer (car agentel-summary-test-runs) "Goal: two")
+    (switch-to-buffer (agentel-session-buffer two))
+    (agentel-list--forget-shown (selected-frame))
+    (agentel-summary--reconcile)
+    (should (equal (agentel-summary-text two) "Goal: two"))))
+
+(ert-deftest agentel-summary-forgets-the-summary-once-the-session-moves-on ()
+  (agentel-summary-test-with-sessions
+    (agentel-test-ask one)
+    (agentel-summary--reconcile)
+    (agentel-summary-test-answer (car agentel-summary-test-runs) "Goal: one")
+    (agentel-test-answer one)
+    (agentel-summary--reconcile)
+    (should-not (agentel-summary-text one))))
+
+(ert-deftest agentel-summary-cancels-the-summary-of-a-session-that-moved-on ()
+  (agentel-summary-test-with-sessions
+    (agentel-test-ask one)
+    (agentel-summary--reconcile)
+    (let ((run (car agentel-summary-test-runs)))
+      (agentel-test-answer one)
+      (agentel-summary--reconcile)
+      (should (plist-get run :cancelled))
+      (agentel-summary-test-answer run "Goal: stale")
+      (should-not (agentel-summary-text one)))))
+
+(ert-deftest agentel-summary-sums-up-a-session-again-when-it-waits-again ()
+  (agentel-summary-test-with-sessions
+    (agentel-test-ask one)
+    (agentel-summary--reconcile)
+    (agentel-summary-test-answer (car agentel-summary-test-runs) "Goal: first")
+    (agentel-test-answer one)
+    (agentel-summary--reconcile)
+    (agentel-conversation-send one 'second 'agentel-test-question '(ask))
+    (agentel-summary--reconcile)
+    (should (= (length agentel-summary-test-runs) 2))))
+
+(ert-deftest agentel-summary-does-not-sum-up-again-after-it-failed ()
+  (agentel-summary-test-with-sessions
+    (agentel-test-ask one)
+    (agentel-summary--reconcile)
+    (agentel-summary-test-answer (car agentel-summary-test-runs) nil)
+    (agentel-summary--reconcile)
+    (should (= (length agentel-summary-test-runs) 1))
+    (should-not (agentel-summary-text one))))
+
+(ert-deftest agentel-summary-goes-on-to-the-next-session-when-one-fails-at-once ()
+  (agentel-summary-test-with-sessions
+    (let* ((cancelled nil)
+           (agentel-summary--start-function
+            (lambda (cwd excerpt callback)
+              (if (equal cwd "/tmp/one/")
+                  (progn (funcall callback nil) (lambda () (setq cancelled t)))
+                (agentel-summary-test-start cwd excerpt callback)))))
+      (agentel-test-ask one)
+      (agentel-test-ask two)
+      (agentel-summary--reconcile)
+      (should (= (length agentel-summary-test-runs) 1))
+      (should (eq (car agentel-summary--job) two))
+      (should-not cancelled))))
+
+(ert-deftest agentel-summary-is-pinned-above-the-prompt ()
+  (agentel-summary-test-with-sessions
+    (agentel-test-ask one)
+    (agentel-summary--reconcile)
+    (agentel-summary-test-answer (car agentel-summary-test-runs) "Goal: one")
+    (should (string-match-p "Goal: one"
+                            (agentel-chat--pinned (agentel-session-store one)
+                                                  (agentel-chat--view-options one))))))
+
 ;;; agentel-summary-test.el ends here

@@ -23,6 +23,8 @@ GUI agent apps:
   whether it waits for an answer
 - one command moves to the next session that needs the user, from
   any buffer
+- an agent of your choice can sum up each session that needs the user
+  above its prompt
 - the desktop is notified when a session needs the user, from a
   terminal over SSH too
 - macOS does not idle sleep while a session runs
@@ -236,6 +238,26 @@ text terminal showing a frame gets an OSC 777 notification, which
 terminal emulators such as Ghostty show on the desktop, so an Emacs
 over SSH notifies too; an Emacs inside tmux is not handled.  Graphic
 frames on macOS notify through =osascript=.
+
+** Summaries
+
+With =agentel-summary-agent= set, each session that needs the user,
+as the list puts first, is summed up above its prompt: its goal, where
+it stands, what it asks of the user and what could be answered.  It is
+off by default; set the agent, a name in =agentel-agents=, and the
+model, a value the agent accepts:
+
+#+begin_src emacs-lisp
+(setq agentel-summary-agent '(:agent claude :model "haiku"))
+#+end_src
+
+Each summary starts the agent with =agentel-command-prefix= and
+=agentel-environment= in the directory of the session, hands it the
+title, the first prompt, the last =agentel-summary-excerpt-items= items
+and what the subagents ask, and stops it once it answered.  Its tool
+calls are refused.  Sessions are summed up one at a time in the order
+of the list.  A summary stays while the session is only looked at and
+goes once its state or conversation changes, as when it is answered.
 
 * Design
 

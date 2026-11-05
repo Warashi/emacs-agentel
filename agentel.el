@@ -42,6 +42,7 @@
 (require 'agentel-async-task)
 (require 'agentel-list)
 (require 'agentel-pending)
+(require 'agentel-summary)
 (require 'agentel-markdown)
 (require 'agentel-focus)
 (require 'agentel-notify)
