@@ -89,13 +89,13 @@ the list, so the variables can depend on the project:
   :type '(choice (repeat string) function)
   :group 'agentel)
 
-(defun agentel--environment (cwd)
+(defun agentel-agent-environment (cwd)
   "Return the extra environment of an agent started in CWD."
   (if (functionp agentel-environment)
       (funcall agentel-environment cwd)
     agentel-environment))
 
-(defun agentel--command-line (agent cwd)
+(defun agentel-agent-command-line (agent cwd)
   "Return the program and arguments that start AGENT in CWD."
   (append (if (functionp agentel-command-prefix)
               (funcall agentel-command-prefix cwd)
@@ -202,7 +202,7 @@ the features that handle them.
 
   (agentel-start :cwd \"~/src/project/\" :model \"opus\" :mode \"plan\")"
   (let* ((cwd (file-name-as-directory (expand-file-name (or cwd default-directory))))
-         (command-line (agentel--command-line agent cwd))
+         (command-line (agentel-agent-command-line agent cwd))
          (session (agentel-session-create
                    :cwd cwd
                    :agent agent
@@ -215,7 +215,7 @@ the features that handle them.
     (setf (agentel-session-connection session)
           (agentel-connection-start
            :command (car command-line) :args (cdr command-line)
-           :env (agentel--environment cwd) :cwd cwd
+           :env (agentel-agent-environment cwd) :cwd cwd
            :on-ready (lambda (_connection) (agentel--open-session session options))
            :on-failure (lambda (error)
                          (agentel--fail session
