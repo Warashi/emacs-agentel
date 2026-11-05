@@ -21,6 +21,8 @@ GUI agent apps:
 - model, effort and mode are start options of a Lisp function
 - a session list shows every running session, its subagents and
   whether it waits for an answer
+- one command moves to the next session that needs the user, from
+  any buffer
 - the desktop is notified when a session needs the user, from a
   terminal over SSH too
 - macOS does not idle sleep while a session runs
@@ -122,6 +124,7 @@ transcript grows so that the prompt stays at the bottom.
 | =C-c C-o=           | change a session option                                             |
 | =C-c C-m=           | change the mode                                                     |
 | =C-c C-l=           | list the sessions                                                   |
+| =C-c C-n=           | show the next session that needs the user                           |
 | =C-c C-f=           | toggle =agentel-focus-mode=                                         |
 | =C-c C-j=           | visit a running subagent                                            |
 | =C-c C-w=           | copy the code of a code block                                       |
@@ -213,6 +216,15 @@ ended while their buffer was not shown, and the mark goes once it is.
 =RET= visits a session, =a= answers its oldest question, =c= cancels
 its turn and =k= stops it.  =TAB= hides the subagents of a session,
 leaving their count (=▸3=) on its line, or shows them again.
+
+=M-x agentel-pending-next= (or =C-c C-n=) shows in the selected window
+the session after the current one among those the list puts first,
+waiting then unread, or the first of them from another buffer.  To
+answer the sessions one after another from anywhere:
+
+#+begin_src emacs-lisp
+(keymap-global-set "C-c n" #'agentel-pending-next)
+#+end_src
 
 ** Notifications
 
