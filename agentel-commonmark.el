@@ -1336,7 +1336,7 @@ The domain may have no period if SHORT."
         char)
     (while (and (setq char (agentel-commonmark--peek text index))
                 (or (agentel-commonmark--alnum-p char) (memq char '(?- ?_ ?.))
-                    (> char 127)))
+                    (and (> char 127) (not (agentel-commonmark--cjk-p char)))))
       (pcase char
         (?_ (cl-incf underscores))
         (?. (setq last-underscores underscores
@@ -1349,11 +1349,14 @@ The domain may have no period if SHORT."
          index)))
 
 (defun agentel-commonmark--link-end (text start end)
-  "Return the end of the extended autolink from START of TEXT, ending by END."
+  "Return the end of the extended autolink from START of TEXT, ending by END.
+Unlike GFM, a CJK character ends it too, as Japanese text goes on
+without a space after a URL."
   (let ((index start))
     (while (and (< index (length text))
                 (not (agentel-commonmark--whitespace-p (aref text index)))
-                (not (eq (aref text index) ?<)))
+                (not (eq (aref text index) ?<))
+                (not (agentel-commonmark--cjk-p (aref text index))))
       (cl-incf index))
     (setq end (max end index))
     (let ((trimming t))
@@ -1373,9 +1376,12 @@ The domain may have no period if SHORT."
     end))
 
 (defun agentel-commonmark--autolink-at (text index)
-  "Return (START END DESTINATION) of an extended autolink at INDEX of TEXT."
+  "Return (START END DESTINATION) of an extended autolink at INDEX of TEXT.
+Unlike GFM, it may start after a CJK character, as Japanese text goes
+on without a space before a URL."
   (let ((boundary (or (= index 0)
-                      (memq (aref text (1- index)) '(?\s ?\t ?\n ?* ?_ ?~ ?\()))))
+                      (memq (aref text (1- index)) '(?\s ?\t ?\n ?* ?_ ?~ ?\())
+                      (agentel-commonmark--cjk-p (aref text (1- index))))))
     (cond
      ((and boundary (string-prefix-p "www." (substring text index)))
       (when-let* ((domain (agentel-commonmark--domain-end text index nil))

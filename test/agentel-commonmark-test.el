@@ -116,5 +116,26 @@
   (should (equal (agentel-commonmark-test--inlines "a~~a()~~あ")
                  '("a" (strikethrough nil "a()") "あ"))))
 
+(defun agentel-commonmark-test--links (markdown)
+  "Return the destinations of the links of the paragraph MARKDOWN."
+  (cl-loop for inline in (agentel-commonmark-test--inlines markdown)
+           when (and (consp inline) (eq (car inline) 'link))
+           collect (plist-get (cadr inline) :destination)))
+
+(ert-deftest agentel-commonmark-ends-a-bare-url-at-cjk ()
+  (should (equal (agentel-commonmark-test--links
+                  "(https://code.claude.com/docs/en/permissions)。わかったことは")
+                 '("https://code.claude.com/docs/en/permissions")))
+  (should (equal (agentel-commonmark-test--links "https://example.com。")
+                 '("https://example.com")))
+  (should (equal (agentel-commonmark-test--links "www.example.com、次に")
+                 '("http://www.example.com"))))
+
+(ert-deftest agentel-commonmark-starts-a-bare-url-after-cjk ()
+  (should (equal (agentel-commonmark-test--links "詳細はhttps://example.com/docsを参照。")
+                 '("https://example.com/docs")))
+  (should (equal (agentel-commonmark-test--links "（https://example.com）")
+                 '("https://example.com"))))
+
 (provide 'agentel-commonmark-test)
 ;;; agentel-commonmark-test.el ends here
