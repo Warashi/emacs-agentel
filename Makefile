@@ -4,10 +4,21 @@ BATCH = $(EMACS) --batch -Q -L . -L test
 SOURCES = $(wildcard agentel*.el)
 TESTS = $(wildcard test/*-test.el)
 
-.PHONY: test lint compile checkdoc clean
+PYTHON ?= python3
+SPEC = test/spec
 
-test:
+.PHONY: test test-spec spec lint compile checkdoc clean
+
+test: test-spec
 	$(BATCH) -l ert $(addprefix -l ,$(TESTS)) -f ert-run-tests-batch-and-exit
+
+test-spec:
+	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m unittest discover -s $(SPEC)
+
+# Regenerate the test cases taken from the specs, to be reviewed.
+spec:
+	$(PYTHON) $(SPEC)/convert.py $(SPEC)/commonmark-0.31.2.json $(SPEC)/gfm-27d942c.txt \
+	  > $(SPEC)/expected.eld
 
 lint: compile checkdoc
 

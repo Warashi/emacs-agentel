@@ -54,6 +54,7 @@
           packages = [
             (emacsFor pkgs)
             pkgs.git
+            pkgs.python3
             pkgs.tmux
           ];
         };
