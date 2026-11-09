@@ -84,5 +84,17 @@
                  (agentel-commonmark-parse markdown) 0 (length markdown)))
     (should (equal (plist-get (cadr (nth 2 (agentel-commonmark-parse markdown))) :end) 4))))
 
+(ert-deftest agentel-commonmark-places-the-backticks-of-code-with-an-escaped-pipe ()
+  (let* ((markdown "| `\\|` |\n|---|\n")
+         (code (nth 2 (nth 2 (nth 2 (nth 2 (agentel-commonmark-parse markdown))))))
+         (attributes (cadr code)))
+    (should (eq (car code) 'code))
+    (should (equal (substring markdown (plist-get attributes :begin)
+                              (plist-get attributes :inner-begin))
+                   "`"))
+    (should (equal (substring markdown (plist-get attributes :inner-begin)
+                              (plist-get attributes :inner-end))
+                   "\\|"))))
+
 (provide 'agentel-commonmark-test)
 ;;; agentel-commonmark-test.el ends here

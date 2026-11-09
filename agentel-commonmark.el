@@ -550,16 +550,18 @@ HEADER says whether it is the header row."
               (cl-decf end))
             (setf (agentel-commonmark--b-begin block) (+ position (car cell))
                   (agentel-commonmark--b-end block) (+ position (cdr cell)))
-            ;; An escaped pipe stands for a pipe, even in code.
+            ;; An escaped pipe stands for a pipe, even in code, and is
+            ;; placed where its backslash is.
             (let ((index start))
               (while (< index end)
-                (let ((next (or (string-search "\\|" text index) end)))
-                  (setq next (min next end))
-                  (agentel-commonmark--add-content
-                   block (substring text index next) (+ position index))
+                (let ((next (min end (or (string-search "\\|" text index) end))))
+                  (when (> next index)
+                    (agentel-commonmark--add-content
+                     block (substring text index next) (+ position index)))
                   (setq index next)
                   (when (< index end)
-                    (cl-incf index))))
+                    (agentel-commonmark--add-content block "|" (+ position index))
+                    (cl-incf index 2))))
               (when (= start end)
                 (agentel-commonmark--add-content block "" (+ position start))))))
         (push block children)))
