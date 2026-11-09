@@ -58,7 +58,7 @@
   "Id of the request to the client that a cancel withdraws.")
 (defvar agentel-mock--counter 0)
 (defconst agentel-mock--markdown
-  "## Plan\n\nI will **change** `agentel-chat.el` and *then* test it:\n\n* write a test\n* run [make](https://www.gnu.org/software/make/)\n\n```emacs-lisp\n(defun agentel-hello ()\n  \"Say hello.\"\n  (message \"hello\"))\n```\n"
+  "## Plan\n\nI will **change** `agentel-chat.el` and *then* test it:\n\n* write a test\n* run [make](https://www.gnu.org/software/make/)\n* ~~skip the docs~~ read https://www.gnu.org/software/emacs/manual/ first\n\n| File | Change |\n|---|---|\n| `agentel-chat.el` | greet |\n| `test/agentel-chat-test.el` | test the greeting |\n\n```emacs-lisp\n(defun agentel-hello ()\n  \"Say hello.\"\n  (message \"hello\"))\n```\n"
   "Reply to a prompt that asks for markdown.")
 (defvar agentel-mock-flavor 'claude
   "Agent whose session config options the mock mimics, claude or copilot.")
