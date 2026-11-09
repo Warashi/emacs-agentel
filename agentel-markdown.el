@@ -5,9 +5,11 @@
 
 ;;; Commentary:
 
-;; Agents answer in Markdown.  Once a message is complete, its headings,
-;; emphasis, inline code, links and fenced code blocks are highlighted;
-;; code blocks are fontified with the major mode of their language.
+;; Agents answer in Markdown.  Once a message is complete, it is parsed
+;; as CommonMark with the extensions of GFM, and its headings, emphasis,
+;; strikethrough, inline code, links and code blocks are highlighted;
+;; a link, bare URLs included, browses its URL when pushed, and code
+;; blocks are fontified with the major mode of their language.
 ;; The columns of tables are aligned by padding displayed on their pipes;
 ;; a table wider than the window has its rows displayed with the cells
 ;; wrapped in narrower columns.
@@ -22,6 +24,7 @@
 (require 'button)
 (require 'agentel-session)
 (require 'agentel-chat)
+(require 'agentel-commonmark)
 
 (defface agentel-markdown-heading-face
   '((t :inherit bold :height 1.1))
@@ -37,6 +40,11 @@
   '((((background light)) :background "grey95" :extend t)
     (((background dark)) :background "grey15" :extend t))
   "Face of fenced code blocks."
+  :group 'agentel)
+
+(defface agentel-markdown-strikethrough-face
+  '((t :strike-through t))
+  "Face of struck through text."
   :group 'agentel)
 
 (defface agentel-markdown-markup-face
@@ -77,8 +85,8 @@
         (setq pos next)))))
 
 (defun agentel-markdown--fontify-code (start end language)
-  "Highlight the code between START and END written in LANGUAGE."
-  (when-let* ((mode (agentel-markdown--mode language)))
+  "Highlight the code between START and END written in LANGUAGE, or nil."
+  (when-let* ((mode (and language (agentel-markdown--mode language))))
     (let ((code (buffer-substring-no-properties start end)))
       (agentel-markdown--copy-faces
        (with-temp-buffer
@@ -87,108 +95,78 @@
          (ignore-errors (font-lock-ensure))
          (buffer-string))
        start)))
-  (add-face-text-property start end 'agentel-markdown-code-block-face t)
-  (put-text-property start end 'agentel-markdown-code t))
+  (add-face-text-property start end 'agentel-markdown-code-block-face t))
 
-(defun agentel-markdown--each-block (function)
-  "Call FUNCTION on each fenced code block of the current buffer.
-It is called with the language, the start of the opening fence, the
-start and end of the code, and the end of the closing fence."
-  (goto-char (point-min))
-  (while (re-search-forward "^[ \t]*```\\([^`\n]*\\)\n" nil t)
-    (let ((language (string-trim (match-string 1)))
-          (fence (match-beginning 0))
-          (start (point)))
-      (if (re-search-forward "^[ \t]*```[ \t]*$" nil t)
-          ;; FUNCTION may run a major mode, which clobbers the match data.
-          (let ((end (match-beginning 0))
-                (close (match-end 0)))
-            (funcall function language fence start end close)
-            (goto-char close))
-        (goto-char (point-max))))))
+;;;; Highlighting
 
-(defun agentel-markdown--code (start end)
-  "Return the code between START and END without its last newline."
-  (string-remove-suffix "\n" (buffer-substring-no-properties start end)))
+(defun agentel-markdown--walk (tree function)
+  "Call FUNCTION on each node of TREE, outermost first."
+  (unless (stringp tree)
+    (funcall function tree)
+    (dolist (child (cddr tree))
+      (agentel-markdown--walk child function))))
 
-(defun agentel-markdown--code-blocks ()
-  "Highlight the fenced code blocks of the current buffer."
-  (agentel-markdown--each-block
-   (lambda (language fence start end close)
-     (agentel-markdown--fontify-code start end language)
-     (add-face-text-property fence start 'agentel-markdown-markup-face)
-     (add-face-text-property end close 'agentel-markdown-markup-face)
-     (put-text-property fence close 'agentel-markdown-code t)
-     (put-text-property fence close 'agentel-markdown-code-block
-                        (agentel-markdown--code start end)))))
+(defun agentel-markdown--at (node key)
+  "Return the position in the buffer of the attribute KEY of NODE."
+  (1+ (plist-get (cadr node) key)))
+
+(defun agentel-markdown--mark (node face)
+  "Give the content of NODE FACE and dim the markup around it."
+  (add-face-text-property (agentel-markdown--at node :inner-begin)
+                          (agentel-markdown--at node :inner-end) face)
+  (add-face-text-property (agentel-markdown--at node :begin)
+                          (agentel-markdown--at node :inner-begin)
+                          'agentel-markdown-markup-face)
+  (add-face-text-property (agentel-markdown--at node :inner-end)
+                          (agentel-markdown--at node :end)
+                          'agentel-markdown-markup-face))
+
+(defun agentel-markdown--code (node)
+  "Return the code of the code block NODE without its last newline."
+  (string-remove-suffix "\n" (or (nth 2 node) "")))
+
+(defun agentel-markdown--highlight-node (node)
+  "Highlight the markup of NODE, a node of the tree of the buffer."
+  (pcase (car node)
+    ('heading
+     (add-face-text-property (agentel-markdown--at node :begin) (agentel-markdown--at node :end)
+                             'agentel-markdown-heading-face))
+    ('emphasis (agentel-markdown--mark node 'italic))
+    ('strong (agentel-markdown--mark node 'bold))
+    ('strikethrough (agentel-markdown--mark node 'agentel-markdown-strikethrough-face))
+    ('code (agentel-markdown--mark node 'agentel-markdown-code-face))
+    ((or 'link 'image)
+     (let ((url (plist-get (cadr node) :destination)))
+       (make-text-button (agentel-markdown--at node :inner-begin)
+                         (agentel-markdown--at node :inner-end)
+                         'action (lambda (_) (browse-url url))
+                         'help-echo url)))
+    ('code-block
+     (agentel-markdown--fontify-code (agentel-markdown--at node :inner-begin)
+                                     (agentel-markdown--at node :inner-end)
+                                     (plist-get (cadr node) :language))
+     (add-face-text-property (agentel-markdown--at node :begin)
+                             (agentel-markdown--at node :inner-begin)
+                             'agentel-markdown-markup-face)
+     (add-face-text-property (agentel-markdown--at node :inner-end)
+                             (agentel-markdown--at node :end)
+                             'agentel-markdown-markup-face)
+     (put-text-property (agentel-markdown--at node :begin) (agentel-markdown--at node :end)
+                        'agentel-markdown-code-block (agentel-markdown--code node)))))
 
 (defun agentel-markdown-code-blocks (text)
-  "Return the fenced code blocks of TEXT as (LANGUAGE . CODE), in order."
-  (with-temp-buffer
-    (insert text)
-    (let (blocks)
-      (agentel-markdown--each-block
-       (lambda (language _fence start end _close)
-         (push (cons language (agentel-markdown--code start end)) blocks)))
-      (nreverse blocks))))
-
-(defun agentel-markdown--each (regexp function)
-  "Call FUNCTION after each match of REGEXP outside code."
-  (goto-char (point-min))
-  (while (re-search-forward regexp nil t)
-    (unless (get-text-property (match-beginning 0) 'agentel-markdown-code)
-      (save-match-data (funcall function)))))
-
-(defun agentel-markdown--emphasis (regexp face)
-  "Give the text matched by REGEXP group 2 FACE and dim group 1 and 3."
-  (agentel-markdown--each
-   regexp
-   (lambda ()
-     (add-face-text-property (match-beginning 2) (match-end 2) face)
-     (add-face-text-property (match-beginning 1) (match-end 1)
-                             'agentel-markdown-markup-face)
-     (add-face-text-property (match-beginning 3) (match-end 3)
-                             'agentel-markdown-markup-face))))
-
-(defun agentel-markdown--inline ()
-  "Highlight the inline Markdown of the current buffer."
-  (agentel-markdown--each
-   "\\(`\\)\\([^`\n]+\\)\\(`\\)"
-   (lambda ()
-     (add-face-text-property (match-beginning 2) (match-end 2)
-                             'agentel-markdown-code-face)
-     (add-face-text-property (match-beginning 1) (match-end 1)
-                             'agentel-markdown-markup-face)
-     (add-face-text-property (match-beginning 3) (match-end 3)
-                             'agentel-markdown-markup-face)
-     (put-text-property (match-beginning 0) (match-end 0) 'agentel-markdown-code t)))
-  (agentel-markdown--each
-   "^#\\{1,6\\}[ \t]+.*$"
-   (lambda () (add-face-text-property (match-beginning 0) (match-end 0)
-                                      'agentel-markdown-heading-face)))
-  (agentel-markdown--emphasis "\\(\\*\\*\\)\\([^*\n]+\\)\\(\\*\\*\\)" 'bold)
-  ;; A star followed by a space starts a list item, not emphasis.
-  (agentel-markdown--emphasis
-   "\\(?:^\\|[^*[:alnum:]]\\)\\(\\*\\)\\([^* \n][^*\n]*\\)\\(\\*\\)" 'italic)
-  (agentel-markdown--each
-   "\\[\\([^]\n]+\\)\\](\\([^)\n]+\\))"
-   (lambda ()
-     (let ((url (match-string 2)))
-       (make-text-button (match-beginning 1) (match-end 1)
-                         'action (lambda (_) (browse-url url))
-                         'help-echo url)))))
+  "Return the code blocks of TEXT as (LANGUAGE . CODE), in order.
+LANGUAGE is empty for a block without one."
+  (let (blocks)
+    (agentel-markdown--walk
+     (agentel-commonmark-parse text)
+     (lambda (node)
+       (when (eq (car node) 'code-block)
+         (push (cons (or (plist-get (cadr node) :language) "") (agentel-markdown--code node))
+               blocks))))
+    (nreverse blocks)))
 
 ;;;; Tables
-
-(defconst agentel-markdown--delimiter-regexp
-  "[ \t]*|?\\(?:[ \t]*:?-+:?[ \t]*|\\)*[ \t]*:?-+:?[ \t]*|?[ \t]*$"
-  "Regexp matching the delimiter row under the header of a table.")
-
-(defun agentel-markdown--table-line-p ()
-  "Return non-nil if the current line can be a row of a table."
-  (and (not (eobp))
-       (not (get-text-property (point) 'agentel-markdown-code-block))
-       (string-search "|" (buffer-substring-no-properties (pos-bol) (pos-eol)))))
 
 (defun agentel-markdown--table-cells ()
   "Return the cells of the table row at point as (START . END).
@@ -209,26 +187,6 @@ cell without one."
       (unless (string-blank-p (buffer-substring-no-properties cell end))
         (push (cons cell end) cells)))
     (nreverse cells)))
-
-(defun agentel-markdown--each-table (function)
-  "Call FUNCTION on each table of the current buffer.
-It is called with the rows of the table and the start of the table.
-A row is the list of its cells, as (START . END)."
-  (goto-char (point-min))
-  (while (not (eobp))
-    (if (and (agentel-markdown--table-line-p)
-             (save-excursion
-               (forward-line)
-               (and (agentel-markdown--table-line-p)
-                    (looking-at-p agentel-markdown--delimiter-regexp))))
-        (let ((start (point))
-              rows)
-          (while (agentel-markdown--table-line-p)
-            (push (agentel-markdown--table-cells) rows)
-            (forward-line))
-          (save-excursion
-            (funcall function (nreverse rows) start)))
-      (forward-line))))
 
 (defun agentel-markdown--lines (start count)
   "Return COUNT lines from START as (BOL . EOL)."
@@ -418,22 +376,33 @@ marked to be formatted again when the width changes."
       (agentel-markdown--wrap-table rows lines width))
     (put-text-property start (cdr (car (last lines))) 'agentel-ui-fits-width t)))
 
-(defun agentel-markdown--tables (width)
-  "Align the columns of the tables of the current buffer to fit in WIDTH."
-  (agentel-markdown--each-table
-   (lambda (rows start) (agentel-markdown--align-table rows start width))))
+(defun agentel-markdown--tables (tree width)
+  "Align the columns of the tables of TREE to fit in WIDTH.
+TREE is the tree of the buffer."
+  (agentel-markdown--walk
+   tree
+   (lambda (node)
+     (when (eq (car node) 'table)
+       (save-excursion
+         (goto-char (agentel-markdown--at node :begin))
+         (let ((start (pos-bol))
+               rows)
+           ;; The delimiter row is not a row of the tree.
+           (dotimes (_ (1+ (length (cddr node))))
+             (push (agentel-markdown--table-cells) rows)
+             (forward-line))
+           (agentel-markdown--align-table (nreverse rows) start width)))))))
 
 (defun agentel-markdown-format (text &optional width)
   "Return TEXT with its Markdown highlighted.
 Tables wider than WIDTH have their cells wrapped to fit in it; without
 WIDTH, no table is wrapped."
-  (with-temp-buffer
-    (insert text)
-    (agentel-markdown--code-blocks)
-    (agentel-markdown--inline)
-    (agentel-markdown--tables width)
-    (remove-text-properties (point-min) (point-max) '(agentel-markdown-code nil))
-    (buffer-string)))
+  (let ((tree (agentel-commonmark-parse text)))
+    (with-temp-buffer
+      (insert text)
+      (agentel-markdown--walk tree #'agentel-markdown--highlight-node)
+      (agentel-markdown--tables tree width)
+      (buffer-string))))
 
 (setq agentel-chat-format-message-function #'agentel-markdown-format)
 

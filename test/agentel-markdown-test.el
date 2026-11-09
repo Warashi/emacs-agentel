@@ -28,6 +28,36 @@
     (should (agentel-markdown-test-has-face s "italic" 'italic))
     (should (agentel-markdown-test-has-face s "code" 'agentel-markdown-code-face))))
 
+(defun agentel-markdown-test-follow (string substring)
+  "Return the URL following the link at SUBSTRING of STRING browses."
+  (let (browsed)
+    (cl-letf (((symbol-function 'browse-url) (lambda (url &rest _) (setq browsed url))))
+      (with-temp-buffer
+        (insert string)
+        (push-button (1+ (string-search substring string))))
+      browsed)))
+
+(ert-deftest agentel-markdown-browses-a-bare-url ()
+  (let ((s (agentel-markdown-format "See https://example.com/a_b?q=1.")))
+    (should (equal (agentel-markdown-test-follow s "https") "https://example.com/a_b?q=1"))
+    (should-not (get-text-property (1- (length s)) 'button s))))
+
+(ert-deftest agentel-markdown-browses-a-link ()
+  (let ((s (agentel-markdown-format "[the docs](https://example.com/docs)")))
+    (should (equal (agentel-markdown-test-follow s "the") "https://example.com/docs"))))
+
+(ert-deftest agentel-markdown-leaves-a-url-in-code-alone ()
+  (let ((s (agentel-markdown-format "Run `curl https://example.com`.")))
+    (should-not (get-text-property (string-search "https" s) 'button s))))
+
+(ert-deftest agentel-markdown-strikes-through-strikethrough ()
+  (let ((s (agentel-markdown-format "It is ~~not~~ done.")))
+    (should (agentel-markdown-test-has-face s "not" 'agentel-markdown-strikethrough-face))
+    (should (agentel-markdown-test-has-face s "~~not" 'agentel-markdown-markup-face))))
+
+(ert-deftest agentel-markdown-copies-an-indented-code-block ()
+  (should (equal (agentel-markdown-test-copy-at "Run:\n\n    make\n" "mak") "make")))
+
 (ert-deftest agentel-markdown-does-not-take-list-stars-for-italics ()
   (let ((s (agentel-markdown-format "* one\n* two")))
     (should-not (agentel-markdown-test-has-face s "one" 'italic))))
