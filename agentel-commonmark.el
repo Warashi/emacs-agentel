@@ -589,7 +589,8 @@ Return 2 if the line is the delimiter row of a table."
               (if (= start 0)
                   (agentel-commonmark--replace container table)
                 (setf (agentel-commonmark--b-content container) (substring content 0 start))
-                (agentel-commonmark--finalize container agentel-commonmark--previous-line-end)
+                (agentel-commonmark--finalize
+                 container (agentel-commonmark--position container (1- start)))
                 (let ((parent (agentel-commonmark--b-parent container)))
                   (setf (agentel-commonmark--b-parent table) parent
                         (agentel-commonmark--b-children parent)

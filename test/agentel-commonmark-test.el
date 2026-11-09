@@ -78,5 +78,11 @@
                             (agentel-commonmark-parse markdown) 0 (length markdown)))
                      (list (plist-get case :source) (plist-get case :example) nil))))))
 
+(ert-deftest agentel-commonmark-ends-a-paragraph-before-the-table-after-it ()
+  (let ((markdown "Text\n| a |\n|---|\n| b |\n"))
+    (should-not (agentel-commonmark-test--misplaced
+                 (agentel-commonmark-parse markdown) 0 (length markdown)))
+    (should (equal (plist-get (cadr (nth 2 (agentel-commonmark-parse markdown))) :end) 4))))
+
 (provide 'agentel-commonmark-test)
 ;;; agentel-commonmark-test.el ends here
