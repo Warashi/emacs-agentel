@@ -9,7 +9,9 @@
 ;; extensions of tables, strikethrough, task list items and autolinks.
 ;; It follows the parsing strategy of the appendix of the CommonMark
 ;; spec, as its reference implementation commonmark.js does.  Raw HTML
-;; is left as text.
+;; is left as text.  Emphasis and strikethrough follow the CJK-friendly
+;; amendments, https://github.com/tats-u/markdown-cjk-friendly, so they
+;; close before Japanese text as its writer means.
 ;;
 ;; The tree it gives has nodes of the form (TYPE ATTRIBUTES . CHILDREN),
 ;; with text as strings.  ATTRIBUTES is a plist whose :begin and :end
@@ -23,6 +25,7 @@
 (require 'rx)
 (require 'subr-x)
 (require 'agentel-commonmark-entities)
+(require 'agentel-commonmark-cjk)
 
 ;;;; Blocks
 
@@ -1016,23 +1019,54 @@ Return how many characters it takes, or 0 if there is none."
 
 ;;;;; Emphasis
 
+(defun agentel-commonmark--cjk-p (char)
+  "Return non-nil if CHAR is a CJK character."
+  (and char (aref agentel-commonmark-cjk-characters char)))
+
+(defun agentel-commonmark--variation-selector-p (char)
+  "Return non-nil if CHAR is a variation selector other than for emoji."
+  (and char (<= #xfe00 char #xfe0e)))
+
+(defun agentel-commonmark--before-delimiters (start)
+  "Return what precedes the delimiter run at START.
+It is a plist telling whether it is whitespace, a punctuation sequence,
+a non-CJK punctuation sequence, a CJK sequence or an ideographic
+variation selector, as the CJK-friendly amendments define them."
+  (let* ((char (if (= start (point-min)) ?\n (char-before start)))
+         (selector (agentel-commonmark--variation-selector-p char))
+         (base (if selector (and (> start (1+ (point-min))) (char-before (1- start))) char))
+         (punct (and base (agentel-commonmark--punctuation-p base)))
+         (ambiguous (and selector (eq char #xfe01) (memq base '(#x2018 #x2019 #x201c #x201d)))))
+    (list :space (agentel-commonmark--whitespace-p char)
+          :punct punct
+          :non-cjk-punct (and punct (not ambiguous) (not (agentel-commonmark--cjk-p base)))
+          :cjk (agentel-commonmark--cjk-p base)
+          :ideographic-selector (<= #xe0100 char #xe01ef))))
+
 (defun agentel-commonmark--scan-delimiters (char)
-  "Return (COUNT CAN-OPEN CAN-CLOSE) of the run of CHAR at point."
+  "Return (COUNT CAN-OPEN CAN-CLOSE) of the run of CHAR at point.
+Its flanking follows the CJK-friendly amendments to CommonMark, which
+agree with CommonMark on text without CJK characters."
   (let* ((start (point))
          (count (progn (skip-chars-forward (string char)) (- (point) start)))
-         (before (if (= start (point-min)) ?\n (char-before start)))
+         (before (agentel-commonmark--before-delimiters start))
          (after (or (char-after) ?\n))
          (after-space (agentel-commonmark--whitespace-p after))
          (after-punct (agentel-commonmark--punctuation-p after))
-         (before-space (agentel-commonmark--whitespace-p before))
-         (before-punct (agentel-commonmark--punctuation-p before))
+         (after-non-cjk-punct (and after-punct (not (agentel-commonmark--cjk-p after))))
+         (before-space (plist-get before :space))
+         (before-non-cjk-punct (plist-get before :non-cjk-punct))
          (left (and (not after-space)
-                    (or (not after-punct) before-space before-punct)))
+                    (or (not after-non-cjk-punct) before-space before-non-cjk-punct
+                        (plist-get before :cjk) (plist-get before :ideographic-selector))))
          (right (and (not before-space)
-                     (or (not before-punct) after-space after-punct))))
+                     (or (not before-non-cjk-punct) after-space after-non-cjk-punct
+                         (agentel-commonmark--cjk-p after)))))
     (goto-char start)
     (if (eq char ?_)
-        (list count (and left (or (not right) before-punct)) (and right (or (not left) after-punct)))
+        (list count
+              (and left (or (not right) (plist-get before :punct)))
+              (and right (or (not left) after-punct)))
       (list count left right))))
 
 (defun agentel-commonmark--handle-delimiter (parent char)

@@ -96,5 +96,25 @@
                               (plist-get attributes :inner-end))
                    "\\|"))))
 
+(defun agentel-commonmark-test--inlines (markdown)
+  "Return the inlines of the paragraph MARKDOWN, as the specs tell them."
+  (cddr (nth 2 (agentel-commonmark-test--comparable (agentel-commonmark-parse markdown)))))
+
+(ert-deftest agentel-commonmark-closes-emphasis-before-cjk-after-punctuation ()
+  (should (equal (agentel-commonmark-test--inlines "**一意性（uniqueness）**が必要です")
+                 '((strong nil "一意性（uniqueness）") "が必要です")))
+  (should (equal (agentel-commonmark-test--inlines "これは**私のやりたかったこと。**だからするの。")
+                 '("これは" (strong nil "私のやりたかったこと。") "だからするの。")))
+  (should (equal (agentel-commonmark-test--inlines "太郎は**「こんにちわ」**といった")
+                 '("太郎は" (strong nil "「こんにちわ」") "といった"))))
+
+(ert-deftest agentel-commonmark-keeps-emphasis-of-other-scripts-as-commonmark ()
+  (should (equal (agentel-commonmark-test--inlines "**foo (bar)**baz")
+                 '("**foo (bar)**baz"))))
+
+(ert-deftest agentel-commonmark-closes-strikethrough-before-cjk-after-punctuation ()
+  (should (equal (agentel-commonmark-test--inlines "a~~a()~~あ")
+                 '("a" (strikethrough nil "a()") "あ"))))
+
 (provide 'agentel-commonmark-test)
 ;;; agentel-commonmark-test.el ends here
