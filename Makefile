@@ -7,7 +7,7 @@ TESTS = $(wildcard test/*-test.el)
 PYTHON ?= python3
 SPEC = test/spec
 
-.PHONY: test test-spec spec entities lint compile checkdoc clean
+.PHONY: test test-spec spec entities cjk lint compile checkdoc clean
 
 test: test-spec
 	$(BATCH) -l ert $(addprefix -l ,$(TESTS)) -f ert-run-tests-batch-and-exit
@@ -22,6 +22,9 @@ spec:
 
 entities:
 	$(PYTHON) etc/entities.py > agentel-commonmark-entities.el
+
+cjk:
+	$(PYTHON) etc/cjk.py etc/cjk-ranges.md > agentel-commonmark-cjk.el
 
 lint: compile checkdoc
 
