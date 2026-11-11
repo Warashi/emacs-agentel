@@ -110,6 +110,30 @@
                   (agentel-list-test-seen 'c :state 'idle :name "Explore" :parent 'p))
                  '("  💤 repo" "    Fix" "    └ 💤 Explore" "  🏃 two"))))
 
+(ert-deftest agentel-list-view-shows-the-work-of-a-session-below-it ()
+  (should (equal (agentel-list-test-view
+                  (agentel-list-test-seen 'p :state 'idle :project "repo" :name "Fix"
+                                          :titled t
+                                          :work (list (list :title "Workflow: research"
+                                                            :open #'ignore)))
+                  (agentel-list-test-seen 'c :state 'idle :name "Explore" :parent 'p))
+                 '("  💤 repo" "    Fix" "    └ ⚙ Workflow: research" "    └ 💤 Explore"))))
+
+(ert-deftest agentel-list-opens-the-work-at-point ()
+  (let* (opened
+         (agentel-list-work-functions
+          (list (lambda (session)
+                  (when (equal (agentel-session-id session) "p")
+                    (list (list :title "Workflow: research"
+                                :open (lambda () (setq opened t)))))))))
+    (agentel-list-test-with-sessions
+      (agentel-session-changed parent)
+      (agentel-list--render)
+      (goto-char (point-min))
+      (search-forward "Workflow: research")
+      (agentel-list-visit)
+      (should opened))))
+
 (defun agentel-list-test-folded-view (folded &rest messages)
   "Return the lines of the list after MESSAGES with the sessions FOLDED."
   (let ((table (make-hash-table :test 'eq :weakness 'key)))

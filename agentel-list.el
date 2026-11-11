@@ -20,6 +20,10 @@
 ;; nothing else, and the buffer draws the view again soon after the
 ;; model changes.  `agentel-list-toggle' folds the subagents of a
 ;; session into a count; the buffer keeps which are folded, not the model.
+;;
+;; Features list the work of a session that is no session of its own,
+;; such as work in the background, through `agentel-list-work-functions'.
+;; It shows below the session, and visiting it opens it.
 
 ;;; Code:
 
@@ -57,6 +61,12 @@ Its keys are weak, so the table does not grow with the sessions gone.")
 
 (defvar agentel-list--refresh-timer nil
   "Timer that refreshes the list after sessions changed.")
+
+(defvar agentel-list-work-functions nil
+  "Abnormal hook returning the work of a session shown below it.
+Each function is called with the session and returns a list of
+plists, each with the :title of a work and an :open function that
+shows it, called without arguments.")
 
 (defun agentel-list--shown-p (session)
   "Return non-nil when the buffer of SESSION is in a visible window."
@@ -164,6 +174,14 @@ project of its own and shows only its title."
                                   "\n")
                         ""))))
     'agentel-list-session session)
+   (mapconcat (lambda (work)
+                (propertize
+                 (concat "  " (make-string (* 2 (1+ depth)) ?\s) "└ ⚙ "
+                         (plist-get work :title) "\n")
+                 'agentel-list-session session
+                 'agentel-list-open (plist-get work :open)))
+              (plist-get seen :work)
+              "")
    (if (agentel-list--folded-p session sessions folded)
        ""
      (mapconcat (pcase-lambda (`(,child . ,seen))
@@ -241,7 +259,10 @@ Those waiting for an answer come first, then the unread ones."
                        :state ,(agentel-session-state session)
                        :project ,(agentel-session-project-name session)
                        :name ,(agentel-session-name session)
-                       :titled ,(and (agentel-session-title session) t)))))
+                       :titled ,(and (agentel-session-title session) t)
+                       :work ,(apply #'append
+                                     (mapcar (lambda (function) (funcall function session))
+                                             agentel-list-work-functions))))))
 
 (defun agentel-list--forget-shown (_frame)
   "Tell the list which of the unread sessions are now shown."
@@ -355,9 +376,11 @@ Do nothing if the session has none and is not folded."
            (agentel-list--render)))))
 
 (defun agentel-list-visit ()
-  "Show the buffer of the session at point."
+  "Show the buffer of the session at point, or open the work at point."
   (interactive)
-  (pop-to-buffer (agentel-chat-buffer (agentel-list--session))))
+  (if-let* ((open (get-text-property (point) 'agentel-list-open)))
+      (funcall open)
+    (pop-to-buffer (agentel-chat-buffer (agentel-list--session)))))
 
 (defun agentel-list-answer ()
   "Answer the oldest question of the session at point."
