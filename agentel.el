@@ -40,6 +40,7 @@
 (require 'agentel-subagent)
 (require 'agentel-copilot-subagent)
 (require 'agentel-async-task)
+(require 'agentel-terminal)
 (require 'agentel-background)
 (require 'agentel-list)
 (require 'agentel-pending)

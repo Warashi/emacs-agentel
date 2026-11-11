@@ -17,8 +17,9 @@
 ;;   resume subagent  send work to the last finished subagent
 ;;   background  a subagent that keeps working until the client cancels
 ;;   async       a background shell command, announced like the adapter
-;;               only to a client with terminal_output capability; it
-;;               completes when the next prompt arrives
+;;               only to a client with terminal_output capability, or
+;;               in a terminal of its own with version 2; it completes
+;;               when the next prompt arrives
 ;;   slow        waits until the client cancels the turn
 ;;   fail        fails the prompt request
 ;;   markdown    answers with headings, emphasis, a list and code
@@ -234,9 +235,12 @@ Version 2 names the id of an option `configId'."
 
 (defun agentel-mock--background-work ()
   "Return the `background' field of the work running in the background."
-  `(background . ,(if agentel-mock--workflow
-                      `[((type . "tool_call") (toolCallId . ,(cdr agentel-mock--workflow)))]
-                    [])))
+  `(background
+    . ,(vconcat
+        (when agentel-mock--workflow
+          `(((type . "tool_call") (toolCallId . ,(cdr agentel-mock--workflow)))))
+        (when (and agentel-mock--async (= agentel-mock--version 2))
+          `(((type . "terminal") (terminalId . ,(cdr agentel-mock--async))))))))
 
 (defun agentel-mock--state (session-id state &rest fields)
   "Tell the client SESSION-ID is in STATE, with the alist FIELDS.
@@ -491,9 +495,48 @@ Like the adapter, the turn stays open while the subagent lives."
   "Return non-nil if the client advertised terminal output."
   (alist-get 'terminal_output (alist-get '_meta agentel-mock--client-capabilities)))
 
+(defun agentel-mock--base64 (text)
+  "Return TEXT encoded as terminal output."
+  (base64-encode-string (encode-coding-string text 'utf-8) t))
+
+(defun agentel-mock--terminal-start (session-id)
+  "Start a background command in a terminal of SESSION-ID, as version 2 does."
+  (let ((task (format "toolu_bash%d" (cl-incf agentel-mock--counter))))
+    (agentel-mock--update session-id `((sessionUpdate . "terminal_update")
+                                       (terminalId . ,task)))
+    (agentel-mock--update
+     session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,task)
+                  (name . "Bash") (title . "Terminal") (kind . "execute")
+                  (status . "pending") (rawInput . ,(make-hash-table))
+                  (content . [((type . "terminal") (terminalId . ,task))])))
+    (agentel-mock--update session-id `((sessionUpdate . "terminal_update")
+                                       (terminalId . ,task) (command . "npm run dev")))
+    (agentel-mock--update
+     session-id `((sessionUpdate . "terminal_update") (terminalId . ,task)
+                  (output . ((data . ,(agentel-mock--base64 "Listening on port 3000"))))))
+    (agentel-mock--update
+     session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,task)
+                  (status . "completed")))
+    (setq agentel-mock--async (cons session-id task))
+    (agentel-mock--state session-id "running")))
+
+(defun agentel-mock--terminal-end ()
+  "End the background command, as version 2 does."
+  (pcase-let ((`(,session-id . ,task) agentel-mock--async))
+    (agentel-mock--update
+     session-id `((sessionUpdate . "terminal_output_chunk") (terminalId . ,task)
+                  (data . ,(agentel-mock--base64 "\n[exited with code 0]\n"))))
+    (agentel-mock--update session-id `((sessionUpdate . "terminal_update")
+                                       (terminalId . ,task)
+                                       (exitStatus . ,(make-hash-table))))
+    (setq agentel-mock--async nil)
+    (agentel-mock--state session-id "idle")))
+
 (defun agentel-mock--async (id session-id)
   "Start a background command in SESSION-ID and end prompt ID."
-  (when (agentel-mock--async-tasks-p)
+  (when (= agentel-mock--version 2)
+    (agentel-mock--terminal-start session-id))
+  (when (and (= agentel-mock--version 1) (agentel-mock--async-tasks-p))
     (let ((task (format "bash-%d" (cl-incf agentel-mock--counter))))
       (agentel-mock--update
        session-id `((sessionUpdate . "tool_call") (toolCallId . ,task)
@@ -553,12 +596,14 @@ Like the adapter, the turn stays open while the subagent lives."
          (text (mapconcat (lambda (block) (or (alist-get 'text block) ""))
                           (alist-get 'prompt params) "")))
     (when agentel-mock--async
-      (agentel-mock--update
-       (car agentel-mock--async)
-       `((sessionUpdate . "tool_call_update")
-         (toolCallId . ,(cdr agentel-mock--async))
-         (_meta . ((terminal_exit . ((terminal_id . ,(cdr agentel-mock--async))
-                                     (exit_code) (signal)))))))
+      (if (= agentel-mock--version 2)
+          (agentel-mock--terminal-end)
+        (agentel-mock--update
+         (car agentel-mock--async)
+         `((sessionUpdate . "tool_call_update")
+           (toolCallId . ,(cdr agentel-mock--async))
+           (_meta . ((terminal_exit . ((terminal_id . ,(cdr agentel-mock--async))
+                                       (exit_code) (signal))))))))
       (setq agentel-mock--async nil))
     (when agentel-mock--workflow
       (agentel-mock--workflow-end))

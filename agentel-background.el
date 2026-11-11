@@ -8,10 +8,12 @@
 ;; In ACP version 2 the agent lists the work that runs independently of
 ;; its turns, such as a dynamic workflow, in the `background' of each
 ;; `state_update'.  The tool calls listed are pinned above the prompt
-;; with their titles, which they keep updating while they run, until the
-;; agent drops them from the list.  Opening one, by clicking its pinned
+;; with their titles, which they keep updating while they run, and the
+;; terminals with their commands, until the agent drops them from the
+;; list.  Opening one, by clicking its pinned
 ;; line or with `agentel-background-open', shows its latest report in a
 ;; buffer of its own, which keeps the last report once the work ended.
+;; The report of a terminal is its output.
 ;; The work also shows below its session in `agentel-list'.
 ;;
 ;; A list left out of a `state_update' is not reported, so the pinned
@@ -27,6 +29,7 @@
 (require 'agentel-list)
 (require 'agentel-store)
 (require 'agentel-ui)
+(require 'agentel-terminal)
 
 (defface agentel-background-face
   '((t :inherit font-lock-builtin-face))
@@ -37,7 +40,7 @@
   "Return the background work DATA of a session changed by MESSAGE.
 DATA has the `session' they run in, kept to open them, and the `items'
 in the order the agent lists them, each (ID . FIELDS) with the `title'
-and the latest `report' of the tool call ID.  MESSAGE is
+and the latest `report' of the tool call or the terminal ID.  MESSAGE is
 \(list SESSION ITEMS), which replaces the items, or (update ID FIELDS),
 which merges the alist FIELDS into the item ID; news of an unknown item
 is ignored."
@@ -87,6 +90,11 @@ list shows them."
       `((title . ,(agentel-store-get tool 'title))
         (report . ,(agentel-store-get tool 'output))))))
 
+(defun agentel-background--terminal (session id)
+  "Return the fields of the terminal ID of SESSION."
+  (let-alist (agentel-terminal-get session id)
+    (seq-filter #'cdr `((title . ,.command) (report . ,.output)))))
+
 (defun agentel-background--report (content)
   "Return the text of the tool call CONTENT, or nil without any."
   (when-let* ((texts (delq nil (mapcar (lambda (item)
@@ -96,14 +104,19 @@ list shows them."
     (string-join texts "\n")))
 
 (defun agentel-background--list (session work)
-  "Pin the tool calls among the background WORK of SESSION."
+  "Pin the tool calls and the terminals among the background WORK of SESSION."
   (agentel-background--send
    session
-   `(list ,session ,(delq nil (mapcar (lambda (entry)
+   `(list ,session
+          ,(delq nil (mapcar (lambda (entry)
                                (let-alist entry
-                                 (when (equal .type "tool_call")
-                                   (cons .toolCallId
-                                         (agentel-background--seen session .toolCallId)))))
+                                 (pcase .type
+                                   ("tool_call"
+                                    (cons .toolCallId
+                                          (agentel-background--seen session .toolCallId)))
+                                   ("terminal"
+                                    (cons .terminalId
+                                          (agentel-background--terminal session .terminalId))))))
                              work)))))
 
 (defun agentel-background--on-update (session update)
@@ -118,7 +131,12 @@ list shows them."
                    (fields (seq-filter #'cdr
                                        `((title . ,.title)
                                          (report . ,(agentel-background--report .content))))))
-         (agentel-background--send session `(update ,.toolCallId ,fields)))))))
+         (agentel-background--send session `(update ,.toolCallId ,fields))))
+      ((or "terminal_update" "terminal_output_chunk")
+       (when (assoc .terminalId (agentel-background--items session))
+         (agentel-background--send
+          session `(update ,.terminalId
+                           ,(agentel-background--terminal session .terminalId))))))))
 
 (defun agentel-background--pin-line (session item width)
   "Return the pinned line of the background work ITEM of SESSION.
