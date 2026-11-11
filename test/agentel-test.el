@@ -231,6 +231,16 @@
     (should-not (save-excursion (goto-char (point-min))
                                 (search-forward "Replayed subagent" nil t)))))
 
+(ert-deftest agentel-v2-start-resumes-a-previous-session-with-its-history ()
+  (let ((agentel-acp-v2-agents '(mock)))
+    (agentel-test-with-started session '(:session-id "old-1")
+      (should (equal (agentel-session-id session) "old-1"))
+      (agentel-test-wait-for-text "The plan was to write tests first.")
+      (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
+      (goto-char (point-min))
+      (search-forward "The plan was")
+      (should (agentel-store-get (agentel-chat-entry-at) 'finished)))))
+
 (ert-deftest agentel-start-shows-the-session-loading ()
   (let* ((states nil)
          (agentel-session-changed-functions

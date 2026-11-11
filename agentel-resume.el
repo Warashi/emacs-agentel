@@ -7,7 +7,8 @@
 
 ;; The /resume command lists the earlier sessions of the working
 ;; directory with `session/list' and opens the chosen one in a new
-;; buffer, replaying its history with `session/load'.  The resumed
+;; buffer, replaying its history with `session/load', or with
+;; `session/resume' in ACP version 2.  The resumed
 ;; session takes over the settings of the session /resume was run in,
 ;; as /clear does.  The agent does not offer /resume itself because
 ;; its own picker is terminal only.

@@ -701,6 +701,24 @@ unknown values are rejected."
                              (gethash session-id agentel-mock--sessions)))))
     (agentel-mock--announce-commands session-id)))
 
+(defun agentel-mock--resume (id params)
+  "Handle `session/resume' request ID with PARAMS of version 2.
+Like the adapter, the history is replayed only from the start asked for,
+each message led by an empty one, and a state ends it."
+  (let ((session-id (agentel-mock--new-session (alist-get 'sessionId params))))
+    (when (equal (alist-get 'type (alist-get 'replayFrom params)) "start")
+      (agentel-mock--update session-id '((sessionUpdate . "user_message") (messageId . "m1")
+                                         (content . [])))
+      (agentel-mock--say session-id "What was the plan?" "user_message_chunk")
+      (agentel-mock--update session-id '((sessionUpdate . "agent_message") (messageId . "m2")
+                                         (content . [])))
+      (agentel-mock--say session-id "The plan was to write tests first."))
+    (agentel-mock--state session-id "idle")
+    (agentel-mock--respond
+     id `((configOptions . ,(agentel-mock--config-options
+                             (gethash session-id agentel-mock--sessions)))))
+    (agentel-mock--announce-commands session-id)))
+
 (defun agentel-mock--handle-request (id method params)
   "Handle the client request ID calling METHOD with PARAMS."
   (pcase method
@@ -738,7 +756,9 @@ unknown values are rejected."
              (configOptions . ,(agentel-mock--config-options
                                 (gethash session-id agentel-mock--sessions)))))
        (agentel-mock--announce-commands session-id)))
-    ("session/load" (agentel-mock--load id params))
+    ((and "session/load" (guard (= agentel-mock--version 1))) (agentel-mock--load id params))
+    ((and "session/resume" (guard (= agentel-mock--version 2)))
+     (agentel-mock--resume id params))
     ("session/list"
      (agentel-mock--respond
       id `((sessions . [((sessionId . "old-1") (cwd . ,(alist-get 'cwd params))

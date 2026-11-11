@@ -120,8 +120,8 @@ the list, so the variables can depend on the project:
 (defvar agentel-session-started-functions nil
   "Abnormal hook run once the agent created or loaded a session.
 Each function is called with the session, the result of
-`session/new' or `session/load', and the keyword arguments given to
-`agentel-start'.")
+`session/new', `session/load' or `session/resume', and the keyword
+arguments given to `agentel-start'.")
 
 (defvar agentel-session-restart-options-functions nil
   "Functions returning start options that recreate a session's settings.
@@ -154,9 +154,16 @@ of SESSION."
       ;; must be found by id before the request is sent.
       (agentel-session-register session session-id)
       (agentel-session-send session '(start-loading))
-      (push (cons 'sessionId session-id) params))
+      (push (cons 'sessionId session-id) params)
+      ;; ACP version 2 resumes a session, and replays its history only
+      ;; when asked to.
+      (when (eql (agentel-connection-version connection) 2)
+        (push '(replayFrom . ((type . "start"))) params)))
     (agentel-connection-request
-     connection (if session-id "session/load" "session/new") params
+     connection (cond ((not session-id) "session/new")
+                      ((eql (agentel-connection-version connection) 2) "session/resume")
+                      (t "session/load"))
+     params
      :on-success
      (lambda (result)
        (if session-id
