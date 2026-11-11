@@ -167,6 +167,17 @@ A chunk after a finished message starts another one."
     ("cancelled" . cancelled) ("paused" . paused))
   "Statuses of tool calls and plan steps by their names in the protocol.")
 
+(defun agentel-conversation--diff (item)
+  "Return the file change of the diff content ITEM as text.
+ACP version 2 tells a git patch, without one for files such as binary
+ones, where only the changes are named."
+  (let-alist item
+    (cond (.patch (agentel-diff-patch .patch.text))
+          (.changes (mapconcat (lambda (change)
+                                 (let-alist change (format "%s %s" .operation .path)))
+                               .changes "\n"))
+          (t (agentel-diff .path .oldText .newText)))))
+
 (defun agentel-conversation--tool-output (content)
   "Return the tool call CONTENT list as text, or nil without textual content."
   (when-let* ((parts
@@ -175,9 +186,7 @@ A chunk after a finished message starts another one."
                       (lambda (item)
                         (pcase (alist-get 'type item)
                           ("content" (alist-get 'text (alist-get 'content item)))
-                          ("diff" (agentel-diff (alist-get 'path item)
-                                                (alist-get 'oldText item)
-                                                (alist-get 'newText item)))
+                          ("diff" (agentel-conversation--diff item))
                           ("terminal" nil)))
                       content))))
     (string-join parts "\n")))

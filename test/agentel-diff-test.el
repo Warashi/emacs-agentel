@@ -31,5 +31,16 @@
       (should (eq (get-text-property (string-search (car case) diff) 'face diff)
                   (cdr case))))))
 
+(ert-deftest agentel-diff-patch-colors-a-git-patch-as-diff-mode-does ()
+  (let ((diff (agentel-diff-patch
+               "diff --git a b\nnew file mode 100644\n--- /dev/null\n+++ b\n@@ -0,0 +1 @@\n+x\n")))
+    (should (equal (substring-no-properties diff)
+                   "diff --git a b\nnew file mode 100644\n--- /dev/null\n+++ b\n@@ -0,0 +1 @@\n+x"))
+    (dolist (case '(("diff --git" . diff-header) ("new file" . diff-header)
+                    ("--- " . diff-file-header) ("@@ " . diff-hunk-header)
+                    ("+x" . diff-added)))
+      (should (eq (get-text-property (string-search (car case) diff) 'face diff)
+                  (cdr case))))))
+
 (provide 'agentel-diff-test)
 ;;; agentel-diff-test.el ends here

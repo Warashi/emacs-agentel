@@ -109,6 +109,28 @@
                              "--- /tmp/a\n+++ /tmp/a\n@@ -1 +1 @@\n-x\n+y\n"
                              "--- /tmp/b\n+++ /tmp/b\n@@ -0,0 +1 @@\n+y"))))))
 
+(ert-deftest agentel-conversation-shows-the-patch-of-an-acp-v2-diff ()
+  (agentel-conversation-test-with-session
+    (agentel-conversation-test-update
+     '((sessionUpdate . "tool_call_update") (toolCallId . "t1") (title . "Edit a")
+       (content . [((type . "diff")
+                    (changes . [((operation . "modify") (path . "/tmp/a") (fileType . "text"))])
+                    (patch . ((format . "git_patch")
+                              (text . "diff --git /tmp/a /tmp/a\n--- /tmp/a\n+++ /tmp/a\n@@ -1 +1 @@\n-x\n+y\n"))))])))
+    (should (equal (substring-no-properties
+                    (alist-get 'output (cdar (agentel-conversation-test-items session))))
+                   "diff --git /tmp/a /tmp/a\n--- /tmp/a\n+++ /tmp/a\n@@ -1 +1 @@\n-x\n+y"))))
+
+(ert-deftest agentel-conversation-names-the-files-of-an-acp-v2-diff-without-a-patch ()
+  (agentel-conversation-test-with-session
+    (agentel-conversation-test-update
+     '((sessionUpdate . "tool_call_update") (toolCallId . "t1") (title . "Write")
+       (content . [((type . "diff")
+                    (changes . [((operation . "add") (path . "/tmp/img.png")
+                                 (fileType . "binary"))]))])))
+    (should (equal (alist-get 'output (cdar (agentel-conversation-test-items session)))
+                   "add /tmp/img.png"))))
+
 (ert-deftest agentel-conversation-replaces-the-plan ()
   (agentel-conversation-test-with-session
     (agentel-conversation-test-update

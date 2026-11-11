@@ -5,9 +5,11 @@
 
 ;;; Commentary:
 
-;; A tool call tells a file change as the old and the new text, of the
-;; whole file or of a snippet.  This file shows the change as a unified
-;; diff made by `diff-command', with the faces of `diff-mode'.
+;; A tool call of ACP version 1 tells a file change as the old and the
+;; new text, of the whole file or of a snippet.  This file shows the
+;; change as a unified diff made by `diff-command', with the faces of
+;; `diff-mode'.  Version 2 tells the change as a git patch, shown with the
+;; same faces.
 
 ;;; Code:
 
@@ -23,9 +25,21 @@
 (defun agentel-diff--face (line)
   "Return the `diff-mode' face of the diff LINE."
   (cond ((string-match-p "\\`\\(---\\|\\+\\+\\+\\) " line) 'diff-file-header)
+        ((string-match-p "\\`\\(diff \\|new file\\|deleted file\\|index \\|old mode\\|new mode\\)"
+                         line)
+         'diff-header)
         ((string-prefix-p "@@" line) 'diff-hunk-header)
         ((string-prefix-p "-" line) 'diff-removed)
         ((string-prefix-p "+" line) 'diff-added)))
+
+(defun agentel-diff-patch (patch)
+  "Return the unified diff PATCH with the faces of `diff-mode'."
+  (mapconcat (lambda (line)
+               (if-let* ((face (agentel-diff--face line)))
+                   (propertize line 'face face)
+                 line))
+             (split-string (string-trim-right patch "\n") "\n")
+             "\n"))
 
 (defun agentel-diff (path old new)
   "Return the unified diff of the file PATH changed from OLD to NEW.
@@ -38,12 +52,7 @@ changes."
           (call-process diff-command nil t nil "-u" "--label" path "--label" path
                         old-file new-file)
           (unless (zerop (buffer-size))
-            (mapconcat (lambda (line)
-                         (if-let* ((face (agentel-diff--face line)))
-                             (propertize line 'face face)
-                           line))
-                       (split-string (string-trim-right (buffer-string) "\n") "\n")
-                       "\n")))
+            (agentel-diff-patch (buffer-string))))
       (delete-file old-file)
       (delete-file new-file))))
 
