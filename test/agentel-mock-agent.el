@@ -215,11 +215,31 @@ KIND is the session update name and defaults to an agent message."
                   (cost . ((amount . ,(* 0.00001 (alist-get 'used state)))
                            (currency . "USD")))))))
 
+(defun agentel-mock--state (session-id state &rest fields)
+  "Tell the client SESSION-ID is in STATE, with the alist FIELDS."
+  (agentel-mock--update session-id `((sessionUpdate . "state_update")
+                                     (state . ,state)
+                                     ,@fields)))
+
 (defun agentel-mock--finish (id session-id &optional stop-reason)
-  "End prompt ID of SESSION-ID with STOP-REASON."
+  "End prompt ID of SESSION-ID with STOP-REASON.
+Version 2 answered the prompt when it took it, so the turn ends with
+the session becoming idle."
   (setq agentel-mock--prompt-id nil)
   (agentel-mock--usage session-id)
-  (agentel-mock--respond id `((stopReason . ,(or stop-reason "end_turn")))))
+  (if (= agentel-mock--version 2)
+      (agentel-mock--state session-id "idle"
+                           `(stopReason . ,(or stop-reason "end_turn"))
+                           '(background . []))
+    (agentel-mock--respond id `((stopReason . ,(or stop-reason "end_turn"))))))
+
+(defun agentel-mock--fail (id session-id code message)
+  "Fail prompt ID of SESSION-ID with CODE and MESSAGE."
+  (if (= agentel-mock--version 2)
+      (agentel-mock--state session-id "idle" '(stopReason . "error")
+                           `(error . ((code . ,code) (message . ,message)))
+                           '(background . []))
+    (agentel-mock--error id code message)))
 
 (defun agentel-mock--tool (session-id)
   "Show a finished Read tool call in SESSION-ID."
@@ -476,13 +496,16 @@ Like the adapter, the turn stays open while the subagent lives."
          (_meta . ((terminal_exit . ((terminal_id . ,(cdr agentel-mock--async))
                                      (exit_code) (signal)))))))
       (setq agentel-mock--async nil))
+    (when (= agentel-mock--version 2)
+      (agentel-mock--respond id `((messageId . ,(format "msg-%d" (cl-incf agentel-mock--counter)))))
+      (agentel-mock--state session-id "running" '(background . [])))
     (agentel-mock--update
      session-id `((sessionUpdate . "session_info_update")
                   (title . ,(truncate-string-to-width text 40))))
     (agentel-mock--say session-id "Thinking about it." "agent_thought_chunk")
     (cond
      ((string-match-p "fail" text)
-      (agentel-mock--error id -32000 "Authentication required"))
+      (agentel-mock--fail id session-id -32000 "Authentication required"))
      ((string-match-p "slow" text)
       (agentel-mock--say session-id "Working slowly")
       (setq agentel-mock--prompt-id (cons id session-id)))
@@ -499,8 +522,13 @@ Like the adapter, the turn stays open while the subagent lives."
      ((string-match-p "wakeup" text)
       (agentel-mock--say session-id "I will wait.")
       (agentel-mock--finish id session-id)
+      (when (= agentel-mock--version 2)
+        (agentel-mock--state session-id "running" '(background . [])))
       (agentel-mock--say session-id agentel-mock--markdown)
-      (agentel-mock--usage session-id))
+      (agentel-mock--usage session-id)
+      (when (= agentel-mock--version 2)
+        (agentel-mock--state session-id "idle" '(stopReason . "end_turn")
+                             '(background . []))))
      ((string-match-p "markdown" text)
       (agentel-mock--say session-id agentel-mock--markdown)
       (agentel-mock--finish id session-id))

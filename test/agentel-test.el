@@ -63,6 +63,30 @@
     (should (eq (agentel-store-model-type (agentel-chat-entry-at (match-beginning 0)))
                 'stop))))
 
+(ert-deftest agentel-v2-prompt-shows-reply-and-returns-to-idle ()
+  (let ((agentel-acp-v2-agents '(mock)))
+    (agentel-test-with-started session nil
+      (agentel-test-send "hello")
+      (agentel-test-wait-for-text "Echo: hello")
+      (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle))))))
+
+(ert-deftest agentel-v2-prompt-failure-is-shown ()
+  (let ((agentel-acp-v2-agents '(mock)))
+    (agentel-test-with-started session nil
+      (agentel-test-send "fail")
+      (agentel-test-wait-for-text "Prompt failed: Authentication required")
+      (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle))))))
+
+(ert-deftest agentel-v2-cancel-ends-the-turn ()
+  (let ((agentel-acp-v2-agents '(mock)))
+    (agentel-test-with-started session nil
+      (agentel-test-send "slow")
+      (agentel-test-wait-for-text "Working slowly")
+      (should (eq (agentel-session-state session) 'running))
+      (agentel-chat-cancel)
+      (agentel-test-wait-for-text "Turn ended: cancelled")
+      (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle))))))
+
 (ert-deftest agentel-killing-the-buffer-stops-the-agent ()
   (agentel-test-with-started session nil
     (let ((process (agentel-connection-process (agentel-session-connection session))))
