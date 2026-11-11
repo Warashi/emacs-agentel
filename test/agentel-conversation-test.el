@@ -79,6 +79,18 @@
     (should (equal (agentel-conversation-test-items session)
                    '((tool (status . done) (title . "Read")))))))
 
+(ert-deftest agentel-conversation-follows-tool-calls-stopped-by-the-user ()
+  (agentel-conversation-test-with-session
+    (agentel-conversation-test-update '((sessionUpdate . "tool_call_update") (toolCallId . "t1")
+                                        (title . "sleep") (status . "in_progress")))
+    (agentel-conversation-test-update '((sessionUpdate . "tool_call_update") (toolCallId . "t1")
+                                        (status . "cancelled")))
+    (agentel-conversation-test-update '((sessionUpdate . "tool_call_update") (toolCallId . "t2")
+                                        (title . "wait") (status . "paused")))
+    (should (equal (agentel-conversation-test-items session)
+                   '((tool (status . cancelled) (title . "sleep"))
+                     (tool (status . paused) (title . "wait")))))))
+
 (ert-deftest agentel-conversation-tells-why-a-tool-is-called-and-its-output ()
   (agentel-conversation-test-with-session
     (agentel-conversation-test-update

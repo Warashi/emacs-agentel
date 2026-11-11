@@ -259,6 +259,20 @@
        (title . "ls\n") (status . "completed")))
     (should (string-match-p "\\`  ✓ ls\\'" (agentel-chat-test-transcript)))))
 
+(ert-deftest agentel-chat-shows-a-tool-call-the-user-stopped ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-update
+     '((sessionUpdate . "tool_call_update") (toolCallId . "t1")
+       (title . "sleep") (status . "cancelled")))
+    (should (string-match-p "\\`  ⊘ sleep\\'" (agentel-chat-test-transcript)))))
+
+(ert-deftest agentel-chat-shows-a-paused-tool-call ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-update
+     '((sessionUpdate . "tool_call_update") (toolCallId . "t1")
+       (title . "wait") (status . "paused")))
+    (should (string-match-p "\\`  ⏸ wait\\'" (agentel-chat-test-transcript)))))
+
 (ert-deftest agentel-chat-fits-a-tool-in-the-width-it-is-shown-in ()
   (let ((tool (agentel-store-model--make
                :type 'tool

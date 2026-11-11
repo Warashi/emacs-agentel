@@ -282,7 +282,8 @@ The folded line fits in the :width of OPTIONS."
   (agentel-ui-define-view type #'agentel-chat--render-notice))
 
 (defconst agentel-chat--status-icons
-  '((pending . "…") (running . "⟳") (done . "✓") (failed . "✗"))
+  '((pending . "…") (running . "⟳") (done . "✓") (failed . "✗")
+    (cancelled . "⊘") (paused . "⏸"))
   "Icons of tool call statuses.")
 
 (defun agentel-chat--indent (text)

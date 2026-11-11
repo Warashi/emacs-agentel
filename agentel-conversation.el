@@ -109,8 +109,8 @@ It is called with the item and non-nil when the item was added."
 (defun agentel-conversation--update-tool (message data)
   "Return the DATA of a tool call changed by MESSAGE.
 The message carries the fields it changes: `title', `why' the agent
-calls it, `status', one of `pending', `running', `done' and `failed',
-and `output' as text."
+calls it, `status', one of `pending', `running', `done', `failed',
+`cancelled' and `paused', and `output' as text."
   (pcase message
     (`(update ,fields)
      (dolist (field fields data)
@@ -162,7 +162,9 @@ A chunk after a finished message starts another one."
 
 (defconst agentel-conversation--statuses
   '(("pending" . pending) ("in_progress" . running)
-    ("completed" . done) ("failed" . failed))
+    ("completed" . done) ("failed" . failed)
+    ;; Only ACP version 2 tells these.
+    ("cancelled" . cancelled) ("paused" . paused))
   "Statuses of tool calls and plan steps by their names in the protocol.")
 
 (defun agentel-conversation--tool-output (content)
