@@ -80,6 +80,87 @@
      '(background . [((type . "subagent") (sessionId . "c1"))]))
     (should-not (agentel-background-test-titles session))))
 
+(defun agentel-background-test-report (session id text)
+  "Tell SESSION that the tool call ID reports TEXT."
+  (agentel-background-test-update
+   session '(sessionUpdate . "tool_call_update") `(toolCallId . ,id)
+   `(content . [((type . "content") (content . ((type . "text") (text . ,text))))])))
+
+(defmacro agentel-background-test-with-open (&rest body)
+  "Run BODY in the buffer of the background work w1 of `session'."
+  (declare (indent 0))
+  `(let ((buffer (agentel-background-open session "w1")))
+     (unwind-protect
+         (with-current-buffer buffer ,@body)
+       (kill-buffer buffer))))
+
+(ert-deftest agentel-background-shows-the-report-of-the-work ()
+  (agentel-background-test-with-session
+    (agentel-background-test-state session "w1")
+    (agentel-background-test-report session "w1" "sleep-0: running")
+    (agentel-background-test-with-open
+      (should (equal (buffer-string) "sleep-0: running")))))
+
+(ert-deftest agentel-background-shows-the-report-the-tool-call-had ()
+  (agentel-background-test-with-session
+    (agentel-background-test-report session "w1" "launched")
+    (agentel-background-test-state session "w1")
+    (agentel-background-test-with-open
+      (should (equal (buffer-string) "launched")))))
+
+(ert-deftest agentel-background-shows-each-new-report-in-place-of-the-last ()
+  (agentel-background-test-with-session
+    (agentel-background-test-state session "w1")
+    (agentel-background-test-report session "w1" "sleep-0: running")
+    (agentel-background-test-with-open
+      (agentel-background-test-report session "w1" "sleep-0: done")
+      (should (equal (buffer-string) "sleep-0: done")))))
+
+(ert-deftest agentel-background-keeps-the-last-report-once-the-work-ends ()
+  (agentel-background-test-with-session
+    (agentel-background-test-state session "w1")
+    (agentel-background-test-report session "w1" "sleep-0: done")
+    (agentel-background-test-with-open
+      (agentel-background-test-state session)
+      (should (equal (buffer-string) "sleep-0: done")))))
+
+(ert-deftest agentel-background-opens-the-same-buffer-again ()
+  (agentel-background-test-with-session
+    (agentel-background-test-state session "w1")
+    (agentel-background-test-with-open
+      (should (eq (agentel-background-open session "w1") buffer)))))
+
+(ert-deftest agentel-background-pinned-line-opens-the-work ()
+  (agentel-background-test-with-session
+    (agentel-background-test-state session "w1")
+    (let* ((model (agentel-store-find (agentel-session-store session) 'background))
+           (line (agentel-ui-view model :width 80))
+           opened)
+      (cl-letf (((symbol-function 'agentel-background-open)
+                 (lambda (s id) (setq opened (list s id))))
+                ((symbol-function 'pop-to-buffer) #'ignore))
+        (funcall (keymap-lookup (get-text-property 0 'keymap line) "<mouse-1>")))
+      (should (equal opened (list session "w1"))))))
+
+(ert-deftest agentel-background-open-asks-for-the-work-of-the-session ()
+  (agentel-background-test-with-session
+    (agentel-background-test-state session "w1")
+    (agentel-background-test-update
+     session '(sessionUpdate . "tool_call_update") '(toolCallId . "w1") '(title . "Workflow"))
+    (with-temp-buffer
+      (cl-letf (((symbol-function 'agentel-session-current) (lambda () session))
+                ((symbol-function 'completing-read) (lambda (&rest _) "Workflow"))
+                ((symbol-function 'pop-to-buffer) #'ignore))
+        (let ((buffer (call-interactively #'agentel-background-open)))
+          (unwind-protect
+              (should (buffer-live-p buffer))
+            (kill-buffer buffer)))))))
+
+(ert-deftest agentel-background-open-refuses-without-work ()
+  (agentel-background-test-with-session
+    (cl-letf (((symbol-function 'agentel-session-current) (lambda () session)))
+      (should-error (call-interactively #'agentel-background-open) :type 'user-error))))
+
 (ert-deftest agentel-background-v2-workflow-is-pinned-until-it-ends ()
   (let ((agentel-acp-v2-agents '(mock)))
     (agentel-test-with-started session nil
