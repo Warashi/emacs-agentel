@@ -157,6 +157,9 @@ not called once the returned connection was shut down."
                      (funcall callback text)
                      (when connection (agentel-connection-shutdown connection)))))
          (fail (lambda (_error) (funcall finish nil)))
+         (answer (lambda ()
+                   (funcall finish (when chunks
+                                     (string-trim (apply #'concat (reverse chunks)))))))
          (prompt
           (lambda ()
             (agentel-connection-request
@@ -164,10 +167,11 @@ not called once the returned connection was shut down."
              `((sessionId . ,session-id)
                (prompt . [((type . "text")
                            (text . ,(concat agentel-summary--instructions excerpt)))]))
+             ;; Version 2 answers once the agent took the prompt, and
+             ;; tells the end of the turn with `state_update'.
              :on-success (lambda (_result)
-                           (funcall finish (when chunks
-                                             (string-trim
-                                              (apply #'concat (nreverse chunks))))))
+                           (unless (eql (agentel-connection-version connection) 2)
+                             (funcall answer)))
              :on-failure fail)))
          (open
           (lambda (_connection)
@@ -194,10 +198,17 @@ not called once the returned connection was shut down."
            :on-update
            (lambda (params)
              (let-alist params
-               (when (and (equal .sessionId session-id)
-                          (equal .update.sessionUpdate "agent_message_chunk"))
-                 (when-let* ((text .update.content.text))
-                   (push text chunks)))))))
+               (when (equal .sessionId session-id)
+                 (pcase .update.sessionUpdate
+                   ("agent_message_chunk"
+                    (when-let* ((text .update.content.text))
+                      (push text chunks)))
+                   ((and "state_update"
+                         (guard (equal .update.state "idle"))
+                         (guard .update.stopReason))
+                    (if (equal .update.stopReason "error")
+                        (funcall finish nil)
+                      (funcall answer)))))))))
     connection))
 
 ;;;; Summing up the sessions that need the user

@@ -90,6 +90,15 @@
                          2))
         (agentel-connection-shutdown connection)))))
 
+(ert-deftest agentel-summary-run-v2-answers-once-the-agent-becomes-idle ()
+  (agentel-summary-test-with-mock
+    (let ((agentel-acp-v2-agents '(mock))
+          done reply)
+      (agentel-summary-run temporary-file-directory "the excerpt"
+                           (lambda (text) (setq done t reply text)))
+      (agentel-test-wait-until (lambda () done))
+      (should (string-match-p "the excerpt" reply)))))
+
 (ert-deftest agentel-summary-run-keeps-its-conversation-out-of-the-sessions ()
   (agentel-summary-test-with-mock
     (let (done)
