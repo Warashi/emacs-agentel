@@ -144,6 +144,25 @@
                    '((plan (steps ((content . "Write tests") (status . done))
                                   ((content . "Implement") (status . pending)))))))))
 
+(ert-deftest agentel-conversation-replaces-each-acp-v2-plan-on-its-own ()
+  (agentel-conversation-test-with-session
+    (agentel-conversation-test-update
+     '((sessionUpdate . "plan_update")
+       (plan . ((type . "items") (planId . "todo")
+                (entries . [((content . "Write tests") (status . "in_progress")
+                             (priority . "medium"))])))))
+    (agentel-conversation-test-update
+     '((sessionUpdate . "plan_update")
+       (plan . ((type . "markdown") (planId . "plan-mode") (content . "- Add a greeting")))))
+    (agentel-conversation-test-update
+     '((sessionUpdate . "plan_update")
+       (plan . ((type . "items") (planId . "todo")
+                (entries . [((content . "Write tests") (status . "cancelled")
+                             (priority . "medium"))])))))
+    (should (equal (agentel-conversation-test-items session)
+                   '((plan (steps ((content . "Write tests") (status . cancelled))))
+                     (plan (text . "- Add a greeting")))))))
+
 (ert-deftest agentel-conversation-records-prompts-and-notes ()
   (agentel-conversation-test-with-session
     (agentel-conversation-prompt session "hi")

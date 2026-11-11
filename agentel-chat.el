@@ -328,13 +328,16 @@ full on top of the output."
 (agentel-ui-define-view 'tool #'agentel-chat--render-tool :collapsed t)
 
 (defconst agentel-chat--plan-marks
-  '((done . "[x]") (running . "[-]") (pending . "[ ]"))
+  '((done . "[x]") (running . "[-]") (pending . "[ ]") (cancelled . "[~]"))
   "Check boxes of plan step statuses.")
 
 (defun agentel-chat--render-plan (entry _options)
-  "Render the plan ENTRY."
+  "Render the plan ENTRY, given as steps or as text."
   (concat
    (propertize "Plan" 'face 'bold)
+   (if-let* ((text (agentel-store-get entry 'text)))
+       (concat "\n" (replace-regexp-in-string "^" "  " (string-trim-right text)))
+     "")
    (mapconcat (lambda (step)
                 (format "\n  %s %s"
                         (or (alist-get (alist-get 'status step)

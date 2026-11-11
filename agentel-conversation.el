@@ -121,10 +121,12 @@ calls it, `status', one of `pending', `running', `done', `failed',
 
 (defun agentel-conversation--update-plan (message _data)
   "Return the data of a plan shown by MESSAGE.
-The message carries the list of steps, each with its `content' as text
-and its `status', one of `pending', `running' and `done'."
+The message (show STEPS) carries the list of steps, each with its
+`content' as text and its `status', one of `pending', `running',
+`done' and `cancelled'.  (show-text TEXT) carries a plan told as text."
   (pcase message
     (`(show ,steps) `((steps . ,steps)))
+    (`(show-text ,text) `((text . ,text)))
     (_ (agentel-store-reject message))))
 
 (agentel-conversation-define 'plan #'agentel-conversation--update-plan)
@@ -224,7 +226,15 @@ ones, where only the changes are named."
     ;; A plan replaces the previous one.
     ("plan" (agentel-conversation-send session 'plan 'plan
                                        `(show ,(agentel-conversation--plan-steps
-                                                (alist-get 'entries update)))))))
+                                                (alist-get 'entries update)))))
+    ;; ACP version 2 tells each plan by its id, such as the todo list and
+    ;; the plan of the plan mode.
+    ("plan_update"
+     (let-alist (alist-get 'plan update)
+       (agentel-conversation-send session (cons 'plan .planId) 'plan
+                                  (if (equal .type "markdown")
+                                      `(show-text ,.content)
+                                    `(show ,(agentel-conversation--plan-steps .entries))))))))
 
 (add-hook 'agentel-session-update-functions #'agentel-conversation--on-update)
 

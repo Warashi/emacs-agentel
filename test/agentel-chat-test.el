@@ -266,6 +266,23 @@
        (title . "sleep") (status . "cancelled")))
     (should (string-match-p "\\`  ⊘ sleep\\'" (agentel-chat-test-transcript)))))
 
+(ert-deftest agentel-chat-shows-a-plan-told-as-text ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-update
+     '((sessionUpdate . "plan_update")
+       (plan . ((type . "markdown") (planId . "plan-mode")
+                (content . "- Add a greeting\n- Test it")))))
+    (should (equal (agentel-chat-test-transcript)
+                   "Plan\n  - Add a greeting\n  - Test it"))))
+
+(ert-deftest agentel-chat-marks-a-cancelled-plan-step ()
+  (agentel-chat-test-with-session
+    (agentel-chat-test-update
+     '((sessionUpdate . "plan_update")
+       (plan . ((type . "items") (planId . "todo")
+                (entries . [((content . "Ship") (status . "cancelled"))])))))
+    (should (equal (agentel-chat-test-transcript) "Plan\n  [~] Ship"))))
+
 (ert-deftest agentel-chat-shows-a-paused-tool-call ()
   (agentel-chat-test-with-session
     (agentel-chat-test-update
