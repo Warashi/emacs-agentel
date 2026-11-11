@@ -18,7 +18,7 @@ test-spec:
 # Regenerate the test cases taken from the specs, to be reviewed.
 spec:
 	$(PYTHON) $(SPEC)/convert.py $(SPEC)/commonmark-0.31.2.json $(SPEC)/gfm-27d942c.txt \
-	  > $(SPEC)/expected.eld
+	  $(SPEC)/cjk-friendly-e9762c3.json > $(SPEC)/expected.eld
 
 entities:
 	$(PYTHON) etc/entities.py > agentel-commonmark-entities.el

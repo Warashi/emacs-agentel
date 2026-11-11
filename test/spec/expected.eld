@@ -3385,4 +3385,594 @@ a.b-c_d@a.b-
 a.b-c_d@a.b_
 "
   :expected (document () (paragraph () (link (:destination "mailto:a.b-c_d@a.b" :title nil) "a.b-c_d@a.b")) (paragraph () (link (:destination "mailto:a.b-c_d@a.b" :title nil) "a.b-c_d@a.b") ".") (paragraph () "a.b-c_d@a.b-") (paragraph () "a.b-c_d@a.b_")))
+ (:source cjk-friendly :example 1 :section "strong.md"
+  :markdown "これは**私のやりたかったこと。**だからするの。
+"
+  :expected (document () (paragraph () "これは" (strong () "私のやりたかったこと。") "だからするの。")))
+ (:source cjk-friendly :example 2 :section "strong.md"
+  :markdown "**[製品ほげ](./product-foo)**と**[製品ふが](./product-bar)**をお試しください
+"
+  :expected (document () (paragraph () (strong () (link (:destination "./product-foo" :title nil) "製品ほげ")) "と" (strong () (link (:destination "./product-bar" :title nil) "製品ふが")) "をお試しください")))
+ (:source cjk-friendly :example 3 :section "strong.md"
+  :markdown "単語と**[単語と](word-and)**単語
+"
+  :expected (document () (paragraph () "単語と" (strong () (link (:destination "word-and" :title nil) "単語と")) "単語")))
+ (:source cjk-friendly :example 4 :section "strong.md"
+  :markdown "**これは太字になりません。**ご注意ください。
+"
+  :expected (document () (paragraph () (strong () "これは太字になりません。") "ご注意ください。")))
+ (:source cjk-friendly :example 5 :section "strong.md"
+  :markdown "カッコに注意**（太字にならない）**文が続く場合に要警戒。
+"
+  :expected (document () (paragraph () "カッコに注意" (strong () "（太字にならない）") "文が続く場合に要警戒。")))
+ (:source cjk-friendly :example 6 :section "strong.md"
+  :markdown "**[リンク](https://example.com)**も注意。（画像も同様）
+"
+  :expected (document () (paragraph () (strong () (link (:destination "https://example.com" :title nil) "リンク")) "も注意。（画像も同様）")))
+ (:source cjk-friendly :example 7 :section "strong.md"
+  :markdown "先頭の**\\`コード\\`も注意。**
+"
+  :expected (document () (paragraph () "先頭の" (strong () "`コード`も注意。"))))
+ (:source cjk-friendly :example 8 :section "strong.md"
+  :markdown "**末尾の\\`コード\\`**も注意。
+"
+  :expected (document () (paragraph () (strong () "末尾の`コード`") "も注意。")))
+ (:source cjk-friendly :example 9 :section "strong.md"
+  :markdown "税込**¥10,000**で入手できます。
+"
+  :expected (document () (paragraph () "税込" (strong () "¥10,000") "で入手できます。")))
+ (:source cjk-friendly :example 10 :section "strong.md"
+  :markdown "正解は**④**です。
+"
+  :expected (document () (paragraph () "正解は" (strong () "④") "です。")))
+ (:source cjk-friendly :example 11 :section "strong.md"
+  :markdown "太郎は**「こんにちわ」**といった
+"
+  :expected (document () (paragraph () "太郎は" (strong () "「こんにちわ」") "といった")))
+ (:source cjk-friendly :example 12 :section "strong.md"
+  :markdown "太郎は**\"こんにちわ\"**といった
+"
+  :expected (document () (paragraph () "太郎は" (strong () "\"こんにちわ\"") "といった")))
+ (:source cjk-friendly :example 13 :section "strong.md"
+  :markdown "太郎は**こんにちわ**といった
+"
+  :expected (document () (paragraph () "太郎は" (strong () "こんにちわ") "といった")))
+ (:source cjk-friendly :example 14 :section "strong.md"
+  :markdown "太郎は**「Hello」**といった
+"
+  :expected (document () (paragraph () "太郎は" (strong () "「Hello」") "といった")))
+ (:source cjk-friendly :example 15 :section "strong.md"
+  :markdown "太郎は**\"Hello\"**といった
+"
+  :expected (document () (paragraph () "太郎は" (strong () "\"Hello\"") "といった")))
+ (:source cjk-friendly :example 16 :section "strong.md"
+  :markdown "太郎は**Hello**といった
+"
+  :expected (document () (paragraph () "太郎は" (strong () "Hello") "といった")))
+ (:source cjk-friendly :example 17 :section "strong.md"
+  :markdown "太郎は**「Oh my god」**といった
+"
+  :expected (document () (paragraph () "太郎は" (strong () "「Oh my god」") "といった")))
+ (:source cjk-friendly :example 18 :section "strong.md"
+  :markdown "太郎は**\"Oh my god\"**といった
+"
+  :expected (document () (paragraph () "太郎は" (strong () "\"Oh my god\"") "といった")))
+ (:source cjk-friendly :example 19 :section "strong.md"
+  :markdown "太郎は**Oh my god**といった
+"
+  :expected (document () (paragraph () "太郎は" (strong () "Oh my god") "といった")))
+ (:source cjk-friendly :example 20 :section "strong.md"
+  :markdown "**C#**や**F#**は**「.NET」**というプラットフォーム上で動作します。
+"
+  :expected (document () (paragraph () (strong () "C#") "や" (strong () "F#") "は" (strong () "「.NET」") "というプラットフォーム上で動作します。")))
+ (:source cjk-friendly :example 21 :section "strong.md"
+  :markdown "IDが**001号**になります。
+"
+  :expected (document () (paragraph () "IDが" (strong () "001号") "になります。")))
+ (:source cjk-friendly :example 22 :section "strong.md"
+  :markdown "IDが**００１号**になります。
+"
+  :expected (document () (paragraph () "IDが" (strong () "００１号") "になります。")))
+ (:source cjk-friendly :example 23 :section "strong.md"
+  :markdown "Go**「初心者」**を対象とした記事です。
+"
+  :expected (document () (paragraph () "Go" (strong () "「初心者」") "を対象とした記事です。")))
+ (:source cjk-friendly :example 24 :section "strong.md"
+  :markdown "**[リンク](https://example.com)**も注意。
+"
+  :expected (document () (paragraph () (strong () (link (:destination "https://example.com" :title nil) "リンク")) "も注意。")))
+ (:source cjk-friendly :example 25 :section "strong.md"
+  :markdown "**⻲田太郎**と申します
+"
+  :expected (document () (paragraph () (strong () "⻲田太郎") "と申します")))
+ (:source cjk-friendly :example 26 :section "strong.md"
+  :markdown "・**㋐**:選択肢１つ目
+"
+  :expected (document () (paragraph () "・" (strong () "㋐") ":選択肢１つ目")))
+ (:source cjk-friendly :example 27 :section "strong.md"
+  :markdown "**真，**她
+"
+  :expected (document () (paragraph () (strong () "真，") "她")))
+ (:source cjk-friendly :example 28 :section "strong.md"
+  :markdown "**真。**她
+"
+  :expected (document () (paragraph () (strong () "真。") "她")))
+ (:source cjk-friendly :example 29 :section "strong.md"
+  :markdown "**真、**她
+"
+  :expected (document () (paragraph () (strong () "真、") "她")))
+ (:source cjk-friendly :example 30 :section "strong.md"
+  :markdown "**真；**她
+"
+  :expected (document () (paragraph () (strong () "真；") "她")))
+ (:source cjk-friendly :example 31 :section "strong.md"
+  :markdown "**真：**她
+"
+  :expected (document () (paragraph () (strong () "真：") "她")))
+ (:source cjk-friendly :example 32 :section "strong.md"
+  :markdown "**真？**她
+"
+  :expected (document () (paragraph () (strong () "真？") "她")))
+ (:source cjk-friendly :example 33 :section "strong.md"
+  :markdown "**真！**她
+"
+  :expected (document () (paragraph () (strong () "真！") "她")))
+ (:source cjk-friendly :example 34 :section "strong.md"
+  :markdown "**真“**她
+"
+  :expected (document () (paragraph () (strong () "真“") "她")))
+ (:source cjk-friendly :example 35 :section "strong.md"
+  :markdown "**真”**她
+"
+  :expected (document () (paragraph () (strong () "真”") "她")))
+ (:source cjk-friendly :example 36 :section "strong.md"
+  :markdown "**真‘**她
+"
+  :expected (document () (paragraph () (strong () "真‘") "她")))
+ (:source cjk-friendly :example 37 :section "strong.md"
+  :markdown "**真’**她
+"
+  :expected (document () (paragraph () (strong () "真’") "她")))
+ (:source cjk-friendly :example 38 :section "strong.md"
+  :markdown "**真（**她
+"
+  :expected (document () (paragraph () (strong () "真（") "她")))
+ (:source cjk-friendly :example 39 :section "strong.md"
+  :markdown "真**（她**
+"
+  :expected (document () (paragraph () "真" (strong () "（她"))))
+ (:source cjk-friendly :example 40 :section "strong.md"
+  :markdown "**真）**她
+"
+  :expected (document () (paragraph () (strong () "真）") "她")))
+ (:source cjk-friendly :example 41 :section "strong.md"
+  :markdown "**真【**她
+"
+  :expected (document () (paragraph () (strong () "真【") "她")))
+ (:source cjk-friendly :example 42 :section "strong.md"
+  :markdown "真**【她**
+"
+  :expected (document () (paragraph () "真" (strong () "【她"))))
+ (:source cjk-friendly :example 43 :section "strong.md"
+  :markdown "**真】**她
+"
+  :expected (document () (paragraph () (strong () "真】") "她")))
+ (:source cjk-friendly :example 44 :section "strong.md"
+  :markdown "**真《**她
+"
+  :expected (document () (paragraph () (strong () "真《") "她")))
+ (:source cjk-friendly :example 45 :section "strong.md"
+  :markdown "真**《她**
+"
+  :expected (document () (paragraph () "真" (strong () "《她"))))
+ (:source cjk-friendly :example 46 :section "strong.md"
+  :markdown "**真》**她
+"
+  :expected (document () (paragraph () (strong () "真》") "她")))
+ (:source cjk-friendly :example 47 :section "strong.md"
+  :markdown "**真—**她
+"
+  :expected (document () (paragraph () (strong () "真—") "她")))
+ (:source cjk-friendly :example 48 :section "strong.md"
+  :markdown "**真～**她
+"
+  :expected (document () (paragraph () (strong () "真～") "她")))
+ (:source cjk-friendly :example 49 :section "strong.md"
+  :markdown "**真…**她
+"
+  :expected (document () (paragraph () (strong () "真…") "她")))
+ (:source cjk-friendly :example 50 :section "strong.md"
+  :markdown "**真·**她
+"
+  :expected (document () (paragraph () (strong () "真·") "她")))
+ (:source cjk-friendly :example 51 :section "strong.md"
+  :markdown "**真〃**她
+"
+  :expected (document () (paragraph () (strong () "真〃") "她")))
+ (:source cjk-friendly :example 52 :section "strong.md"
+  :markdown "**真-**她
+"
+  :expected (document () (paragraph () (strong () "真-") "她")))
+ (:source cjk-friendly :example 53 :section "strong.md"
+  :markdown "**真々**她
+"
+  :expected (document () (paragraph () (strong () "真々") "她")))
+ (:source cjk-friendly :example 54 :section "strong.md"
+  :markdown "**真**她
+"
+  :expected (document () (paragraph () (strong () "真") "她")))
+ (:source cjk-friendly :example 55 :section "strong.md"
+  :markdown "**真，** 她
+"
+  :expected (document () (paragraph () (strong () "真，") " 她")))
+ (:source cjk-friendly :example 56 :section "strong.md"
+  :markdown "**真**，她
+"
+  :expected (document () (paragraph () (strong () "真") "，她")))
+ (:source cjk-friendly :example 57 :section "strong.md"
+  :markdown "**真，**&ZeroWidthSpace;她
+"
+  :expected (document () (paragraph () (strong () "真，") "​她")))
+ (:source cjk-friendly :example 58 :section "strong.md"
+  :markdown "私は**⻲田太郎**と申します
+"
+  :expected (document () (paragraph () "私は" (strong () "⻲田太郎") "と申します")))
+ (:source cjk-friendly :example 59 :section "strong.md"
+  :markdown "選択肢**㋐**: 1つ目の選択肢
+"
+  :expected (document () (paragraph () "選択肢" (strong () "㋐") ": 1つ目の選択肢")))
+ (:source cjk-friendly :example 60 :section "strong.md"
+  :markdown "**さようなら︙**と太郎はいった。
+"
+  :expected (document () (paragraph () (strong () "さようなら︙") "と太郎はいった。")))
+ (:source cjk-friendly :example 61 :section "strong.md"
+  :markdown ".NET**（.NET Frameworkは不可）**では、
+"
+  :expected (document () (paragraph () ".NET" (strong () "（.NET Frameworkは不可）") "では、")))
+ (:source cjk-friendly :example 62 :section "strong.md"
+  :markdown "「禰󠄀」の偏は示ではなく**礻**です。
+"
+  :expected (document () (paragraph () "「禰󠄀」の偏は示ではなく" (strong () "礻") "です。")))
+ (:source cjk-friendly :example 63 :section "strong.md"
+  :markdown "Git**（注：不是GitHub）**
+"
+  :expected (document () (paragraph () "Git" (strong () "（注：不是GitHub）"))))
+ (:source cjk-friendly :example 64 :section "strong.md"
+  :markdown "太郎は**「こんにちわ」**といった。
+"
+  :expected (document () (paragraph () "太郎は" (strong () "「こんにちわ」") "といった。")))
+ (:source cjk-friendly :example 65 :section "strong.md"
+  :markdown "𰻞𰻞**（ビャンビャン）**麺
+"
+  :expected (document () (paragraph () "𰻞𰻞" (strong () "（ビャンビャン）") "麺")))
+ (:source cjk-friendly :example 66 :section "strong.md"
+  :markdown "𰻞𰻞**(ビャンビャン)**麺
+"
+  :expected (document () (paragraph () "𰻞𰻞" (strong () "(ビャンビャン)") "麺")))
+ (:source cjk-friendly :example 67 :section "strong.md"
+  :markdown "ハイパーテキストコーヒーポット制御プロトコル**(HTCPCP)**
+"
+  :expected (document () (paragraph () "ハイパーテキストコーヒーポット制御プロトコル" (strong () "(HTCPCP)"))))
+ (:source cjk-friendly :example 68 :section "strong.md"
+  :markdown "﨑**(崎)**
+"
+  :expected (document () (paragraph () "﨑" (strong () "(崎)"))))
+ (:source cjk-friendly :example 69 :section "strong.md"
+  :markdown "国際規格**[ECMA-262](https://tc39.es/ecma262/)**
+"
+  :expected (document () (paragraph () "国際規格" (strong () (link (:destination "https://tc39.es/ecma262/" :title nil) "ECMA-262")))))
+ (:source cjk-friendly :example 70 :section "strong.md"
+  :markdown "㐧**(第の俗字)**
+"
+  :expected (document () (paragraph () "㐧" (strong () "(第の俗字)"))))
+ (:source cjk-friendly :example 71 :section "strong.md"
+  :markdown "𠮟**(こちらが正式表記)**
+"
+  :expected (document () (paragraph () "𠮟" (strong () "(こちらが正式表記)"))))
+ (:source cjk-friendly :example 72 :section "strong.md"
+  :markdown "𪜈**(トモの合略仮名)**
+"
+  :expected (document () (paragraph () "𪜈" (strong () "(トモの合略仮名)"))))
+ (:source cjk-friendly :example 73 :section "strong.md"
+  :markdown "𫠉**(馬の俗字)**
+"
+  :expected (document () (paragraph () "𫠉" (strong () "(馬の俗字)"))))
+ (:source cjk-friendly :example 74 :section "strong.md"
+  :markdown "谺𬤲**(こだま)**石神社
+"
+  :expected (document () (paragraph () "谺𬤲" (strong () "(こだま)") "石神社")))
+ (:source cjk-friendly :example 75 :section "strong.md"
+  :markdown "石𮧟**(いしただら)**
+"
+  :expected (document () (paragraph () "石𮧟" (strong () "(いしただら)"))))
+ (:source cjk-friendly :example 76 :section "strong.md"
+  :markdown "**推荐几个框架：**React、Vue等前端框架。
+"
+  :expected (document () (paragraph () (strong () "推荐几个框架：") "React、Vue等前端框架。")))
+ (:source cjk-friendly :example 77 :section "strong.md"
+  :markdown "葛󠄀**(こちらが正式表記)**城市
+"
+  :expected (document () (paragraph () "葛󠄀" (strong () "(こちらが正式表記)") "城市")))
+ (:source cjk-friendly :example 78 :section "strong.md"
+  :markdown "禰󠄀**(こちらが正式表記)**豆子
+"
+  :expected (document () (paragraph () "禰󠄀" (strong () "(こちらが正式表記)") "豆子")))
+ (:source cjk-friendly :example 79 :section "strong.md"
+  :markdown "𱟛**(U+317DB)**
+"
+  :expected (document () (paragraph () "𱟛" (strong () "(U+317DB)"))))
+ (:source cjk-friendly :example 80 :section "strong.md"
+  :markdown "阿寒湖アイヌシアターイコㇿ**(Akanko Ainu Theater Ikor)**
+"
+  :expected (document () (paragraph () "阿寒湖アイヌシアターイコㇿ" (strong () "(Akanko Ainu Theater Ikor)"))))
+ (:source cjk-friendly :example 81 :section "strong.md"
+  :markdown "あ𛀙**(か)**よろし
+"
+  :expected (document () (paragraph () "あ𛀙" (strong () "(か)") "よろし")))
+ (:source cjk-friendly :example 82 :section "strong.md"
+  :markdown "𮹝**(simplified form of 龘 in China)**
+"
+  :expected (document () (paragraph () "𮹝" (strong () "(simplified form of 龘 in China)"))))
+ (:source cjk-friendly :example 83 :section "strong.md"
+  :markdown "大塚︀**(U+585A U+FE00)** 大塚**(U+FA10)**
+"
+  :expected (document () (paragraph () "大塚︀" (strong () "(U+585A U+FE00)") " 大塚" (strong () "(U+FA10)"))))
+ (:source cjk-friendly :example 84 :section "strong.md"
+  :markdown "〽︎**(庵点)**は、
+"
+  :expected (document () (paragraph () "〽︎" (strong () "(庵点)") "は、")))
+ (:source cjk-friendly :example 85 :section "strong.md"
+  :markdown "**“︁Git”︁**Hub
+
+"
+  :expected (document () (paragraph () (strong () "“︁Git”︁") "Hub")))
+ (:source cjk-friendly :example 86 :section "korean.md"
+  :markdown "**이 [링크](https://example.kr/)**만을 강조하고 싶다.
+"
+  :expected (document () (paragraph () (strong () "이 " (link (:destination "https://example.kr/" :title nil) "링크")) "만을 강조하고 싶다.")))
+ (:source cjk-friendly :example 87 :section "korean.md"
+  :markdown "**스크립트(script)**라고
+"
+  :expected (document () (paragraph () (strong () "스크립트(script)") "라고")))
+ (:source cjk-friendly :example 88 :section "korean.md"
+  :markdown "패키지를 발행하려면 **`npm publish`**를 실행하십시오.
+"
+  :expected (document () (paragraph () "패키지를 발행하려면 " (strong () (code () "npm publish")) "를 실행하십시오.")))
+ (:source cjk-friendly :example 89 :section "korean.md"
+  :markdown "**안녕(hello)**하세요.
+"
+  :expected (document () (paragraph () (strong () "안녕(hello)") "하세요.")))
+ (:source cjk-friendly :example 90 :section "korean.md"
+  :markdown "ᅡ**(a)**
+"
+  :expected (document () (paragraph () "ᅡ" (strong () "(a)"))))
+ (:source cjk-friendly :example 91 :section "korean.md"
+  :markdown "**(k)**ᄏ
+
+"
+  :expected (document () (paragraph () (strong () "(k)") "ᄏ")))
+ (:source cjk-friendly :example 92 :section "pseudo-emoji.md"
+  :markdown "a**〰**a
+"
+  :expected (document () (paragraph () "a" (strong () "〰") "a")))
+ (:source cjk-friendly :example 93 :section "pseudo-emoji.md"
+  :markdown "a**〽**a
+"
+  :expected (document () (paragraph () "a" (strong () "〽") "a")))
+ (:source cjk-friendly :example 94 :section "pseudo-emoji.md"
+  :markdown "a**🈂**a
+"
+  :expected (document () (paragraph () "a" (strong () "🈂") "a")))
+ (:source cjk-friendly :example 95 :section "pseudo-emoji.md"
+  :markdown "a**🈷**a
+"
+  :expected (document () (paragraph () "a" (strong () "🈷") "a")))
+ (:source cjk-friendly :example 96 :section "pseudo-emoji.md"
+  :markdown "a**㊗**a
+"
+  :expected (document () (paragraph () "a" (strong () "㊗") "a")))
+ (:source cjk-friendly :example 97 :section "pseudo-emoji.md"
+  :markdown "a**㊙**a
+
+"
+  :expected (document () (paragraph () "a" (strong () "㊙") "a")))
+ (:source cjk-friendly :example 98 :section "non-bmp.md"
+  :markdown "
+a**a«**a
+"
+  :expected (document () (paragraph () "a**a«**a")))
+ (:source cjk-friendly :example 99 :section "non-bmp.md"
+  :markdown "a**»a**a
+"
+  :expected (document () (paragraph () "a**»a**a")))
+ (:source cjk-friendly :example 100 :section "non-bmp.md"
+  :markdown "a**a∇**a
+"
+  :expected (document () (paragraph () "a**a∇**a")))
+ (:source cjk-friendly :example 101 :section "non-bmp.md"
+  :markdown "a**∇a**a
+"
+  :expected (document () (paragraph () "a**∇a**a")))
+ (:source cjk-friendly :example 102 :section "non-bmp.md"
+  :markdown "a**a𝜵**a
+"
+  :expected (document () (paragraph () "a**a𝜵**a")))
+ (:source cjk-friendly :example 103 :section "non-bmp.md"
+  :markdown "a**𝜵a**a
+"
+  :expected (document () (paragraph () "a**𝜵a**a")))
+ (:source cjk-friendly :example 104 :section "non-bmp.md"
+  :markdown "a**𐬻a**a
+"
+  :expected (document () (paragraph () "a**𐬻a**a")))
+ (:source cjk-friendly :example 105 :section "non-bmp.md"
+  :markdown "a**a𐬻**a
+
+"
+  :expected (document () (paragraph () "a**a𐬻**a")))
+ (:source cjk-friendly :example 106 :section "underscore-cjk-punct.md"
+  :markdown "__注意__：注意事項
+"
+  :expected (document () (paragraph () (strong () "注意") "：注意事項")))
+ (:source cjk-friendly :example 107 :section "underscore-cjk-punct.md"
+  :markdown "注意：__注意事項__
+"
+  :expected (document () (paragraph () "注意：" (strong () "注意事項"))))
+ (:source cjk-friendly :example 108 :section "underscore-cjk-punct.md"
+  :markdown "正體字。︁_Traditional._
+"
+  :expected (document () (paragraph () "正體字。︁" (emphasis () "Traditional."))))
+ (:source cjk-friendly :example 109 :section "underscore-cjk-punct.md"
+  :markdown "正體字。︁__Hong Kong and Taiwan.__
+"
+  :expected (document () (paragraph () "正體字。︁" (strong () "Hong Kong and Taiwan."))))
+ (:source cjk-friendly :example 110 :section "underscore-cjk-punct.md"
+  :markdown "简体字 / 新字体。︀_Simplified._
+"
+  :expected (document () (paragraph () "简体字 / 新字体。︀" (emphasis () "Simplified."))))
+ (:source cjk-friendly :example 111 :section "underscore-cjk-punct.md"
+  :markdown "简体字 / 新字体。︀__Mainland China or Japan.__
+"
+  :expected (document () (paragraph () "简体字 / 新字体。︀" (strong () "Mainland China or Japan."))))
+ (:source cjk-friendly :example 112 :section "underscore-cjk-punct.md"
+  :markdown "“︁Git”︁__Hub__
+
+"
+  :expected (document () (paragraph () "“︁Git”︁" (strong () "Hub"))))
+ (:source cjk-friendly :example 113 :section "gfm-strikethrough.md"
+  :markdown "a~~a()~~あ
+"
+  :expected (document () (paragraph () "a" (strikethrough () "a()") "あ")))
+ (:source cjk-friendly :example 114 :section "gfm-strikethrough.md"
+  :markdown "あ~~()a~~a
+"
+  :expected (document () (paragraph () "あ" (strikethrough () "()a") "a")))
+ (:source cjk-friendly :example 115 :section "gfm-strikethrough.md"
+  :markdown "𩸽~~()a~~a
+"
+  :expected (document () (paragraph () "𩸽" (strikethrough () "()a") "a")))
+ (:source cjk-friendly :example 116 :section "gfm-strikethrough.md"
+  :markdown "a~~a()~~𩸽
+"
+  :expected (document () (paragraph () "a" (strikethrough () "a()") "𩸽")))
+ (:source cjk-friendly :example 117 :section "gfm-strikethrough.md"
+  :markdown "葛󠄀~~()a~~a
+"
+  :expected (document () (paragraph () "葛󠄀" (strikethrough () "()a") "a")))
+ (:source cjk-friendly :example 118 :section "gfm-strikethrough.md"
+  :markdown "羽︀~~()a~~a
+"
+  :expected (document () (paragraph () "羽︀" (strikethrough () "()a") "a")))
+ (:source cjk-friendly :example 119 :section "gfm-strikethrough.md"
+  :markdown "a~~「a~~」
+"
+  :expected (document () (paragraph () "a" (strikethrough () "「a") "」")))
+ (:source cjk-friendly :example 120 :section "gfm-strikethrough.md"
+  :markdown "「~~a」~~a
+"
+  :expected (document () (paragraph () "「" (strikethrough () "a」") "a")))
+ (:source cjk-friendly :example 121 :section "gfm-strikethrough.md"
+  :markdown "~~a~~：~~a~~
+"
+  :expected (document () (paragraph () (strikethrough () "a") "：" (strikethrough () "a"))))
+ (:source cjk-friendly :example 122 :section "gfm-strikethrough.md"
+  :markdown "~~日本語。︀~~English.
+"
+  :expected (document () (paragraph () (strikethrough () "日本語。︀") "English.")))
+ (:source cjk-friendly :example 123 :section "gfm-strikethrough.md"
+  :markdown "~~“︁a”︁~~a
+
+"
+  :expected (document () (paragraph () (strikethrough () "“︁a”︁") "a")))
+ (:source cjk-friendly :example 124 :section "gfm-non-cjk.md"
+  :markdown "~~Hi~~ Hello, ~there~ world!
+"
+  :expected (document () (paragraph () (strikethrough () "Hi") " Hello, " (strikethrough () "there") " world!")))
+ (:source cjk-friendly :example 125 :section "gfm-non-cjk.md"
+  :markdown "This ~~has a
+"
+  :expected (document () (paragraph () "This ~~has a")))
+ (:source cjk-friendly :example 126 :section "gfm-non-cjk.md"
+  :markdown "new paragraph~~.
+"
+  :expected (document () (paragraph () "new paragraph~~.")))
+ (:source cjk-friendly :example 127 :section "gfm-non-cjk.md"
+  :markdown "This will ~~~not~~~ strike.
+"
+  :expected (document () (paragraph () "This will ~~~not~~~ strike.")))
+ (:source cjk-friendly :example 128 :section "gfm-non-cjk.md"
+  :markdown "A proper ~strikethrough~.
+"
+  :expected (document () (paragraph () "A proper " (strikethrough () "strikethrough") ".")))
+ (:source cjk-friendly :example 129 :section "gfm-non-cjk.md"
+  :markdown "These are ~not strikethroughs.
+"
+  :expected (document () (paragraph () "These are ~not strikethroughs.")))
+ (:source cjk-friendly :example 130 :section "gfm-non-cjk.md"
+  :markdown "No, they are not~
+"
+  :expected (document () (paragraph () "No, they are not~")))
+ (:source cjk-friendly :example 131 :section "gfm-non-cjk.md"
+  :markdown "This ~is ~ legit~ isn't ~ legit.
+"
+  :expected (document () (paragraph () "This " (strikethrough () "is ~ legit") " isn't ~ legit.")))
+ (:source cjk-friendly :example 132 :section "gfm-non-cjk.md"
+  :markdown "This is not ~~~~~one~~~~~ huge strikethrough.
+"
+  :expected (document () (paragraph () "This is not ~~~~~one~~~~~ huge strikethrough.")))
+ (:source cjk-friendly :example 133 :section "gfm-non-cjk.md"
+  :markdown "~one~ ~~two~~ ~~~three~~~
+"
+  :expected (document () (paragraph () (strikethrough () "one") " " (strikethrough () "two") " ~~~three~~~")))
+ (:source cjk-friendly :example 134 :section "gfm-non-cjk.md"
+  :markdown "No ~mismatch~~
+"
+  :expected (document () (paragraph () "No ~mismatch~~")))
+ (:source cjk-friendly :example 135 :section "gfm-non-cjk.md"
+  :markdown "~~**_`this`_**~~  
+~~***`this`***~~  
+~~___`this`___~~
+"
+  :expected (document () (paragraph () (strikethrough () (strong () (emphasis () (code () "this")))) (hard-break ()) (strikethrough () (emphasis () (strong () (code () "this")))) (hard-break ()) (strikethrough () (emphasis () (strong () (code () "this")))))))
+ (:source cjk-friendly :example 136 :section "gfm-non-cjk.md"
+  :markdown "~~**_this_**~~  
+~~***this***~~  
+~~___this___~~
+"
+  :expected (document () (paragraph () (strikethrough () (strong () (emphasis () "this"))) (hard-break ()) (strikethrough () (emphasis () (strong () "this"))) (hard-break ()) (strikethrough () (emphasis () (strong () "this"))))))
+ (:source cjk-friendly :example 137 :section "gfm-non-cjk.md"
+  :markdown "~Hi~ Hello, world!
+"
+  :expected (document () (paragraph () (strikethrough () "Hi") " Hello, world!")))
+ (:source cjk-friendly :example 138 :section "gfm-non-cjk.md"
+  :markdown "This ~text~ ~~is~~ ~~~curious~~~.
+"
+  :expected (document () (paragraph () "This " (strikethrough () "text") " " (strikethrough () "is") " ~~~curious~~~.")))
+ (:source cjk-friendly :example 139 :section "gfm-non-cjk.md"
+  :markdown "[^~~is~~1]
+"
+  :expected (document () (paragraph () "[^" (strikethrough () "is") "1]")))
+ (:source cjk-friendly :example 140 :section "gfm-non-cjk.md"
+  :markdown "a~~()a~~a
+"
+  :expected (document () (paragraph () "a~~()a~~a")))
+ (:source cjk-friendly :example 141 :section "gfm-non-cjk.md"
+  :markdown "a~~a()~~a
+"
+  :expected (document () (paragraph () "a~~a()~~a")))
+ (:source cjk-friendly :example 142 :section "gfm-non-cjk.md"
+  :markdown "~~()~~
+"
+  :expected (document () (paragraph () (strikethrough () "()"))))
+ (:source cjk-friendly :example 143 :section "gfm-non-cjk.md"
+  :markdown "(~~()~~)
+"
+  :expected (document () (paragraph () "(" (strikethrough () "()") ")")))
+ (:source cjk-friendly :example 144 :section "gfm-non-cjk.md"
+  :markdown "| A |
+| - |
+| https://example.com/ |
+
+"
+  :expected (document () (table () (table-row (:header t) (table-cell (:align nil) "A")) (table-row (:header nil) (table-cell (:align nil) (link (:destination "https://example.com/" :title nil) "https://example.com/"))))))
 )

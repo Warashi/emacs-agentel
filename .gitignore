@@ -52,3 +52,6 @@ flycheck_*.el
 
 # undo-tree
 *.~undo-tree~
+
+# packages to regenerate the test cases of markdown-cjk-friendly
+/test/spec/node_modules/

@@ -1,0 +1,722 @@
+[
+ {
+  "file": "strong.md",
+  "markdown": "これは**私のやりたかったこと。**だからするの。\n",
+  "html": "<p>これは<strong>私のやりたかったこと。</strong>だからするの。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**[製品ほげ](./product-foo)**と**[製品ふが](./product-bar)**をお試しください\n",
+  "html": "<p><strong><a href=\"./product-foo\">製品ほげ</a></strong>と<strong><a href=\"./product-bar\">製品ふが</a></strong>をお試しください</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "単語と**[単語と](word-and)**単語\n",
+  "html": "<p>単語と<strong><a href=\"word-and\">単語と</a></strong>単語</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**これは太字になりません。**ご注意ください。\n",
+  "html": "<p><strong>これは太字になりません。</strong>ご注意ください。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "カッコに注意**（太字にならない）**文が続く場合に要警戒。\n",
+  "html": "<p>カッコに注意<strong>（太字にならない）</strong>文が続く場合に要警戒。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**[リンク](https://example.com)**も注意。（画像も同様）\n",
+  "html": "<p><strong><a href=\"https://example.com\">リンク</a></strong>も注意。（画像も同様）</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "先頭の**\\`コード\\`も注意。**\n",
+  "html": "<p>先頭の<strong>`コード`も注意。</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**末尾の\\`コード\\`**も注意。\n",
+  "html": "<p><strong>末尾の`コード`</strong>も注意。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "税込**¥10,000**で入手できます。\n",
+  "html": "<p>税込<strong>¥10,000</strong>で入手できます。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "正解は**④**です。\n",
+  "html": "<p>正解は<strong>④</strong>です。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "太郎は**「こんにちわ」**といった\n",
+  "html": "<p>太郎は<strong>「こんにちわ」</strong>といった</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "太郎は**\"こんにちわ\"**といった\n",
+  "html": "<p>太郎は<strong>\"こんにちわ\"</strong>といった</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "太郎は**こんにちわ**といった\n",
+  "html": "<p>太郎は<strong>こんにちわ</strong>といった</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "太郎は**「Hello」**といった\n",
+  "html": "<p>太郎は<strong>「Hello」</strong>といった</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "太郎は**\"Hello\"**といった\n",
+  "html": "<p>太郎は<strong>\"Hello\"</strong>といった</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "太郎は**Hello**といった\n",
+  "html": "<p>太郎は<strong>Hello</strong>といった</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "太郎は**「Oh my god」**といった\n",
+  "html": "<p>太郎は<strong>「Oh my god」</strong>といった</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "太郎は**\"Oh my god\"**といった\n",
+  "html": "<p>太郎は<strong>\"Oh my god\"</strong>といった</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "太郎は**Oh my god**といった\n",
+  "html": "<p>太郎は<strong>Oh my god</strong>といった</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**C#**や**F#**は**「.NET」**というプラットフォーム上で動作します。\n",
+  "html": "<p><strong>C#</strong>や<strong>F#</strong>は<strong>「.NET」</strong>というプラットフォーム上で動作します。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "IDが**001号**になります。\n",
+  "html": "<p>IDが<strong>001号</strong>になります。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "IDが**００１号**になります。\n",
+  "html": "<p>IDが<strong>００１号</strong>になります。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "Go**「初心者」**を対象とした記事です。\n",
+  "html": "<p>Go<strong>「初心者」</strong>を対象とした記事です。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**[リンク](https://example.com)**も注意。\n",
+  "html": "<p><strong><a href=\"https://example.com\">リンク</a></strong>も注意。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**⻲田太郎**と申します\n",
+  "html": "<p><strong>⻲田太郎</strong>と申します</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "・**㋐**:選択肢１つ目\n",
+  "html": "<p>・<strong>㋐</strong>:選択肢１つ目</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真，**她\n",
+  "html": "<p><strong>真，</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真。**她\n",
+  "html": "<p><strong>真。</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真、**她\n",
+  "html": "<p><strong>真、</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真；**她\n",
+  "html": "<p><strong>真；</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真：**她\n",
+  "html": "<p><strong>真：</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真？**她\n",
+  "html": "<p><strong>真？</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真！**她\n",
+  "html": "<p><strong>真！</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真“**她\n",
+  "html": "<p><strong>真“</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真”**她\n",
+  "html": "<p><strong>真”</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真‘**她\n",
+  "html": "<p><strong>真‘</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真’**她\n",
+  "html": "<p><strong>真’</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真（**她\n",
+  "html": "<p><strong>真（</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "真**（她**\n",
+  "html": "<p>真<strong>（她</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真）**她\n",
+  "html": "<p><strong>真）</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真【**她\n",
+  "html": "<p><strong>真【</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "真**【她**\n",
+  "html": "<p>真<strong>【她</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真】**她\n",
+  "html": "<p><strong>真】</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真《**她\n",
+  "html": "<p><strong>真《</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "真**《她**\n",
+  "html": "<p>真<strong>《她</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真》**她\n",
+  "html": "<p><strong>真》</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真—**她\n",
+  "html": "<p><strong>真—</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真～**她\n",
+  "html": "<p><strong>真～</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真…**她\n",
+  "html": "<p><strong>真…</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真·**她\n",
+  "html": "<p><strong>真·</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真〃**她\n",
+  "html": "<p><strong>真〃</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真-**她\n",
+  "html": "<p><strong>真-</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真々**她\n",
+  "html": "<p><strong>真々</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真**她\n",
+  "html": "<p><strong>真</strong>她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真，** 她\n",
+  "html": "<p><strong>真，</strong> 她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真**，她\n",
+  "html": "<p><strong>真</strong>，她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**真，**&ZeroWidthSpace;她\n",
+  "html": "<p><strong>真，</strong>​她</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "私は**⻲田太郎**と申します\n",
+  "html": "<p>私は<strong>⻲田太郎</strong>と申します</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "選択肢**㋐**: 1つ目の選択肢\n",
+  "html": "<p>選択肢<strong>㋐</strong>: 1つ目の選択肢</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**さようなら︙**と太郎はいった。\n",
+  "html": "<p><strong>さようなら︙</strong>と太郎はいった。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": ".NET**（.NET Frameworkは不可）**では、\n",
+  "html": "<p>.NET<strong>（.NET Frameworkは不可）</strong>では、</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "「禰󠄀」の偏は示ではなく**礻**です。\n",
+  "html": "<p>「禰󠄀」の偏は示ではなく<strong>礻</strong>です。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "Git**（注：不是GitHub）**\n",
+  "html": "<p>Git<strong>（注：不是GitHub）</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "太郎は**「こんにちわ」**といった。\n",
+  "html": "<p>太郎は<strong>「こんにちわ」</strong>といった。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "𰻞𰻞**（ビャンビャン）**麺\n",
+  "html": "<p>𰻞𰻞<strong>（ビャンビャン）</strong>麺</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "𰻞𰻞**(ビャンビャン)**麺\n",
+  "html": "<p>𰻞𰻞<strong>(ビャンビャン)</strong>麺</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "ハイパーテキストコーヒーポット制御プロトコル**(HTCPCP)**\n",
+  "html": "<p>ハイパーテキストコーヒーポット制御プロトコル<strong>(HTCPCP)</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "﨑**(崎)**\n",
+  "html": "<p>﨑<strong>(崎)</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "国際規格**[ECMA-262](https://tc39.es/ecma262/)**\n",
+  "html": "<p>国際規格<strong><a href=\"https://tc39.es/ecma262/\">ECMA-262</a></strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "㐧**(第の俗字)**\n",
+  "html": "<p>㐧<strong>(第の俗字)</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "𠮟**(こちらが正式表記)**\n",
+  "html": "<p>𠮟<strong>(こちらが正式表記)</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "𪜈**(トモの合略仮名)**\n",
+  "html": "<p>𪜈<strong>(トモの合略仮名)</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "𫠉**(馬の俗字)**\n",
+  "html": "<p>𫠉<strong>(馬の俗字)</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "谺𬤲**(こだま)**石神社\n",
+  "html": "<p>谺𬤲<strong>(こだま)</strong>石神社</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "石𮧟**(いしただら)**\n",
+  "html": "<p>石𮧟<strong>(いしただら)</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**推荐几个框架：**React、Vue等前端框架。\n",
+  "html": "<p><strong>推荐几个框架：</strong>React、Vue等前端框架。</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "葛󠄀**(こちらが正式表記)**城市\n",
+  "html": "<p>葛󠄀<strong>(こちらが正式表記)</strong>城市</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "禰󠄀**(こちらが正式表記)**豆子\n",
+  "html": "<p>禰󠄀<strong>(こちらが正式表記)</strong>豆子</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "𱟛**(U+317DB)**\n",
+  "html": "<p>𱟛<strong>(U+317DB)</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "阿寒湖アイヌシアターイコㇿ**(Akanko Ainu Theater Ikor)**\n",
+  "html": "<p>阿寒湖アイヌシアターイコㇿ<strong>(Akanko Ainu Theater Ikor)</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "あ𛀙**(か)**よろし\n",
+  "html": "<p>あ𛀙<strong>(か)</strong>よろし</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "𮹝**(simplified form of 龘 in China)**\n",
+  "html": "<p>𮹝<strong>(simplified form of 龘 in China)</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "大塚︀**(U+585A U+FE00)** 大塚**(U+FA10)**\n",
+  "html": "<p>大塚︀<strong>(U+585A U+FE00)</strong> 大塚<strong>(U+FA10)</strong></p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "〽︎**(庵点)**は、\n",
+  "html": "<p>〽︎<strong>(庵点)</strong>は、</p>\n"
+ },
+ {
+  "file": "strong.md",
+  "markdown": "**“︁Git”︁**Hub\n\n",
+  "html": "<p><strong>“︁Git”︁</strong>Hub</p>\n"
+ },
+ {
+  "file": "korean.md",
+  "markdown": "**이 [링크](https://example.kr/)**만을 강조하고 싶다.\n",
+  "html": "<p><strong>이 <a href=\"https://example.kr/\">링크</a></strong>만을 강조하고 싶다.</p>\n"
+ },
+ {
+  "file": "korean.md",
+  "markdown": "**스크립트(script)**라고\n",
+  "html": "<p><strong>스크립트(script)</strong>라고</p>\n"
+ },
+ {
+  "file": "korean.md",
+  "markdown": "패키지를 발행하려면 **`npm publish`**를 실행하십시오.\n",
+  "html": "<p>패키지를 발행하려면 <strong><code>npm publish</code></strong>를 실행하십시오.</p>\n"
+ },
+ {
+  "file": "korean.md",
+  "markdown": "**안녕(hello)**하세요.\n",
+  "html": "<p><strong>안녕(hello)</strong>하세요.</p>\n"
+ },
+ {
+  "file": "korean.md",
+  "markdown": "ᅡ**(a)**\n",
+  "html": "<p>ᅡ<strong>(a)</strong></p>\n"
+ },
+ {
+  "file": "korean.md",
+  "markdown": "**(k)**ᄏ\n\n",
+  "html": "<p><strong>(k)</strong>ᄏ</p>\n"
+ },
+ {
+  "file": "pseudo-emoji.md",
+  "markdown": "a**〰**a\n",
+  "html": "<p>a<strong>〰</strong>a</p>\n"
+ },
+ {
+  "file": "pseudo-emoji.md",
+  "markdown": "a**〽**a\n",
+  "html": "<p>a<strong>〽</strong>a</p>\n"
+ },
+ {
+  "file": "pseudo-emoji.md",
+  "markdown": "a**🈂**a\n",
+  "html": "<p>a<strong>🈂</strong>a</p>\n"
+ },
+ {
+  "file": "pseudo-emoji.md",
+  "markdown": "a**🈷**a\n",
+  "html": "<p>a<strong>🈷</strong>a</p>\n"
+ },
+ {
+  "file": "pseudo-emoji.md",
+  "markdown": "a**㊗**a\n",
+  "html": "<p>a<strong>㊗</strong>a</p>\n"
+ },
+ {
+  "file": "pseudo-emoji.md",
+  "markdown": "a**㊙**a\n\n",
+  "html": "<p>a<strong>㊙</strong>a</p>\n"
+ },
+ {
+  "file": "non-bmp.md",
+  "markdown": "\na**a«**a\n",
+  "html": "<p>a**a«**a</p>\n"
+ },
+ {
+  "file": "non-bmp.md",
+  "markdown": "a**»a**a\n",
+  "html": "<p>a**»a**a</p>\n"
+ },
+ {
+  "file": "non-bmp.md",
+  "markdown": "a**a∇**a\n",
+  "html": "<p>a**a∇**a</p>\n"
+ },
+ {
+  "file": "non-bmp.md",
+  "markdown": "a**∇a**a\n",
+  "html": "<p>a**∇a**a</p>\n"
+ },
+ {
+  "file": "non-bmp.md",
+  "markdown": "a**a𝜵**a\n",
+  "html": "<p>a**a𝜵**a</p>\n"
+ },
+ {
+  "file": "non-bmp.md",
+  "markdown": "a**𝜵a**a\n",
+  "html": "<p>a**𝜵a**a</p>\n"
+ },
+ {
+  "file": "non-bmp.md",
+  "markdown": "a**𐬻a**a\n",
+  "html": "<p>a**𐬻a**a</p>\n"
+ },
+ {
+  "file": "non-bmp.md",
+  "markdown": "a**a𐬻**a\n\n",
+  "html": "<p>a**a𐬻**a</p>\n"
+ },
+ {
+  "file": "underscore-cjk-punct.md",
+  "markdown": "__注意__：注意事項\n",
+  "html": "<p><strong>注意</strong>：注意事項</p>\n"
+ },
+ {
+  "file": "underscore-cjk-punct.md",
+  "markdown": "注意：__注意事項__\n",
+  "html": "<p>注意：<strong>注意事項</strong></p>\n"
+ },
+ {
+  "file": "underscore-cjk-punct.md",
+  "markdown": "正體字。︁_Traditional._\n",
+  "html": "<p>正體字。︁<em>Traditional.</em></p>\n"
+ },
+ {
+  "file": "underscore-cjk-punct.md",
+  "markdown": "正體字。︁__Hong Kong and Taiwan.__\n",
+  "html": "<p>正體字。︁<strong>Hong Kong and Taiwan.</strong></p>\n"
+ },
+ {
+  "file": "underscore-cjk-punct.md",
+  "markdown": "简体字 / 新字体。︀_Simplified._\n",
+  "html": "<p>简体字 / 新字体。︀<em>Simplified.</em></p>\n"
+ },
+ {
+  "file": "underscore-cjk-punct.md",
+  "markdown": "简体字 / 新字体。︀__Mainland China or Japan.__\n",
+  "html": "<p>简体字 / 新字体。︀<strong>Mainland China or Japan.</strong></p>\n"
+ },
+ {
+  "file": "underscore-cjk-punct.md",
+  "markdown": "“︁Git”︁__Hub__\n\n",
+  "html": "<p>“︁Git”︁<strong>Hub</strong></p>\n"
+ },
+ {
+  "file": "gfm-strikethrough.md",
+  "markdown": "a~~a()~~あ\n",
+  "html": "<p>a<del>a()</del>あ</p>\n"
+ },
+ {
+  "file": "gfm-strikethrough.md",
+  "markdown": "あ~~()a~~a\n",
+  "html": "<p>あ<del>()a</del>a</p>\n"
+ },
+ {
+  "file": "gfm-strikethrough.md",
+  "markdown": "𩸽~~()a~~a\n",
+  "html": "<p>𩸽<del>()a</del>a</p>\n"
+ },
+ {
+  "file": "gfm-strikethrough.md",
+  "markdown": "a~~a()~~𩸽\n",
+  "html": "<p>a<del>a()</del>𩸽</p>\n"
+ },
+ {
+  "file": "gfm-strikethrough.md",
+  "markdown": "葛󠄀~~()a~~a\n",
+  "html": "<p>葛󠄀<del>()a</del>a</p>\n"
+ },
+ {
+  "file": "gfm-strikethrough.md",
+  "markdown": "羽︀~~()a~~a\n",
+  "html": "<p>羽︀<del>()a</del>a</p>\n"
+ },
+ {
+  "file": "gfm-strikethrough.md",
+  "markdown": "a~~「a~~」\n",
+  "html": "<p>a<del>「a</del>」</p>\n"
+ },
+ {
+  "file": "gfm-strikethrough.md",
+  "markdown": "「~~a」~~a\n",
+  "html": "<p>「<del>a」</del>a</p>\n"
+ },
+ {
+  "file": "gfm-strikethrough.md",
+  "markdown": "~~a~~：~~a~~\n",
+  "html": "<p><del>a</del>：<del>a</del></p>\n"
+ },
+ {
+  "file": "gfm-strikethrough.md",
+  "markdown": "~~日本語。︀~~English.\n",
+  "html": "<p><del>日本語。︀</del>English.</p>\n"
+ },
+ {
+  "file": "gfm-strikethrough.md",
+  "markdown": "~~“︁a”︁~~a\n\n",
+  "html": "<p><del>“︁a”︁</del>a</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "~~Hi~~ Hello, ~there~ world!\n",
+  "html": "<p><del>Hi</del> Hello, <del>there</del> world!</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "This ~~has a\n",
+  "html": "<p>This ~~has a</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "new paragraph~~.\n",
+  "html": "<p>new paragraph~~.</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "This will ~~~not~~~ strike.\n",
+  "html": "<p>This will ~~~not~~~ strike.</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "A proper ~strikethrough~.\n",
+  "html": "<p>A proper <del>strikethrough</del>.</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "These are ~not strikethroughs.\n",
+  "html": "<p>These are ~not strikethroughs.</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "No, they are not~\n",
+  "html": "<p>No, they are not~</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "This ~is ~ legit~ isn't ~ legit.\n",
+  "html": "<p>This <del>is ~ legit</del> isn't ~ legit.</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "This is not ~~~~~one~~~~~ huge strikethrough.\n",
+  "html": "<p>This is not ~~~~~one~~~~~ huge strikethrough.</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "~one~ ~~two~~ ~~~three~~~\n",
+  "html": "<p><del>one</del> <del>two</del> ~~~three~~~</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "No ~mismatch~~\n",
+  "html": "<p>No ~mismatch~~</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "~~**_`this`_**~~  \n~~***`this`***~~  \n~~___`this`___~~\n",
+  "html": "<p><del><strong><em><code>this</code></em></strong></del><br>\n<del><em><strong><code>this</code></strong></em></del><br>\n<del><em><strong><code>this</code></strong></em></del></p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "~~**_this_**~~  \n~~***this***~~  \n~~___this___~~\n",
+  "html": "<p><del><strong><em>this</em></strong></del><br>\n<del><em><strong>this</strong></em></del><br>\n<del><em><strong>this</strong></em></del></p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "~Hi~ Hello, world!\n",
+  "html": "<p><del>Hi</del> Hello, world!</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "This ~text~ ~~is~~ ~~~curious~~~.\n",
+  "html": "<p>This <del>text</del> <del>is</del> ~~~curious~~~.</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "[^~~is~~1]\n",
+  "html": "<p>[^<del>is</del>1]</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "a~~()a~~a\n",
+  "html": "<p>a~~()a~~a</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "a~~a()~~a\n",
+  "html": "<p>a~~a()~~a</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "~~()~~\n",
+  "html": "<p><del>()</del></p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "(~~()~~)\n",
+  "html": "<p>(<del>()</del>)</p>\n"
+ },
+ {
+  "file": "gfm-non-cjk.md",
+  "markdown": "| A |\n| - |\n| https://example.com/ |\n\n",
+  "html": "<table>\n<thead>\n<tr>\n<th>A</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><a href=\"https://example.com/\">https://example.com/</a></td>\n</tr>\n</tbody>\n</table>\n"
+ }
+]
