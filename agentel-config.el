@@ -99,7 +99,8 @@ options, (select CATEGORY VALUE), (start-applying) and
      `(report
        ,(mapcar (lambda (option)
                   (let-alist option
-                    `((id . ,.id) (name . ,.name) (category . ,.category)
+                    ;; ACP version 2 names the id `configId'.
+                    `((id . ,(or .configId .id)) (name . ,.name) (category . ,.category)
                       (value . ,.currentValue)
                       (choices . ,(mapcar (lambda (choice)
                                             (let-alist choice
@@ -134,12 +135,21 @@ options, (select CATEGORY VALUE), (start-applying) and
 
 ;;;; Changing options
 
+(defun agentel-config-set-params (connection session-id id value)
+  "Return the params that set the option ID of SESSION-ID to VALUE.
+CONNECTION is the one the session is on.  ACP version 2 tags the value
+of a select option with its type."
+  `((sessionId . ,session-id) (configId . ,id)
+    ,@(when (eql (agentel-connection-version connection) 2) '((type . "id")))
+    (value . ,value)))
+
 (defun agentel-config-set (session id value &optional callback)
   "Set the config option ID of SESSION to VALUE.
 CALLBACK is called without arguments once the agent answered."
   (agentel-connection-request
    (agentel-session-connection session) "session/set_config_option"
-   `((sessionId . ,(agentel-session-id session)) (configId . ,id) (value . ,value))
+   (agentel-config-set-params (agentel-session-connection session)
+                              (agentel-session-id session) id value)
    :on-success (lambda (result)
                  (agentel-config--report session (alist-get 'configOptions result))
                  (when callback (funcall callback)))

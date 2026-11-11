@@ -36,6 +36,7 @@
 (require 'agentel-store)
 (require 'agentel-ui)
 (require 'agentel-list)
+(require 'agentel-config)
 
 (declare-function agentel-agent-command-line "agentel")
 (declare-function agentel-agent-environment "agentel")
@@ -131,9 +132,10 @@ It has the title, the first prompt, the last
 
 (defun agentel-summary--model-option (result)
   "Return the id of the model option in the RESULT of `session/new'."
-  (alist-get 'id (seq-find (lambda (option)
-                             (equal (alist-get 'category option) "model"))
-                           (alist-get 'configOptions result))))
+  (let-alist (seq-find (lambda (option)
+                         (equal (alist-get 'category option) "model"))
+                       (alist-get 'configOptions result))
+    (or .configId .id)))
 
 (defun agentel-summary-run (cwd excerpt callback)
   "Sum up EXCERPT with `agentel-summary-agent' started in CWD.
@@ -183,7 +185,7 @@ not called once the returned connection was shut down."
                (if-let* ((option (agentel-summary--model-option result)))
                    (agentel-connection-request
                     connection "session/set_config_option"
-                    `((sessionId . ,session-id) (configId . ,option) (value . ,model))
+                    (agentel-config-set-params connection session-id option model)
                     :on-success (lambda (_result) (funcall prompt))
                     :on-failure fail)
                  (funcall finish nil)))

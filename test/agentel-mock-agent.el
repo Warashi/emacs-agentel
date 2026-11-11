@@ -172,10 +172,17 @@ KIND is the session update name and defaults to an agent message."
     (vconcat options)))
 
 (defun agentel-mock--config-options (state)
-  "Return the configOptions of session STATE."
-  (if (eq agentel-mock-flavor 'copilot)
-      (agentel-mock--copilot-config-options state)
-    (agentel-mock--claude-config-options state)))
+  "Return the configOptions of session STATE.
+Version 2 names the id of an option `configId'."
+  (let ((options (if (eq agentel-mock-flavor 'copilot)
+                     (agentel-mock--copilot-config-options state)
+                   (agentel-mock--claude-config-options state))))
+    (if (= agentel-mock--version 2)
+        (vconcat (mapcar (lambda (option)
+                           (cons (cons 'configId (alist-get 'id option))
+                                 (assq-delete-all 'id (copy-alist option))))
+                         options))
+      options)))
 
 (defun agentel-mock--new-session (id)
   "Create session state for ID and announce its commands."
@@ -546,17 +553,26 @@ unknown values are rejected."
          (state (gethash session-id agentel-mock--sessions))
          (config-id (alist-get 'configId params))
          (value (alist-get 'value params))
-         (option (seq-find (lambda (o) (equal (alist-get 'id o) config-id))
+         (option (seq-find (lambda (o) (equal (or (alist-get 'configId o)
+                                                  (alist-get 'id o))
+                                              config-id))
                            (agentel-mock--config-options state)))
          (values (mapcar (lambda (v) (alist-get 'value v)) (alist-get 'options option))))
     (when (and (equal config-id "model") (equal value "opus"))
       (setq value "opus[1m]"))
-    (if (not (member value values))
-        (agentel-mock--error id -32603 (format "Invalid value for config option %s: %s"
-                                               config-id value))
+    (cond
+     ;; Version 2 tags a select value with its type.
+     ((and (= agentel-mock--version 2)
+           (not (equal (alist-get 'type params) "id")))
+      (agentel-mock--error id -32602 (format "Invalid params: type %s"
+                                             (alist-get 'type params))))
+     ((not (member value values))
+      (agentel-mock--error id -32603 (format "Invalid value for config option %s: %s"
+                                             config-id value)))
+     (t
       (setf (alist-get (intern config-id) state) value)
       (puthash session-id state agentel-mock--sessions)
-      (agentel-mock--respond id `((configOptions . ,(agentel-mock--config-options state)))))))
+      (agentel-mock--respond id `((configOptions . ,(agentel-mock--config-options state))))))))
 
 (defun agentel-mock--load (id params)
   "Handle `session/load' request ID with PARAMS by replaying history."

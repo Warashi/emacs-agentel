@@ -32,6 +32,24 @@
     (should (equal (agentel-config-value session "thought_level") "high"))
     (should (equal (agentel-config-value session "mode") "plan"))))
 
+(ert-deftest agentel-config-v2-applies-start-options-in-order ()
+  (let ((agentel-acp-v2-agents '(mock)))
+    (agentel-test-with-started session '(:model "opus[1m]" :effort "high" :mode "plan")
+      (agentel-config-test-settled session)
+      (should (equal (agentel-config-value session "model") "opus[1m]"))
+      (should (equal (agentel-config-value session "thought_level") "high"))
+      (should (equal (agentel-config-value session "mode") "plan")))))
+
+(ert-deftest agentel-config-v2-can-be-changed-interactively ()
+  (let ((agentel-acp-v2-agents '(mock)))
+    (agentel-test-with-started session nil
+      (agentel-config-test-settled session)
+      (cl-letf (((symbol-function 'completing-read)
+                 (lambda (_prompt _collection &rest _) "Accept edits")))
+        (agentel-config-set-mode))
+      (agentel-test-wait-until
+       (lambda () (equal (agentel-config-value session "mode") "acceptEdits"))))))
+
 (ert-deftest agentel-config-runs-the-session-until-start-options-are-applied ()
   (let ((agentel-session--registry nil)
         (agentel-session-changed-functions nil)
