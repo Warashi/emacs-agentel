@@ -56,6 +56,17 @@
   :type '(alist :key-type symbol :value-type (repeat string))
   :group 'agentel)
 
+(defcustom agentel-acp-v2-agents nil
+  "Names of the agents in `agentel-agents' spoken to with ACP version 2.
+The other agents are spoken to with version 1.  An agent that answers
+another version fails to start."
+  :type '(repeat symbol)
+  :group 'agentel)
+
+(defun agentel-agent-protocol-version (agent)
+  "Return the ACP version to speak to AGENT."
+  (if (memq agent agentel-acp-v2-agents) 2 1))
+
 (defcustom agentel-default-agent 'claude
   "Name of the agent in `agentel-agents' a session runs by default."
   :type 'symbol
@@ -217,6 +228,7 @@ the features that handle them.
           (agentel-connection-start
            :command (car command-line) :args (cdr command-line)
            :env (agentel-agent-environment cwd) :cwd cwd
+           :protocol-version (agentel-agent-protocol-version agent)
            :on-ready (lambda (_connection) (agentel--open-session session options))
            :on-failure (lambda (error)
                          (agentel--fail session

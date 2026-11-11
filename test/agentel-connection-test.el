@@ -37,6 +37,43 @@
         (should-not (assq 'fs received))
         (should-not (assq 'terminal received))))))
 
+(ert-deftest agentel-connection-speaks-the-version-it-asks-for ()
+  (let ((agentel-session--registry nil)
+        (agentel-connection-capability-functions
+         (list (lambda () '((elicitation . ((form . nil)))))))
+        ready)
+    (let* ((command (agentel-test-mock-command))
+           (conn (agentel-connection-start
+                  :command (car command) :args (cdr command)
+                  :cwd temporary-file-directory :protocol-version 2
+                  :on-ready (lambda (_c) (setq ready t)))))
+      (unwind-protect
+          (progn
+            (agentel-test-wait-until (lambda () ready))
+            (should (equal (agentel-connection-version conn) 2))
+            (should (assq 'elicitation
+                          (alist-get 'receivedCapabilities
+                                     (alist-get '_meta (agentel-connection-info conn))))))
+        (agentel-connection-shutdown conn)))))
+
+(ert-deftest agentel-connection-fails-when-the-agent-answers-another-version ()
+  (let ((agentel-session--registry nil)
+        failure)
+    (let* ((command (agentel-test-mock-command 'copilot))
+           (conn (agentel-connection-start
+                  :command (car command) :args (cdr command)
+                  :cwd temporary-file-directory :protocol-version 2
+                  :on-failure (lambda (e) (setq failure e)))))
+      (unwind-protect
+          (should (string-match-p
+                   "ACP version 1"
+                   (alist-get 'message (agentel-test-wait-until (lambda () failure)))))
+        (agentel-connection-shutdown conn)))))
+
+(ert-deftest agentel-connection-speaks-version-1-by-default ()
+  (agentel-connection-test-with-mock conn
+    (should (equal (agentel-connection-version conn) 1))))
+
 (ert-deftest agentel-connection-request-calls-back-with-result ()
   (agentel-connection-test-with-mock conn
     (let (result)

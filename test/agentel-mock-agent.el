@@ -25,6 +25,10 @@
 ;;   wakeup      after the prompt ends, starts a turn of its own that
 ;;               answers with markdown, as for a scheduled wakeup
 ;;
+;; It answers initialize with the version asked for, up to 2, in the
+;; shape of claude-agent-acp 0.106.0 for 2; the copilot flavor answers 1
+;; like Copilot CLI 1.0.109.
+;;
 ;; Anything else is echoed back.  The initialize response carries the
 ;; client capabilities it received under `_meta.receivedCapabilities'
 ;; so tests can inspect them.
@@ -52,6 +56,8 @@
   "Session id of the subagent that works until a cancel.")
 (defvar agentel-mock--client-capabilities nil
   "Client capabilities of the initialize request.")
+(defvar agentel-mock--version 1
+  "ACP version agreed in initialize.")
 (defvar agentel-mock--async nil
   "(SESSION-ID . TASK-ID) of the background command still running.")
 (defvar agentel-mock--asking nil
@@ -550,17 +556,30 @@ unknown values are rejected."
   "Handle the client request ID calling METHOD with PARAMS."
   (pcase method
     ("initialize"
-     (setq agentel-mock--client-capabilities (alist-get 'clientCapabilities params))
-     (agentel-mock--respond
-      id `((protocolVersion . 1)
-           (agentCapabilities . ((loadSession . t)
-                                 (sessionCapabilities . ((list . ,(make-hash-table))
-                                                         (resume . ,(make-hash-table))))))
-           (agentInfo . ((name . "agentel-mock") (version . "0")))
-           (authMethods . [])
-           (_meta . ((receivedCapabilities
-                      . ,(or (alist-get 'clientCapabilities params)
-                             (make-hash-table))))))))
+     (setq agentel-mock--version
+           (if (eq agentel-mock-flavor 'copilot)
+               1
+             (min 2 (alist-get 'protocolVersion params))))
+     (setq agentel-mock--client-capabilities
+           (alist-get (if (= agentel-mock--version 2) 'capabilities 'clientCapabilities)
+                      params))
+     (let ((received `(_meta . ((receivedCapabilities
+                                 . ,(or agentel-mock--client-capabilities
+                                        (make-hash-table)))))))
+       (agentel-mock--respond
+        id (if (= agentel-mock--version 2)
+               `((protocolVersion . 2)
+                 (info . ((name . "agentel-mock") (version . "0")))
+                 (capabilities . ((session . ((status . ,(make-hash-table))))))
+                 (authMethods . [])
+                 ,received)
+             `((protocolVersion . 1)
+               (agentCapabilities . ((loadSession . t)
+                                     (sessionCapabilities . ((list . ,(make-hash-table))
+                                                             (resume . ,(make-hash-table))))))
+               (agentInfo . ((name . "agentel-mock") (version . "0")))
+               (authMethods . [])
+               ,received)))))
     ("session/new"
      (let ((session-id (agentel-mock--new-session
                         (format "mock-%d-%d" (emacs-pid)

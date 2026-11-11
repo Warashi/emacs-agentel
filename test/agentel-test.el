@@ -138,6 +138,17 @@
                                2)
                      '("env" "AGENTEL_OTHER=1"))))))
 
+(ert-deftest agentel-start-speaks-version-2-to-the-agents-chosen-for-it ()
+  (let ((agentel-acp-v2-agents '(mock)))
+    (agentel-test-with-started session nil
+      (should (equal (agentel-connection-version (agentel-session-connection session))
+                     2)))))
+
+(ert-deftest agentel-start-speaks-version-1-to-the-other-agents ()
+  (agentel-test-with-started session nil
+    (should (equal (agentel-connection-version (agentel-session-connection session))
+                   1))))
+
 (ert-deftest agentel-start-runs-the-default-agent ()
   (agentel-test-with-started session nil
     (should (eq (agentel-session-agent session) 'mock))))

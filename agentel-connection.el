@@ -18,9 +18,6 @@
 (require 'lisp-mnt)
 (require 'agentel-session)
 
-(defconst agentel-connection-protocol-version 1
-  "ACP protocol version agentel speaks.")
-
 (defvar agentel-connection-capability-functions nil
   "Functions returning client capability entries to advertise.
 Each is called with no arguments and returns an alist that is merged
@@ -122,12 +119,28 @@ params, for example to withdraw a question on `$/cancel_request'.")
   (unless (agentel-connection-stopping connection)
     (run-hook-with-args 'agentel-connection-exit-functions connection)))
 
-(cl-defun agentel-connection-start (&key command args env cwd on-ready on-failure
-                                         on-update)
+(defun agentel-connection-version (connection)
+  "Return the ACP version CONNECTION speaks, or nil before initialize."
+  (alist-get 'protocolVersion (agentel-connection-info connection)))
+
+(defun agentel-connection--initialize-params (version)
+  "Return the params of the initialize request for ACP VERSION."
+  (let ((info `((name . "agentel") (version . ,(agentel-connection--version))))
+        (capabilities (agentel-connection--capabilities)))
+    (if (= version 2)
+        `((protocolVersion . 2) (info . ,info) (capabilities . ,capabilities))
+      `((protocolVersion . ,version)
+        (clientInfo . ,info)
+        (clientCapabilities . ,capabilities)))))
+
+(cl-defun agentel-connection-start (&key command args env cwd (protocol-version 1)
+                                         on-ready on-failure on-update)
   "Start the agent COMMAND with ARGS in CWD and initialize it.
 ENV is a list of \"VAR=value\" strings added to the environment.
+PROTOCOL-VERSION is the ACP version to speak, 1 or 2.
 ON-READY is called with the connection once the agent answered
-initialize, and ON-FAILURE with the error when it did not.  ON-UPDATE
+initialize, and ON-FAILURE with the error when it did not or answered
+another version.  ON-UPDATE
 is called with the params of each `session/update' in place of the
 session registry, for a connection whose sessions are not shown.
 Return the connection."
@@ -161,13 +174,17 @@ Return the connection."
       (condition-case err
           (agentel-connection-request
            connection "initialize"
-           `((protocolVersion . ,agentel-connection-protocol-version)
-             (clientInfo . ((name . "agentel")
-                            (version . ,(agentel-connection--version))))
-             (clientCapabilities . ,(agentel-connection--capabilities)))
-           :on-success (lambda (result)
-                         (setf (agentel-connection-info connection) result)
-                         (when on-ready (funcall on-ready connection)))
+           (agentel-connection--initialize-params protocol-version)
+           :on-success
+           (lambda (result)
+             (let ((version (alist-get 'protocolVersion result)))
+               ;; The capabilities went under the keys of the version
+               ;; asked for, so another version would silently lack them.
+               (if (not (equal version protocol-version))
+                   (funcall fail `((message . ,(format "The agent speaks ACP version %s, not %s"
+                                                       version protocol-version))))
+                 (setf (agentel-connection-info connection) result)
+                 (when on-ready (funcall on-ready connection)))))
            :on-failure fail)
         (error (funcall fail `((message . ,(error-message-string err)))))))
     (when-let* ((process (agentel-connection-process connection)))

@@ -80,6 +80,16 @@
       (agentel-test-wait-until (lambda () done))
       (agentel-test-wait-until (lambda () (not (agentel-connection-live-p connection)))))))
 
+(ert-deftest agentel-summary-run-speaks-the-version-chosen-for-its-agent ()
+  (agentel-summary-test-with-mock
+    (let* ((agentel-acp-v2-agents '(mock))
+           (connection (agentel-summary-run temporary-file-directory "x" #'ignore)))
+      (unwind-protect
+          (should (equal (agentel-test-wait-until
+                          (lambda () (agentel-connection-version connection)))
+                         2))
+        (agentel-connection-shutdown connection)))))
+
 (ert-deftest agentel-summary-run-keeps-its-conversation-out-of-the-sessions ()
   (agentel-summary-test-with-mock
     (let (done)

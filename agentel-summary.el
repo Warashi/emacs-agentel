@@ -39,6 +39,7 @@
 
 (declare-function agentel-agent-command-line "agentel")
 (declare-function agentel-agent-environment "agentel")
+(declare-function agentel-agent-protocol-version "agentel")
 
 (defcustom agentel-summary-agent nil
   "Agent and model that sum up the sessions that need the user.
@@ -187,6 +188,7 @@ not called once the returned connection was shut down."
           (agentel-connection-start
            :command (car command-line) :args (cdr command-line)
            :env (agentel-agent-environment cwd) :cwd cwd
+           :protocol-version (agentel-agent-protocol-version agent)
            :on-ready open
            :on-failure fail
            :on-update
