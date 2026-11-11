@@ -10,11 +10,13 @@
 (require 'agentel-test-helper)
 
 (defmacro agentel-background-test-with-session (&rest body)
-  "Run BODY with a registered session bound to `session'."
+  "Run BODY with a registered session of an ACP v2 agent bound to `session'."
   (declare (indent 0))
   `(let ((agentel-session--registry nil)
          (agentel-session-changed-functions nil))
-     (let ((session (agentel-session-create)))
+     (let ((session (agentel-session-create
+                     :connection (agentel-connection--make
+                                  :info '((protocolVersion . 2))))))
        (agentel-session-register session "s1")
        ,@body)))
 

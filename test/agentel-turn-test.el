@@ -159,6 +159,12 @@ instead of being sent, newest first."
         (agentel-turn-test-state child "running")
         (should-not (agentel-session-in-turn child))))))
 
+(ert-deftest agentel-turn-v1-leaves-the-turn-to-the-answer-of-the-prompt ()
+  (agentel-turn-test-with-session
+    (agentel-turn-prompt session "hello")
+    (agentel-turn-test-state session "idle" '(stopReason . "end_turn"))
+    (should (agentel-session-in-turn session))))
+
 (ert-deftest agentel-turn-cancel-asks-the-agent-to-stop ()
   (agentel-turn-test-with-session
     (agentel-turn-cancel session)

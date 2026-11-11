@@ -63,7 +63,8 @@
 (defun agentel-turn--on-update (session update)
   "Follow the turns of SESSION through the `state_update' UPDATE."
   (when (and (equal (alist-get 'sessionUpdate update) "state_update")
-             (not (agentel-session-parent session)))
+             (not (agentel-session-parent session))
+             (agentel-turn--v2-p session))
     (let-alist update
       (pcase .state
         ("running"
