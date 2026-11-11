@@ -3,7 +3,8 @@
 Usage: python3 cjk.py cjk-ranges.md > agentel-commonmark-cjk.el
 
 cjk-ranges.md is ranges.md of https://github.com/tats-u/markdown-cjk-friendly
-at e9762c379b36ce5ee0e9b185fae9a908244f598b.
+at e9762c379b36ce5ee0e9b185fae9a908244f598b, under the MIT license in
+LICENSE-markdown-cjk-friendly.
 """
 
 import re
