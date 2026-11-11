@@ -24,6 +24,9 @@
 ;;   markdown    answers with headings, emphasis, a list and code
 ;;   wakeup      after the prompt ends, starts a turn of its own that
 ;;               answers with markdown, as for a scheduled wakeup
+;;   workflow    with version 2, a Workflow tool call that goes on in the
+;;               background after the turn; it ends when the next prompt
+;;               arrives
 ;;
 ;; It answers initialize with the version asked for, up to 2, in the
 ;; shape of claude-agent-acp 0.106.0 for 2; the copilot flavor answers 1
@@ -58,6 +61,8 @@
   "Client capabilities of the initialize request.")
 (defvar agentel-mock--version 1
   "ACP version agreed in initialize.")
+(defvar agentel-mock--workflow nil
+  "(SESSION-ID . TOOL-CALL-ID) of the workflow running in the background.")
 (defvar agentel-mock--async nil
   "(SESSION-ID . TASK-ID) of the background command still running.")
 (defvar agentel-mock--asking nil
@@ -222,11 +227,20 @@ Version 2 names the id of an option `configId'."
                   (cost . ((amount . ,(* 0.00001 (alist-get 'used state)))
                            (currency . "USD")))))))
 
+(defun agentel-mock--background-work ()
+  "Return the `background' field of the work running in the background."
+  `(background . ,(if agentel-mock--workflow
+                      `[((type . "tool_call") (toolCallId . ,(cdr agentel-mock--workflow)))]
+                    [])))
+
 (defun agentel-mock--state (session-id state &rest fields)
-  "Tell the client SESSION-ID is in STATE, with the alist FIELDS."
+  "Tell the client SESSION-ID is in STATE, with the alist FIELDS.
+The background work is listed unless FIELDS has it."
   (agentel-mock--update session-id `((sessionUpdate . "state_update")
                                      (state . ,state)
-                                     ,@fields)))
+                                     ,@fields
+                                     ,@(unless (assq 'background fields)
+                                         (list (agentel-mock--background-work))))))
 
 (defun agentel-mock--finish (id session-id &optional stop-reason)
   "End prompt ID of SESSION-ID with STOP-REASON.
@@ -236,16 +250,14 @@ the session becoming idle."
   (agentel-mock--usage session-id)
   (if (= agentel-mock--version 2)
       (agentel-mock--state session-id "idle"
-                           `(stopReason . ,(or stop-reason "end_turn"))
-                           '(background . []))
+                           `(stopReason . ,(or stop-reason "end_turn")))
     (agentel-mock--respond id `((stopReason . ,(or stop-reason "end_turn"))))))
 
 (defun agentel-mock--fail (id session-id code message)
   "Fail prompt ID of SESSION-ID with CODE and MESSAGE."
   (if (= agentel-mock--version 2)
       (agentel-mock--state session-id "idle" '(stopReason . "error")
-                           `(error . ((code . ,code) (message . ,message)))
-                           '(background . []))
+                           `(error . ((code . ,code) (message . ,message))))
     (agentel-mock--error id code message)))
 
 (defun agentel-mock--tool (session-id)
@@ -490,6 +502,38 @@ Like the adapter, the turn stays open while the subagent lives."
   (agentel-mock--say session-id "Started a background command.")
   (agentel-mock--finish id session-id))
 
+(defun agentel-mock--workflow-start (id session-id)
+  "Start a workflow in the background of SESSION-ID and end prompt ID."
+  (let ((tool (format "toolu_wf%d" (cl-incf agentel-mock--counter))))
+    (agentel-mock--update
+     session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,tool)
+                  (name . "Workflow") (rawInput . ,(make-hash-table))
+                  (status . "pending") (title . "Workflow") (kind . "other")
+                  (content . [])))
+    (agentel-mock--update
+     session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,tool)
+                  (status . "in_progress")
+                  (rawOutput . "Workflow launched in background.")))
+    (setq agentel-mock--workflow (cons session-id tool))
+    (agentel-mock--state session-id "running")
+    (agentel-mock--say session-id "Started a workflow.")
+    (agentel-mock--finish id session-id)
+    (agentel-mock--update
+     session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,tool)
+                  (title . "Workflow: research: sleep-0")
+                  (content . [((type . "content")
+                               (content . ((type . "text")
+                                           (text . "Two agents sleep\n\nLast activity: sleep-0\n\n0 tokens · 0 tool calls · 0s\n\n**research**\n- sleep-0: running\n- sleep-1: running"))))])))))
+
+(defun agentel-mock--workflow-end ()
+  "End the workflow running in the background."
+  (pcase-let ((`(,session-id . ,tool) agentel-mock--workflow))
+    (agentel-mock--update
+     session-id `((sessionUpdate . "tool_call_update") (toolCallId . ,tool)
+                  (status . "completed")))
+    (setq agentel-mock--workflow nil)
+    (agentel-mock--state session-id "idle")))
+
 (defun agentel-mock--prompt (id params)
   "Handle prompt request ID with PARAMS."
   (let* ((session-id (alist-get 'sessionId params))
@@ -503,9 +547,11 @@ Like the adapter, the turn stays open while the subagent lives."
          (_meta . ((terminal_exit . ((terminal_id . ,(cdr agentel-mock--async))
                                      (exit_code) (signal)))))))
       (setq agentel-mock--async nil))
+    (when agentel-mock--workflow
+      (agentel-mock--workflow-end))
     (when (= agentel-mock--version 2)
       (agentel-mock--respond id `((messageId . ,(format "msg-%d" (cl-incf agentel-mock--counter)))))
-      (agentel-mock--state session-id "running" '(background . [])))
+      (agentel-mock--state session-id "running"))
     (agentel-mock--update
      session-id `((sessionUpdate . "session_info_update")
                   (title . ,(truncate-string-to-width text 40))))
@@ -525,17 +571,18 @@ Like the adapter, the turn stays open while the subagent lives."
      ((string-match-p "ask" text) (agentel-mock--ask id session-id))
      ((string-match-p "background" text) (agentel-mock--background id session-id))
      ((string-match-p "async" text) (agentel-mock--async id session-id))
+     ((and (= agentel-mock--version 2) (string-match-p "workflow" text))
+      (agentel-mock--workflow-start id session-id))
      ((string-match-p "subagent" text) (agentel-mock--subagent id session-id))
      ((string-match-p "wakeup" text)
       (agentel-mock--say session-id "I will wait.")
       (agentel-mock--finish id session-id)
       (when (= agentel-mock--version 2)
-        (agentel-mock--state session-id "running" '(background . [])))
+        (agentel-mock--state session-id "running"))
       (agentel-mock--say session-id agentel-mock--markdown)
       (agentel-mock--usage session-id)
       (when (= agentel-mock--version 2)
-        (agentel-mock--state session-id "idle" '(stopReason . "end_turn")
-                             '(background . []))))
+        (agentel-mock--state session-id "idle" '(stopReason . "end_turn"))))
      ((string-match-p "markdown" text)
       (agentel-mock--say session-id agentel-mock--markdown)
       (agentel-mock--finish id session-id))
