@@ -95,8 +95,13 @@
                         (error . ((code . ,code) (message . ,message))))))
 
 (defun agentel-mock--update (session-id update)
-  "Send UPDATE for SESSION-ID."
+  "Send UPDATE for SESSION-ID.
+Version 2 has no `tool_call', whose first `tool_call_update' makes it."
   (sleep-for agentel-mock--delay)
+  (when (and (= agentel-mock--version 2)
+             (equal (alist-get 'sessionUpdate update) "tool_call"))
+    (setq update (cons '(sessionUpdate . "tool_call_update")
+                       (assq-delete-all 'sessionUpdate (copy-alist update)))))
   (agentel-mock--send `((jsonrpc . "2.0") (method . "session/update")
                         (params . ((sessionId . ,session-id)
                                    (update . ,update))))))
@@ -290,12 +295,20 @@ the session becoming idle."
                                            (text . "Remove the build directory"))))])
                   (_meta . ((claudeCode . ((toolName . "Bash")))))))
     (setq agentel-mock--prompt-id (cons id session-id))
+    (when (= agentel-mock--version 2)
+      (agentel-mock--state session-id "requires_action"))
     (agentel-mock--request
      "session/request_permission"
      `((sessionId . ,session-id)
-       (toolCall . ((toolCallId . ,tool-id) (title . "rm -rf build")
-                    (kind . "execute")
-                    (rawInput . ((command . "rm -rf build")))))
+       ,@(let ((tool `((toolCallId . ,tool-id) (title . "rm -rf build")
+                       (kind . "execute")
+                       (rawInput . ((command . "rm -rf build"))))))
+           ;; Version 2 puts the tool call under the subject and adds a
+           ;; heading of its own.
+           (if (= agentel-mock--version 2)
+               `((title . "rm -rf build")
+                 (subject . ((type . "tool_call") (toolCall . ,tool))))
+             `((toolCall . ,tool))))
        (options . [((optionId . "allow-once") (name . "Yes") (kind . "allow_once"))
                    ((optionId . "allow-with-updates")
                     (name . "Yes, and don't ask again for rm commands")

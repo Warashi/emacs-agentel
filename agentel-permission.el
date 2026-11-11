@@ -108,7 +108,9 @@ no longer asks."
   "Handle the permission request ID with PARAMS on CONNECTION."
   (if-let* ((session (agentel-session-get (alist-get 'sessionId params) connection)))
       (let* ((options (append (alist-get 'options params) nil))
-             (tool (alist-get 'toolCall params))
+             ;; ACP version 2 puts the tool call under the subject.
+             (tool (or (alist-get 'toolCall params)
+                       (alist-get 'toolCall (alist-get 'subject params))))
              (content (agentel-conversation--tool-output (alist-get 'content tool)))
              (details (if (and content (not (string-empty-p content)))
                           content
@@ -116,7 +118,7 @@ no longer asks."
              (item (agentel-conversation-send
                     session (cons 'permission id) 'permission
                     `(ask ,(format "Allow %s?"
-                                   (or (alist-get 'title (alist-get 'toolCall params))
+                                   (or (alist-get 'title tool)
                                        "this tool call"))
                           ,(mapcar (lambda (o) (or (alist-get 'name o)
                                                    (alist-get 'optionId o)))

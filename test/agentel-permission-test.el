@@ -21,6 +21,30 @@
     (agentel-test-wait-for-text "Allow rm -rf build\\?")
     (agentel-test-wait-for-text "\\[Yes\\] \\[Yes, and don't ask again for rm commands\\] \\[No\\]")))
 
+(ert-deftest agentel-permission-v2-shows-the-tool-and-its-options ()
+  (let ((agentel-acp-v2-agents '(mock)))
+    (agentel-test-with-started _session nil
+      (agentel-permission-test-ask)
+      (agentel-test-wait-for-text "Allow rm -rf build\\?")
+      (agentel-test-wait-for-text "\\[Yes\\] \\[Yes, and don't ask again for rm commands\\] \\[No\\]"))))
+
+(ert-deftest agentel-permission-v2-shows-the-plan-before-approval ()
+  (let ((agentel-acp-v2-agents '(mock)))
+    (agentel-test-with-started session nil
+      (agentel-permission--handle
+       (agentel-session-connection session) 99
+       `((sessionId . ,(agentel-session-id session))
+         (title . "Ready to code?")
+         (subject . ((type . "tool_call")
+                     (toolCall . ((title . "Approve Plan")
+                                  (rawInput . ((plan . "Raw plan")))
+                                  (content . [((type . "content")
+                                               (content . ((type . "text")
+                                                           (text . "# Plan"))))])))))
+         (options . [((optionId . "reject") (name . "No, keep planning"))])))
+      (should (string-match-p "Allow Approve Plan\\?" (buffer-string)))
+      (should (string-match-p "# Plan" (buffer-string))))))
+
 (ert-deftest agentel-permission-shows-the-plan-before-approval ()
   (agentel-test-with-started session nil
     (agentel-permission--handle
