@@ -161,6 +161,31 @@
     (cl-letf (((symbol-function 'agentel-session-current) (lambda () session)))
       (should-error (call-interactively #'agentel-background-open) :type 'user-error))))
 
+(ert-deftest agentel-background-lists-its-work-below-the-session ()
+  (agentel-background-test-with-session
+    (agentel-background-test-state session "w1")
+    (agentel-background-test-update
+     session '(sessionUpdate . "tool_call_update") '(toolCallId . "w1") '(title . "Workflow"))
+    (let ((work (agentel-background--list-work session)))
+      (should (equal (mapcar (lambda (w) (plist-get w :title)) work) '("Workflow")))
+      (let (opened)
+        (cl-letf (((symbol-function 'agentel-background-open)
+                   (lambda (s id) (setq opened (list s id))))
+                  ((symbol-function 'pop-to-buffer) #'ignore))
+          (funcall (plist-get (car work) :open)))
+        (should (equal opened (list session "w1")))))))
+
+(ert-deftest agentel-background-tells-the-session-changed-with-its-titles ()
+  (agentel-background-test-with-session
+    (let (changed)
+      (add-hook 'agentel-session-changed-functions (lambda (_s) (setq changed t)))
+      (agentel-background-test-state session "w1")
+      (should changed)
+      (setq changed nil)
+      (agentel-background-test-update
+       session '(sessionUpdate . "tool_call_update") '(toolCallId . "w1") '(title . "Workflow"))
+      (should changed))))
+
 (ert-deftest agentel-background-v2-workflow-is-pinned-until-it-ends ()
   (let ((agentel-acp-v2-agents '(mock)))
     (agentel-test-with-started session nil

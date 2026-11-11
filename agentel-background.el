@@ -12,6 +12,7 @@
 ;; agent drops them from the list.  Opening one, by clicking its pinned
 ;; line or with `agentel-background-open', shows its latest report in a
 ;; buffer of its own, which keeps the last report once the work ended.
+;; The work also shows below its session in `agentel-list'.
 ;;
 ;; A list left out of a `state_update' is not reported, so the pinned
 ;; work stays.  Work of other types is left out: claude-agent-acp lists
@@ -23,6 +24,7 @@
 (require 'agentel-session)
 (require 'agentel-conversation)
 (require 'agentel-chat)
+(require 'agentel-list)
 (require 'agentel-store)
 (require 'agentel-ui)
 
@@ -57,10 +59,20 @@ is ignored."
 
 (agentel-store-define 'agentel-background #'agentel-background--update)
 
+(defun agentel-background--title (item)
+  "Return the title of the background work ITEM."
+  (or (alist-get 'title (cdr item)) "Background work"))
+
 (defun agentel-background--send (session message)
-  "Change the background work of SESSION by MESSAGE."
-  (agentel-store-dispatch (agentel-session-store session) 'background 'agentel-background
-                          message))
+  "Change the background work of SESSION by MESSAGE.
+The session is told it changed when the titles of its work did, so the
+list shows them."
+  (let ((titles (mapcar #'agentel-background--title (agentel-background--items session))))
+    (agentel-store-dispatch (agentel-session-store session) 'background 'agentel-background
+                            message)
+    (unless (equal titles (mapcar #'agentel-background--title
+                                  (agentel-background--items session)))
+      (agentel-session-changed session))))
 
 (defun agentel-background--items (session)
   "Return the background work items of SESSION."
@@ -107,10 +119,6 @@ is ignored."
                                        `((title . ,.title)
                                          (report . ,(agentel-background--report .content))))))
          (agentel-background--send session `(update ,.toolCallId ,fields)))))))
-
-(defun agentel-background--title (item)
-  "Return the title of the background work ITEM."
-  (or (alist-get 'title (cdr item)) "Background work"))
 
 (defun agentel-background--pin-line (session item width)
   "Return the pinned line of the background work ITEM of SESSION.
@@ -209,7 +217,16 @@ minibuffer.  Return the buffer."
       (pop-to-buffer buffer))
     buffer))
 
+(defun agentel-background--list-work (session)
+  "Return the background work of SESSION as `agentel-list' shows it."
+  (mapcar (lambda (item)
+            (list :title (agentel-background--title item)
+                  :open (lambda ()
+                          (pop-to-buffer (agentel-background-open session (car item))))))
+          (agentel-background--items session)))
+
 (keymap-set agentel-chat-mode-map "C-c C-b" #'agentel-background-open)
+(add-hook 'agentel-list-work-functions #'agentel-background--list-work)
 
 (add-hook 'agentel-session-update-functions #'agentel-background--on-update)
 
