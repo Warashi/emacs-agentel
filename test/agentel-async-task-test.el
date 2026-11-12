@@ -14,6 +14,13 @@
   (when-let* ((pin (overlay-get agentel-chat--pin 'before-string)))
     (substring-no-properties pin)))
 
+(defmacro agentel-async-task-test-with-v1-started (var &rest body)
+  "Start a session on the mock agent with ACP version 1, bind it to VAR, run BODY.
+Version 2 tells terminals in updates of their own."
+  (declare (indent 1))
+  `(let ((agentel-test-acp-version 1))
+     (agentel-test-with-started ,var nil ,@body)))
+
 (ert-deftest agentel-async-task-advertises-terminal-output ()
   (agentel-test-with-started session nil
     (let* ((received (alist-get 'receivedCapabilities
@@ -24,7 +31,7 @@
       (should-not (alist-get 'jetbrains meta)))))
 
 (ert-deftest agentel-async-task-running-is-pinned-above-the-prompt ()
-  (agentel-test-with-started session nil
+  (agentel-async-task-test-with-v1-started session
     (agentel-test-send "async please")
     (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
     (should (equal (agentel-async-task-test-pin)
@@ -102,7 +109,7 @@
 (ert-deftest agentel-async-task-is-not-sent-without-the-capability ()
   (let ((agentel-connection-capability-functions
          (remq #'agentel-async-task--capabilities agentel-connection-capability-functions)))
-    (agentel-test-with-started session nil
+    (agentel-async-task-test-with-v1-started session
       (agentel-test-send "async please")
       (agentel-test-wait-until (lambda () (eq (agentel-session-state session) 'idle)))
       (should-not (agentel-async-task-test-pin)))))

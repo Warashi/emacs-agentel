@@ -679,23 +679,27 @@ unknown values are rejected."
       (puthash session-id state agentel-mock--sessions)
       (agentel-mock--respond id `((configOptions . ,(agentel-mock--config-options state))))))))
 
+(defun agentel-mock--replay-subagent (session-id)
+  "Replay a finished subagent into the history of SESSION-ID."
+  (let ((child "task-replayed"))
+    (setf (alist-get 'subagent-id (gethash session-id agentel-mock--sessions)) child)
+    (agentel-mock--update
+     session-id `((sessionUpdate . "subagent_update") (sessionId . ,child)
+                  (title . "Explore") (description . "Review the parser")
+                  (state . ((state . "running")))))
+    (agentel-mock--session-message session-id child "Read the parser.")
+    (agentel-mock--say child "Replayed subagent text.")
+    (agentel-mock--update
+     session-id `((sessionUpdate . "subagent_update")
+                  (sessionId . ,child)
+                  (state . ((state . "idle") (stopReason . "end_turn")))))))
+
 (defun agentel-mock--load (id params)
   "Handle `session/load' request ID with PARAMS by replaying history."
   (let ((session-id (agentel-mock--new-session (alist-get 'sessionId params))))
     (agentel-mock--say session-id "What was the plan?" "user_message_chunk")
     (agentel-mock--say session-id "The plan was to write tests first.")
-    (let ((child "task-replayed"))
-      (setf (alist-get 'subagent-id (gethash session-id agentel-mock--sessions)) child)
-      (agentel-mock--update
-       session-id `((sessionUpdate . "subagent_update") (sessionId . ,child)
-                    (title . "Explore") (description . "Review the parser")
-                    (state . ((state . "running")))))
-      (agentel-mock--session-message session-id child "Read the parser.")
-      (agentel-mock--say child "Replayed subagent text.")
-      (agentel-mock--update
-       session-id `((sessionUpdate . "subagent_update")
-                    (sessionId . ,child)
-                    (state . ((state . "idle") (stopReason . "end_turn"))))))
+    (agentel-mock--replay-subagent session-id)
     (agentel-mock--respond
      id `((configOptions . ,(agentel-mock--config-options
                              (gethash session-id agentel-mock--sessions)))))
@@ -712,7 +716,8 @@ each message led by an empty one, and a state ends it."
       (agentel-mock--say session-id "What was the plan?" "user_message_chunk")
       (agentel-mock--update session-id '((sessionUpdate . "agent_message") (messageId . "m2")
                                          (content . [])))
-      (agentel-mock--say session-id "The plan was to write tests first."))
+      (agentel-mock--say session-id "The plan was to write tests first.")
+      (agentel-mock--replay-subagent session-id))
     (agentel-mock--state session-id "idle")
     (agentel-mock--respond
      id `((configOptions . ,(agentel-mock--config-options

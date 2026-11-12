@@ -9,8 +9,10 @@ SPEC = test/spec
 
 .PHONY: test test-spec spec entities cjk lint compile checkdoc clean
 
+# Run the tests with both ACP versions agentel speaks.
 test: test-spec
 	$(BATCH) -l ert $(addprefix -l ,$(TESTS)) -f ert-run-tests-batch-and-exit
+	AGENTEL_TEST_ACP_VERSION=2 $(BATCH) -l ert $(addprefix -l ,$(TESTS)) -f ert-run-tests-batch-and-exit
 
 test-spec:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m unittest discover -s $(SPEC)

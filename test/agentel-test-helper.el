@@ -34,11 +34,21 @@ Return the value of PREDICATE, failing the test on timeout."
       (ert-fail "Timed out waiting for condition"))
     value))
 
+(defvar agentel-test-acp-version
+  (string-to-number (or (getenv "AGENTEL_TEST_ACP_VERSION") "1"))
+  "ACP version the tests speak to the mock agent by default.
+Set AGENTEL_TEST_ACP_VERSION to 2 to run them all with version 2.  A
+test of a feature of one version binds it.")
+
 (defmacro agentel-test-with-started (var options &rest body)
-  "Start a session on the mock agent with OPTIONS, bind it to VAR, run BODY."
+  "Start a session on the mock agent with OPTIONS, bind it to VAR, run BODY.
+The mock speaks `agentel-test-acp-version' unless a test chooses."
   (declare (indent 2))
   `(let* ((agentel-session--registry nil)
           (command (agentel-test-mock-command))
+          (agentel-acp-v2-agents (if (= agentel-test-acp-version 2)
+                                     (cons 'mock agentel-acp-v2-agents)
+                                   agentel-acp-v2-agents))
           (agentel-agents (cons (cons 'mock command) agentel-agents))
           (agentel-default-agent 'mock)
           (,var (apply #'agentel-start :cwd temporary-file-directory
