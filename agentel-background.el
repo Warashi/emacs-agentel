@@ -40,7 +40,8 @@
   "Return the background work DATA of a session changed by MESSAGE.
 DATA has the `session' they run in, kept to open them, and the `items'
 in the order the agent lists them, each (ID . FIELDS) with the `title'
-and the latest `report' of the tool call or the terminal ID.  MESSAGE is
+and the latest `report' of the tool call or the terminal ID, and
+`verbatim' for the output of a terminal, which is no markdown.  MESSAGE is
 \(list SESSION ITEMS), which replaces the items, or (update ID FIELDS),
 which merges the alist FIELDS into the item ID; news of an unknown item
 is ignored."
@@ -93,7 +94,7 @@ list shows them."
 (defun agentel-background--terminal (session id)
   "Return the fields of the terminal ID of SESSION."
   (let-alist (agentel-terminal-get session id)
-    (seq-filter #'cdr `((title . ,.command) (report . ,.output)))))
+    (seq-filter #'cdr `((title . ,.command) (report . ,.output) (verbatim . t)))))
 
 (defun agentel-background--report (content)
   "Return the text of the tool call CONTENT, or nil without any."
@@ -167,7 +168,7 @@ Each line fits in the :width of OPTIONS."
 ;;;; The buffer of a work
 
 (defvar agentel-background--buffers (make-hash-table :test 'equal)
-  "Buffers showing background work, by (SESSION . ID).")
+  "Buffers showing background work, by (SESSION-ID . ID).")
 
 (defvar-local agentel-background--shown nil
   "The report shown in this buffer.")
@@ -175,13 +176,14 @@ Each line fits in the :width of OPTIONS."
 (define-derived-mode agentel-background-mode special-mode "agentel-background"
   "Major mode of the buffer showing the report of a background work.")
 
-(defun agentel-background--show (report)
-  "Show REPORT in this buffer unless it shows it already."
+(defun agentel-background--show (report verbatim)
+  "Show REPORT in this buffer unless it shows it already.
+A VERBATIM report is shown as it is, otherwise as a message."
   (when (and report (not (equal report agentel-background--shown)))
     (setq agentel-background--shown report)
     (let ((inhibit-read-only t))
       (erase-buffer)
-      (insert (if agentel-chat-format-message-function
+      (insert (if (and agentel-chat-format-message-function (not verbatim))
                   (funcall agentel-chat-format-message-function report
                            (when-let* ((window (get-buffer-window)))
                              (window-width window)))
@@ -198,17 +200,18 @@ Each line fits in the :width of OPTIONS."
          (follow (lambda (_model _added)
                    (when-let* ((item (assoc id (agentel-background--items session))))
                      (with-current-buffer buffer
-                       (agentel-background--show (alist-get 'report (cdr item))))))))
+                       (agentel-background--show (alist-get 'report (cdr item))
+                                                 (alist-get 'verbatim (cdr item))))))))
     (with-current-buffer buffer
       (agentel-background-mode)
       (agentel-store-subscribe store follow 'background)
       (add-hook 'kill-buffer-hook
                 (lambda ()
                   (agentel-store-unsubscribe store follow)
-                  (remhash (cons session id) agentel-background--buffers))
+                  (remhash (cons (agentel-session-id session) id) agentel-background--buffers))
                 nil t))
     (funcall follow nil nil)
-    (puthash (cons session id) buffer agentel-background--buffers)
+    (puthash (cons (agentel-session-id session) id) buffer agentel-background--buffers)
     buffer))
 
 (defun agentel-background--read (session)
@@ -228,7 +231,8 @@ minibuffer.  Return the buffer."
   (interactive
    (let ((session (agentel-session-current)))
      (list session (agentel-background--read session))))
-  (let ((buffer (or (let ((buffer (gethash (cons session id) agentel-background--buffers)))
+  (let ((buffer (or (let ((buffer (gethash (cons (agentel-session-id session) id)
+                                            agentel-background--buffers)))
                       (and (buffer-live-p buffer) buffer))
                     (agentel-background--buffer session id))))
     (when (called-interactively-p 'any)

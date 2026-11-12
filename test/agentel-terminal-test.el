@@ -90,6 +90,22 @@
       (should (equal (alist-get 'title item) "npm run dev"))
       (should (equal (alist-get 'report item) "Listening on 3000")))))
 
+(ert-deftest agentel-terminal-in-the-background-shows-its-output-as-it-is ()
+  (agentel-terminal-test-with-session
+    (agentel-terminal-test-start "t1" "cat notes.md")
+    (agentel-terminal-test-update
+     '(sessionUpdate . "terminal_update") '(terminalId . "t1")
+     `(output . ((data . ,(agentel-terminal-test-base64 "# x\n* y\n")))))
+    (agentel-terminal-test-update
+     '(sessionUpdate . "state_update") '(state . "running")
+     '(background . [((type . "terminal") (terminalId . "t1"))]))
+    (let ((buffer (agentel-background-open session "t1")))
+      (unwind-protect
+          (with-current-buffer buffer
+            (should (equal (buffer-string) "# x\n* y\n"))
+            (should-not (text-properties-at (point-min))))
+        (kill-buffer buffer)))))
+
 (ert-deftest agentel-terminal-v2-background-command-is-pinned-until-it-exits ()
   (let ((agentel-acp-v2-agents '(mock)))
     (agentel-test-with-started session nil
