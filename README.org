@@ -77,6 +77,16 @@ session:
 their names as =C-c C-o= shows them: Copilot CLI takes =plan= for its
 Plan mode, whose value is a URL.
 
+agentel speaks ACP version 1 by default.  The agents named in
+=agentel-acp-v2-agents= are spoken to with version 2, which
+claude-agent-acp 0.106.0 speaks as a draft.  With it, the progress of
+dynamic workflows shows (see the pinned work below).  An agent that
+answers another version fails to start:
+
+#+begin_src emacs-lisp
+(setq agentel-acp-v2-agents '(claude))
+#+end_src
+
 ** Running the agent through a wrapper
 
 =agentel-command-prefix= is put in front of the agent command, so the
@@ -129,6 +139,7 @@ transcript grows so that the prompt stays at the bottom.
 | =C-c C-n=           | show the next session that needs the user                           |
 | =C-c C-f=           | toggle =agentel-focus-mode=                                         |
 | =C-c C-j=           | visit a running subagent                                            |
+| =C-c C-b=           | show the report of background work (ACP v2)                         |
 | =C-c C-w=           | copy the code of a code block                                       |
 | =TAB=               | complete a slash command or an =@= path, or fold the entry at point |
 | =M-p= / =M-n=       | previous / next sent prompt                                         |
@@ -175,8 +186,15 @@ the prompt, so work that outlives a turn stays in view.  Clicking a
 subagent there, or =C-c C-j=, visits its buffer.  Background tasks are
 tracked through the =_meta.terminal_output= extension.  A background
 Bash command stays pinned until its terminal exits, even after its
-tool call or the parent's turn completes.  Background workflows are
-not reported by the adapter without AIR and do not appear in the pin.
+tool call or the parent's turn completes.
+
+With ACP version 2, the work the agent lists as running in the
+background, such as a dynamic workflow or a Bash command, is pinned by
+its title or command instead, until the agent drops it from the list.
+Clicking it, or =C-c C-b=, shows its latest report, such as the phases
+and agents of a workflow or the output of a command, in a buffer of its
+own that follows the report and keeps the last one once the work ended.
+Background subagents show as subagents.
 
 When Claude resumes a finished subagent with =SendMessage= in the same
 session, its new work continues in the original subagent buffer.  An
@@ -216,7 +234,9 @@ first.  Next come the unread sessions, marked with =●=: their turn
 ended while their buffer was not shown, and the mark goes once it is.
 =n= and =p= move to the next and previous session, subagents included.
 =RET= visits a session, =a= answers its oldest question, =c= cancels
-its turn and =k= stops it.  =TAB= hides the subagents of a session,
+its turn and =k= stops it.  With ACP version 2, the work of a session
+in the background follows it as =└ ⚙= lines, and =RET= on one shows its
+report.  =TAB= hides the subagents of a session,
 leaving their count (=▸3=) on its line, or shows them again.
 
 =M-x agentel-pending-next= (or =C-c C-n=) shows in the selected window
@@ -363,7 +383,9 @@ without the real agent, add it to =agentel-agents=:
 #+end_src
 
 The mock reacts to words in the prompt: =tool=, =permission=, =ask=,
-=subagent=, =background=, =async=, =markdown=, =slow= and =fail=.
+=subagent=, =background=, =async=, =markdown=, =slow=, =fail= and,
+with ACP version 2, =workflow=.  It speaks the version asked for, so
+=make test= runs every test with each version.
 
 After changing =Package-Requires=, regenerate the lock files in =lock/=.
 Fetching packages that are not locked yet requires impure evaluation:
