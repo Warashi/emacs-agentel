@@ -155,15 +155,19 @@ and its buffer takes over the name and windows of SESSION's buffer."
   (let* ((old-buffer (agentel-session-buffer session))
          (name (buffer-name old-buffer))
          (windows (get-buffer-window-list old-buffer nil t))
-         (new (apply #'agentel-start :display nil
-                     (append options (agentel-session-restart-options session))))
-         (new-buffer (agentel-session-buffer new)))
-    (dolist (window windows)
-      (set-window-buffer window new-buffer))
+         (options (append options (agentel-session-restart-options session))))
+    ;; The old agent is stopped before the new one starts, since a wrapper
+    ;; may refuse to start an agent on what the old one still holds, such
+    ;; as a workspace mounted into one container at a time.
     (kill-buffer old-buffer)
-    (with-current-buffer new-buffer
-      (rename-buffer name t))
-    new))
+    (let* ((new (apply #'agentel-start :display nil options))
+           (new-buffer (agentel-session-buffer new)))
+      (dolist (window windows)
+        (when (window-live-p window)
+          (set-window-buffer window new-buffer)))
+      (with-current-buffer new-buffer
+        (rename-buffer name t))
+      new)))
 
 (defun agentel--fail (session message)
   "End SESSION because it could not start, showing MESSAGE."

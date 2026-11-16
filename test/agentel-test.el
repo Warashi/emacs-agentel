@@ -276,5 +276,16 @@
                                      :session-id "old-1" :display nil)))
                    '(:cwd "/tmp/project/" :agent copilot :model "opus" :mode "plan")))))
 
+(ert-deftest agentel-replace-stops-the-old-agent-before-starting ()
+  (agentel-test-with-started session nil
+    (let* ((process (agentel-connection-process (agentel-session-connection session)))
+           (old-alive 'not-started)
+           (agentel-command-prefix
+            (lambda (_options) (setq old-alive (process-live-p process)) nil))
+           (replaced (agentel-replace session)))
+      (unwind-protect
+          (should-not old-alive)
+        (kill-buffer (agentel-session-buffer replaced))))))
+
 (provide 'agentel-test)
 ;;; agentel-test.el ends here
