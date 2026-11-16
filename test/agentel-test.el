@@ -198,7 +198,7 @@
   (let* ((agentel-session--registry nil)
          ;; A batch Emacs dies of SIGPIPE when it writes to an agent
          ;; that is gone, so the agent reads the initialize request first.
-         (agentel-agents '((sh "sh" "-c" "read request; echo 'Not logged in' >&2; exit 3")))
+         (agentel-agents '((sh "sh" "-c" "read request; echo 'Checking the login' >&2; sleep 0.1; echo 'Not logged in' >&2; exit 3")))
          (agentel-default-agent 'sh)
          (session (agentel-start :cwd temporary-file-directory :display nil)))
     (unwind-protect
@@ -206,19 +206,20 @@
           (agentel-test-wait-until
            (lambda () (memq (agentel-session-state session) '(failed exited))))
           (agentel-test-wait-for-text "Agent exited")
-          (agentel-test-wait-for-text "Not logged in")
+          (agentel-test-wait-for-text "Checking the login\n.*Not logged in")
           (should-not (string-search "acp-client" (buffer-string)))
           (should (= (how-many "Not logged in" (point-min) (point-max)) 1)))
       (kill-buffer (agentel-session-buffer session)))))
 
-(ert-deftest agentel-shows-stderr-while-starting ()
+(ert-deftest agentel-shows-stderr-while-starting-folded-in-one-entry ()
   (let* ((agentel-session--registry nil)
-         (agentel-agents '((sh "sh" "-c" "echo 'Setting up the workspace' >&2; sleep 10")))
+         (agentel-agents '((sh "sh" "-c" "echo 'Fetching inputs' >&2; sleep 0.1; echo 'Building the shell' >&2; sleep 10")))
          (agentel-default-agent 'sh)
          (session (agentel-start :cwd temporary-file-directory :display nil)))
     (unwind-protect
         (with-current-buffer (agentel-session-buffer session)
-          (agentel-test-wait-for-text "Setting up the workspace")
+          (agentel-test-wait-for-text "▸ Starting: Building the shell")
+          (should-not (string-search "Fetching inputs" (buffer-string)))
           (should (eq (agentel-session-state session) 'starting)))
       (kill-buffer (agentel-session-buffer session)))))
 

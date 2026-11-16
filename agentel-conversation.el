@@ -106,6 +106,13 @@ It is called with the item and non-nil when the item was added."
         (`(show ,text) `((text . ,text)))
         (_ (agentel-store-reject message))))))
 
+(agentel-conversation-define 'stderr
+  (lambda (message data)
+    (pcase message
+      (`(lines ,lines) `((lines . ,(append (alist-get 'lines data) lines))))
+      ('(fail) `((lines . ,(alist-get 'lines data)) (failed . t)))
+      (_ (agentel-store-reject message)))))
+
 (defun agentel-conversation--update-tool (message data)
   "Return the DATA of a tool call changed by MESSAGE.
 The message carries the fields it changes: `title', `why' the agent

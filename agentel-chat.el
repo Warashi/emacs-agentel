@@ -281,6 +281,22 @@ The folded line fits in the :width of OPTIONS."
 (dolist (type '(notice error stop))
   (agentel-ui-define-view type #'agentel-chat--render-notice))
 
+(defun agentel-chat--render-stderr (entry options)
+  "Render the stderr ENTRY of a starting agent, folded when OPTIONS say so.
+Folded, it shows the latest line in the :width of OPTIONS.  The entry
+of a start that failed is never folded, since its lines tell why."
+  (let ((lines (agentel-store-get entry 'lines))
+        (failed (agentel-store-get entry 'failed)))
+    (propertize
+     (if (and (plist-get options :collapsed) (not failed))
+         (agentel-ui-one-line "▸ Starting: " (car (last lines))
+                              (plist-get options :width))
+       (concat "▾ Starting\n" (agentel-chat--indent (string-join lines "\n"))))
+     'face (if failed 'agentel-chat-error-face 'agentel-chat-notice-face)
+     'keymap agentel-chat-entry-map)))
+
+(agentel-ui-define-view 'stderr #'agentel-chat--render-stderr :collapsed t)
+
 (defconst agentel-chat--status-icons
   '((pending . "…") (running . "⟳") (done . "✓") (failed . "✗")
     (cancelled . "⊘") (paused . "⏸"))

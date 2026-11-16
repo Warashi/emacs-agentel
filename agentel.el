@@ -171,6 +171,8 @@ and its buffer takes over the name and windows of SESSION's buffer."
 
 (defun agentel--fail (session message)
   "End SESSION because it could not start, showing MESSAGE."
+  (when (agentel-conversation-find session 'stderr)
+    (agentel-conversation-send session 'stderr 'stderr '(fail)))
   (agentel-conversation-note session message 'error)
   (agentel-session-send session '(end failed)))
 
@@ -214,7 +216,7 @@ and its buffer takes over the name and windows of SESSION's buffer."
   (dolist (session (agentel-session-roots))
     (when (and (eq (agentel-session-connection session) connection)
                (eq (agentel-session-state session) 'starting))
-      (agentel-conversation-note session (string-join lines "\n")))))
+      (agentel-conversation-send session 'stderr 'stderr `(lines ,lines)))))
 
 (add-hook 'agentel-connection-stderr-functions #'agentel--show-starting-stderr)
 

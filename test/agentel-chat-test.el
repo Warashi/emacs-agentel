@@ -302,6 +302,22 @@
                   :type 'thought :data `((text . ,(make-string 100 ?h))))))
     (should (= (string-width (agentel-ui-view thought :width 20 :collapsed t)) 20))))
 
+(ert-deftest agentel-chat-folds-stderr-to-its-latest-line ()
+  (let ((stderr (agentel-store-model--make
+                 :type 'stderr :data '((lines "Fetching inputs" "Building the shell")))))
+    (should (equal (substring-no-properties
+                    (agentel-ui-view stderr :width 80 :collapsed t))
+                   "▸ Starting: Building the shell"))
+    (should (string-match-p "Fetching inputs\n.*Building the shell"
+                            (agentel-ui-view stderr :width 80 :collapsed nil)))))
+
+(ert-deftest agentel-chat-unfolds-stderr-of-a-failed-start ()
+  (let ((stderr (agentel-store-model--make
+                 :type 'stderr
+                 :data '((lines "Fetching inputs" "Refused") (failed . t)))))
+    (should (string-match-p "Fetching inputs\n.*Refused"
+                            (agentel-ui-view stderr :width 80 :collapsed t)))))
+
 (ert-deftest agentel-chat-updating-an-old-tool-keeps-later-entries-intact ()
   (agentel-chat-test-with-session
     (agentel-chat-test-update
