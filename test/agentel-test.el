@@ -206,7 +206,8 @@
           (agentel-test-wait-until
            (lambda () (memq (agentel-session-state session) '(failed exited))))
           (agentel-test-wait-for-text "Agent exited")
-          (agentel-test-wait-for-text "Not logged in"))
+          (agentel-test-wait-for-text "Not logged in")
+          (should-not (string-search "acp-client" (buffer-string))))
       (kill-buffer (agentel-session-buffer session)))))
 
 (ert-deftest agentel-shows-why-the-agent-could-not-start ()

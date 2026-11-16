@@ -191,7 +191,11 @@ Return the connection."
       (add-function :after (process-sentinel process)
                     (lambda (process _event)
                       (unless (process-live-p process)
-                        (agentel-connection--on-exit connection)))))
+                        (agentel-connection--on-exit connection))))
+      ;; The default sentinel of the stderr pipe writes "Process ...
+      ;; finished" into the stderr buffer, which acp.el reports as stderr.
+      (when-let* ((stderr (get-process (concat (process-name process) " stderr"))))
+        (set-process-sentinel stderr #'ignore)))
     connection))
 
 (defun agentel-connection-process (connection)
