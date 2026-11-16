@@ -210,8 +210,8 @@ transcript too.
 
 =agentel-focus-mode= shows only what the next input needs: the last
 prompt, the questions still open, errors and why the turn ended,
-together with the last agent message and the latest thought or tool
-call when it came after that message.  Before the first prompt, it also
+together with the agent messages since the prompt and the latest
+thought or tool call when it came after the last of them.  Before the first prompt, it also
 shows what the agent wrote to stderr while it started.  To open every
 session this way:
 

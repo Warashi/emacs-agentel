@@ -7,8 +7,9 @@
 
 ;; `agentel-focus-mode' shows in the transcript only what the user
 ;; answers next: the last prompt, the questions still waiting for an
-;; answer, errors and why the turn ended, the last agent message, and
-;; the latest thought or tool call when it came after that message.
+;; answer, errors and why the turn ended, the agent messages since the
+;; prompt, and the latest thought or tool call when it came after the
+;; last of them.
 ;; Before the first prompt, what the agent wrote to stderr while it
 ;; started is shown too.  A
 ;; subagent is shown while it waits for an answer; while it runs it is
@@ -27,9 +28,9 @@
   "Return the ITEMS of a conversation the next input needs, oldest first.
 They are those from the last prompt on, or all without a prompt, that
 are prompts, errors, why the turn ended, the stderr of the agent while
-it started, waiting for an answer, the last agent message or the latest
-thought or tool call after it."
-  (let ((turn items) last-message last-activity)
+it started, waiting for an answer, agent messages or the latest
+thought or tool call after the last agent message."
+  (let ((turn items) last-activity)
     (let ((tail items))
       (while tail
         (when (eq (agentel-store-model-type (car tail)) 'user)
@@ -37,13 +38,12 @@ thought or tool call after it."
         (setq tail (cdr tail))))
     (dolist (item turn)
       (pcase (agentel-store-model-type item)
-        ('agent (setq last-message item
-                      last-activity nil))
+        ('agent (setq last-activity nil))
         ((or 'thought 'tool) (setq last-activity item))))
     (seq-filter (lambda (item)
-                  (or (eq item last-message)
-                      (eq item last-activity)
-                      (memq (agentel-store-model-type item) '(user error stop stderr))
+                  (or (eq item last-activity)
+                      (memq (agentel-store-model-type item)
+                            '(user agent error stop stderr))
                       (agentel-store-get item 'waiting)))
                 turn)))
 
@@ -51,8 +51,9 @@ thought or tool call after it."
 (define-minor-mode agentel-focus-mode
   "Show only what the next input to the session needs.
 The last prompt stays visible, with the questions waiting for an
-answer, errors and why the turn ended, the last agent message, and
-the latest thought or tool call when it came after that message."
+answer, errors and why the turn ended, the agent messages since the
+prompt, and the latest thought or tool call when it came after the last
+of them."
   :lighter " Focus"
   (if agentel-focus-mode
       (setq-local agentel-chat-transcript-function #'agentel-focus-items)

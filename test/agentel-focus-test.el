@@ -90,6 +90,15 @@
                     (list old old-error prompt message tool question answered thought stop))
                    (list prompt message question thought stop)))))
 
+(ert-deftest agentel-focus-items-keeps-every-agent-message-of-the-turn ()
+  (let ((prompt (agentel-focus-test-item 'user))
+        (first (agentel-focus-test-item 'agent))
+        (tool (agentel-focus-test-item 'tool))
+        (thought (agentel-focus-test-item 'thought))
+        (last (agentel-focus-test-item 'agent)))
+    (should (equal (agentel-focus-items (list prompt first tool thought last))
+                   (list prompt first last)))))
+
 (ert-deftest agentel-focus-items-without-a-prompt-chooses-from-all ()
   (let ((notice (agentel-focus-test-item 'notice))
         (message (agentel-focus-test-item 'agent)))
@@ -106,8 +115,8 @@
     (agentel-focus-test-a-finished-turn session)
     (let ((text (agentel-focus-test-visible)))
       (should (string-match-p "second prompt" text))
-      (should (string-match-p "second answer" text))
-      (dolist (hidden '("first prompt" "first answer" "Thinking" "Let me look"
+      (should (string-match-p "Let me look\\.\\(.\\|\n\\)*second answer" text))
+      (dolist (hidden '("first prompt" "first answer" "Thinking"
                         "Read README" "a notice"))
         (should-not (string-match-p hidden text)))
       (should (string-prefix-p "❯ second prompt" text)))))
@@ -214,7 +223,7 @@
     (agentel-focus-test-tool "t1" "Read a.el later")
     (should-not (string-match-p "Read a\\.el" (agentel-focus-test-visible)))))
 
-(ert-deftest agentel-focus-shows-the-last-message-while-running ()
+(ert-deftest agentel-focus-shows-the-messages-while-running ()
   (agentel-focus-test-with-session
     (agentel-focus-test-prompt session "do it")
     (agentel-focus-test-chunk "agent_message_chunk" "Let me look.")
@@ -223,7 +232,7 @@
                             (agentel-focus-test-visible)))
     (agentel-focus-test-chunk "agent_message_chunk" "Some ")
     (agentel-focus-test-chunk "agent_message_chunk" "text")
-    (should (string-match-p "\\`❯ do it\n\nSome text\n\n❯ \\'"
+    (should (string-match-p "\\`❯ do it\n\nLet me look\\.\n\nSome text\n\n❯ \\'"
                             (agentel-focus-test-visible)))))
 
 (ert-deftest agentel-focus-shows-a-tool-call-that-ended-the-turn ()
