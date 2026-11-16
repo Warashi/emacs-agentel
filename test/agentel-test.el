@@ -32,6 +32,13 @@
     (agentel-test-with-started session nil
       (should (equal (agentel-session-project session) "repo/worktree")))))
 
+(ert-deftest agentel-start-names-the-session-as-told ()
+  (let ((project-find-functions
+         (list (lambda (dir) (list 'agentel-test-project dir "repo/worktree")))))
+    (agentel-test-with-started session '(:project "fix (handoff)")
+      (should (equal (agentel-session-project session) "fix (handoff)"))
+      (should (equal (buffer-name) "*agentel: fix (handoff)*")))))
+
 (ert-deftest agentel-start-outside-a-project-names-the-buffer-after-the-directory ()
   (let ((project-find-functions nil))
     (agentel-test-with-started session nil

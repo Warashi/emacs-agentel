@@ -216,16 +216,17 @@ of SESSION."
 
 ;;;###autoload
 (cl-defun agentel-start (&rest options &key cwd (agent agentel-default-agent)
-                                (display t) &allow-other-keys)
+                                (display t) project &allow-other-keys)
   "Start AGENT in CWD and open a buffer for a new session.
 Return the session.
 
 OPTIONS are keyword arguments.  AGENT names an entry of
 `agentel-agents' and defaults to `agentel-default-agent'.  CWD
 defaults to `default-directory'.  When DISPLAY is nil the buffer is
-not shown.  :session-id loads that earlier session instead of creating
-one.  Other keywords, such as :model, :effort and :mode, are read by
-the features that handle them.
+not shown.  PROJECT names the session instead of the project of CWD.
+:session-id loads that earlier session instead of creating one.  Other
+keywords, such as :model, :effort and :mode, are read by the features
+that handle them.
 
   (agentel-start :cwd \"~/src/project/\" :model \"opus\" :mode \"plan\")"
   (let* ((cwd (file-name-as-directory (expand-file-name (or cwd default-directory))))
@@ -234,8 +235,9 @@ the features that handle them.
          (session (agentel-session-create
                    :cwd cwd
                    :agent agent
-                   :project (when-let* ((project (project-current nil cwd)))
-                              (project-name project))))
+                   :project (or project
+                                (when-let* ((found (project-current nil cwd)))
+                                  (project-name found)))))
          (buffer (agentel-chat-open session :input t)))
     (with-current-buffer buffer
       (setq default-directory cwd)
