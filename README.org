@@ -92,16 +92,18 @@ answers another version fails to start:
 =agentel-command-prefix= is put in front of the agent command, so the
 agent can run in a container or a sandbox while =agentel-agents=
 keeps the plain command.  It is a list of strings, or a function that
-receives the session directory and returns one.  For Docker, mount the
-directory and keep stdin open; do not allocate a TTY (=-t=), since ACP
-speaks JSON over stdio:
+receives the keyword arguments of =agentel-start=, with =:cwd= and
+=:agent= filled in, and returns one.  For Docker, mount the directory
+and keep stdin open; do not allocate a TTY (=-t=), since ACP speaks
+JSON over stdio:
 
 #+begin_src emacs-lisp
 (setq agentel-command-prefix
-      (lambda (cwd)
-        (list "docker" "run" "--rm" "-i"
-              "-v" (format "%s:%s" cwd cwd) "-w" cwd
-              "my-agent-image")))
+      (lambda (options)
+        (let ((cwd (plist-get options :cwd)))
+          (list "docker" "run" "--rm" "-i"
+                "-v" (format "%s:%s" cwd cwd) "-w" cwd
+                "my-agent-image"))))
 #+end_src
 
 The prefix is the same for every agent, so the image needs the
@@ -110,13 +112,13 @@ commands of all agents in =agentel-agents= that you start.
 =agentel-environment= goes to the first program of the prefix; pass
 the variables on yourself if the wrapper does not (=docker run -e=).
 It is a list of ="VAR=value"= strings, or a function that receives the
-session directory and returns one.  For example, to name each Claude
-Code session after its project:
+same keyword arguments and returns one.  For example, to name each
+Claude Code session after its project:
 
 #+begin_src emacs-lisp
 (setq agentel-environment
-      (lambda (cwd)
-        (when-let* ((project (project-current nil cwd)))
+      (lambda (options)
+        (when-let* ((project (project-current nil (plist-get options :cwd))))
           (list (concat "CLAUDE_CODE_SESSION_NAME=" (project-name project))))))
 #+end_src
 

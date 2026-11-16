@@ -22,6 +22,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'map)
 (require 'project)
 (require 'agentel-session)
 (require 'agentel-connection)
@@ -79,13 +80,14 @@ another version fails to start."
 The agent is started as this list followed by its program and
 arguments in `agentel-agents'.  When nil the agent is started directly.
 
-A function is called with the directory of the session and returns
-the list, or nil to start the agent directly, so the prefix can
-depend on the project:
+A function is called with the keyword arguments of `agentel-start',
+with :cwd and :agent filled in, and returns the list, or nil to start
+the agent directly, so the prefix can depend on the session:
 
-  (lambda (cwd)
-    (list \"docker\" \"run\" \"--rm\" \"-i\"
-          \"-v\" (format \"%s:%s\" cwd cwd) \"-w\" cwd \"image\"))"
+  (lambda (options)
+    (let ((cwd (plist-get options :cwd)))
+      (list \"docker\" \"run\" \"--rm\" \"-i\"
+            \"-v\" (format \"%s:%s\" cwd cwd) \"-w\" cwd \"image\")))"
   :type '(choice (repeat string) function)
   :group 'agentel)
 
@@ -94,28 +96,32 @@ depend on the project:
 With `agentel-command-prefix' the variables are given to the first
 program of the prefix, which may not pass them on to the agent.
 
-A function is called with the directory of the session and returns
-the list, so the variables can depend on the project:
+A function is called with the keyword arguments of `agentel-start',
+with :cwd and :agent filled in, and returns the list, so the variables
+can depend on the session:
 
-  (lambda (cwd)
-    (when-let* ((project (project-current nil cwd)))
+  (lambda (options)
+    (when-let* ((project (project-current nil (plist-get options :cwd))))
       (list (concat \"CLAUDE_CODE_SESSION_NAME=\" (project-name project)))))"
   :type '(choice (repeat string) function)
   :group 'agentel)
 
-(defun agentel-agent-environment (cwd)
-  "Return the extra environment of an agent started in CWD."
+(defun agentel-agent-environment (options)
+  "Return the extra environment of an agent started with OPTIONS.
+OPTIONS are keyword arguments of `agentel-start' with :cwd and :agent."
   (if (functionp agentel-environment)
-      (funcall agentel-environment cwd)
+      (funcall agentel-environment options)
     agentel-environment))
 
-(defun agentel-agent-command-line (agent cwd)
-  "Return the program and arguments that start AGENT in CWD."
-  (append (if (functionp agentel-command-prefix)
-              (funcall agentel-command-prefix cwd)
-            agentel-command-prefix)
-          (or (alist-get agent agentel-agents)
-              (user-error "No agent named %s in `agentel-agents'" agent))))
+(defun agentel-agent-command-line (options)
+  "Return the program and arguments that start an agent with OPTIONS.
+OPTIONS are keyword arguments of `agentel-start' with :cwd and :agent."
+  (let ((agent (plist-get options :agent)))
+    (append (if (functionp agentel-command-prefix)
+                (funcall agentel-command-prefix options)
+              agentel-command-prefix)
+            (or (alist-get agent agentel-agents)
+                (user-error "No agent named %s in `agentel-agents'" agent)))))
 
 (defvar agentel-session-started-functions nil
   "Abnormal hook run once the agent created or loaded a session.
@@ -223,7 +229,8 @@ the features that handle them.
 
   (agentel-start :cwd \"~/src/project/\" :model \"opus\" :mode \"plan\")"
   (let* ((cwd (file-name-as-directory (expand-file-name (or cwd default-directory))))
-         (command-line (agentel-agent-command-line agent cwd))
+         (options (map-merge 'plist options (list :cwd cwd :agent agent)))
+         (command-line (agentel-agent-command-line options))
          (session (agentel-session-create
                    :cwd cwd
                    :agent agent
@@ -236,7 +243,7 @@ the features that handle them.
     (setf (agentel-session-connection session)
           (agentel-connection-start
            :command (car command-line) :args (cdr command-line)
-           :env (agentel-agent-environment cwd) :cwd cwd
+           :env (agentel-agent-environment options) :cwd cwd
            :protocol-version (agentel-agent-protocol-version agent)
            :on-ready (lambda (_connection) (agentel--open-session session options))
            :on-failure (lambda (error)

@@ -144,7 +144,7 @@ not called once the returned connection was shut down."
   (let* ((agent (plist-get agentel-summary-agent :agent))
          (model (plist-get agentel-summary-agent :model))
          (command-line (if (and agent model)
-                           (agentel-agent-command-line agent cwd)
+                           (agentel-agent-command-line (list :cwd cwd :agent agent))
                          (user-error "`agentel-summary-agent' needs an :agent and a :model")))
          (session-id nil)
          (chunks nil)
@@ -193,7 +193,7 @@ not called once the returned connection was shut down."
     (setq connection
           (agentel-connection-start
            :command (car command-line) :args (cdr command-line)
-           :env (agentel-agent-environment cwd) :cwd cwd
+           :env (agentel-agent-environment (list :cwd cwd :agent agent)) :cwd cwd
            :protocol-version (agentel-agent-protocol-version agent)
            :on-ready open
            :on-failure fail

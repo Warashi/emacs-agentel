@@ -124,28 +124,32 @@
       (agentel-test-send "hello")
       (agentel-test-wait-for-text "Echo: hello"))))
 
-(ert-deftest agentel-command-prefix-function-gets-the-session-directory ()
-  (let* ((directories nil)
-         (agentel-command-prefix (lambda (cwd)
-                                   (push cwd directories)
+(ert-deftest agentel-command-prefix-function-gets-the-start-options ()
+  (let* ((given nil)
+         (agentel-command-prefix (lambda (options)
+                                   (push options given)
                                    '("env" "AGENTEL_WRAPPED=1"))))
-    (agentel-test-with-started session nil
-      (should (equal directories (list (agentel-session-cwd session))))
+    (agentel-test-with-started session '(:model "haiku")
+      (should (= (length given) 1))
+      (should (equal (plist-get (car given) :cwd) (agentel-session-cwd session)))
+      (should (eq (plist-get (car given) :agent) 'mock))
+      (should (equal (plist-get (car given) :model) "haiku"))
       (should (equal (seq-take (process-command
                                 (agentel-connection-process
                                  (agentel-session-connection session)))
                                2)
                      '("env" "AGENTEL_WRAPPED=1"))))))
 
-(ert-deftest agentel-environment-function-gives-the-agent-variables-of-the-session-directory ()
+(ert-deftest agentel-environment-function-gives-the-agent-variables-of-the-start-options ()
   (let* ((directories nil)
-         (agentel-environment (lambda (cwd)
-                                (push cwd directories)
-                                (list (concat "AGENTEL_CWD=" cwd))))
+         (agentel-environment (lambda (options)
+                                (let ((cwd (plist-get options :cwd)))
+                                  (push cwd directories)
+                                  (list (concat "AGENTEL_CWD=" cwd)))))
          (agentel-command-prefix
-          (lambda (cwd)
+          (lambda (options)
             (list "sh" "-c" "test \"$AGENTEL_CWD\" = \"$1\" && shift && exec \"$@\""
-                  "sh" cwd))))
+                  "sh" (plist-get options :cwd)))))
     (agentel-test-with-started session nil
       (should (equal directories (list (agentel-session-cwd session))))
       (agentel-test-send "hello")
