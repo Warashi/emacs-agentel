@@ -95,6 +95,12 @@
         (message (agentel-focus-test-item 'agent)))
     (should (equal (agentel-focus-items (list notice message)) (list message)))))
 
+(ert-deftest agentel-focus-items-shows-stderr-until-the-first-prompt ()
+  (let ((stderr (agentel-focus-test-item 'stderr '((lines "Building the shell"))))
+        (prompt (agentel-focus-test-item 'user)))
+    (should (equal (agentel-focus-items (list stderr)) (list stderr)))
+    (should (equal (agentel-focus-items (list stderr prompt)) (list prompt)))))
+
 (ert-deftest agentel-focus-shows-the-last-prompt-and-answer-when-idle ()
   (agentel-focus-test-with-session
     (agentel-focus-test-a-finished-turn session)

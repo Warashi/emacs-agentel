@@ -8,7 +8,9 @@
 ;; `agentel-focus-mode' shows in the transcript only what the user
 ;; answers next: the last prompt, the questions still waiting for an
 ;; answer, errors and why the turn ended, the last agent message, and
-;; the latest thought or tool call when it came after that message.  A
+;; the latest thought or tool call when it came after that message.
+;; Before the first prompt, what the agent wrote to stderr while it
+;; started is shown too.  A
 ;; subagent is shown while it waits for an answer; while it runs it is
 ;; pinned above the prompt instead.
 ;;
@@ -24,8 +26,9 @@
 (defun agentel-focus-items (items)
   "Return the ITEMS of a conversation the next input needs, oldest first.
 They are those from the last prompt on, or all without a prompt, that
-are prompts, errors, why the turn ended, waiting for an answer, the
-last agent message or the latest thought or tool call after it."
+are prompts, errors, why the turn ended, the stderr of the agent while
+it started, waiting for an answer, the last agent message or the latest
+thought or tool call after it."
   (let ((turn items) last-message last-activity)
     (let ((tail items))
       (while tail
@@ -40,7 +43,7 @@ last agent message or the latest thought or tool call after it."
     (seq-filter (lambda (item)
                   (or (eq item last-message)
                       (eq item last-activity)
-                      (memq (agentel-store-model-type item) '(user error stop))
+                      (memq (agentel-store-model-type item) '(user error stop stderr))
                       (agentel-store-get item 'waiting)))
                 turn)))
 
