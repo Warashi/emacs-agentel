@@ -209,15 +209,25 @@ and its buffer takes over the name and windows of SESSION's buffer."
        (agentel--fail session (format "Could not start the session: %s"
                                       (alist-get 'message error)))))))
 
+(defun agentel--show-starting-stderr (connection lines)
+  "Show LINES of stderr to the sessions of CONNECTION still starting."
+  (dolist (session (agentel-session-roots))
+    (when (and (eq (agentel-session-connection session) connection)
+               (eq (agentel-session-state session) 'starting))
+      (agentel-conversation-note session (string-join lines "\n")))))
+
+(add-hook 'agentel-connection-stderr-functions #'agentel--show-starting-stderr)
+
 (defun agentel--report-exit (connection)
-  "Tell the sessions of CONNECTION that their agent exited, and why."
+  "Tell the sessions of CONNECTION that their agent exited, and why.
+A session without an id never started, so it was shown all the stderr."
   (let ((stderr (agentel-connection-stderr connection)))
     (dolist (session (agentel-session-roots))
       (when (eq (agentel-session-connection session) connection)
         (agentel-conversation-note
          session
          (concat "Agent exited"
-                 (if stderr
+                 (if (and stderr (agentel-session-id session))
                      (concat ":\n" (mapconcat (lambda (l) (concat "  " l))
                                               (last stderr 5) "\n"))
                    ""))

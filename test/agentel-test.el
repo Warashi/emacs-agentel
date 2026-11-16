@@ -207,8 +207,28 @@
            (lambda () (memq (agentel-session-state session) '(failed exited))))
           (agentel-test-wait-for-text "Agent exited")
           (agentel-test-wait-for-text "Not logged in")
-          (should-not (string-search "acp-client" (buffer-string))))
+          (should-not (string-search "acp-client" (buffer-string)))
+          (should (= (how-many "Not logged in" (point-min) (point-max)) 1)))
       (kill-buffer (agentel-session-buffer session)))))
+
+(ert-deftest agentel-shows-stderr-while-starting ()
+  (let* ((agentel-session--registry nil)
+         (agentel-agents '((sh "sh" "-c" "echo 'Setting up the workspace' >&2; sleep 10")))
+         (agentel-default-agent 'sh)
+         (session (agentel-start :cwd temporary-file-directory :display nil)))
+    (unwind-protect
+        (with-current-buffer (agentel-session-buffer session)
+          (agentel-test-wait-for-text "Setting up the workspace")
+          (should (eq (agentel-session-state session) 'starting)))
+      (kill-buffer (agentel-session-buffer session)))))
+
+(ert-deftest agentel-keeps-stderr-of-a-started-session-for-its-exit ()
+  (agentel-test-with-started session nil
+    (let ((connection (agentel-session-connection session)))
+      (agentel-connection--record-stderr connection "Rate limited\n")
+      (should-not (string-search "Rate limited" (buffer-string)))
+      (delete-process (agentel-connection-process connection))
+      (agentel-test-wait-for-text "Agent exited:\n +Rate limited"))))
 
 (ert-deftest agentel-shows-why-the-agent-could-not-start ()
   (let* ((agentel-session--registry nil)

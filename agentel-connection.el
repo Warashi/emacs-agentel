@@ -37,6 +37,9 @@ params, for example to withdraw a question on `$/cancel_request'.")
 (defvar agentel-connection-exit-functions nil
   "Abnormal hook run with a connection whose agent exited on its own.")
 
+(defvar agentel-connection-stderr-functions nil
+  "Abnormal hook run with a connection and the lines its agent wrote to stderr.")
+
 (defconst agentel-connection--stderr-lines 20
   "Number of stderr lines of the agent kept for error reports.")
 
@@ -46,11 +49,13 @@ params, for example to withdraw a question on `$/cancel_request'.")
   client info stderr stopping on-update)
 
 (defun agentel-connection--record-stderr (connection text)
-  "Keep the last lines of the stderr TEXT of CONNECTION."
-  (let ((lines (append (agentel-connection-stderr connection)
-                       (split-string text "\n" t "[ \t]+"))))
+  "Keep the last lines of the stderr TEXT of CONNECTION and pass them on."
+  (let ((new (split-string text "\n" t "[ \t]+")))
     (setf (agentel-connection-stderr connection)
-          (last lines agentel-connection--stderr-lines))))
+          (last (append (agentel-connection-stderr connection) new)
+                agentel-connection--stderr-lines))
+    (when new
+      (run-hook-with-args 'agentel-connection-stderr-functions connection new))))
 
 (defun agentel-connection--merge-capability (key left right)
   "Merge two values of client capability KEY, LEFT and RIGHT."
