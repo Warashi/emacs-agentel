@@ -184,7 +184,17 @@
 (ert-deftest agentel-config-restarts-without-options-the-model-lacks ()
   (agentel-test-with-started session '(:model "haiku")
     (agentel-config-test-settled session)
-    (should-not (plist-member (agentel-config--restart-options session) :effort))))
+    (should-not (plist-get (agentel-config--restart-options session) :effort))))
+
+(ert-deftest agentel-config-restarts-without-a-start-option-the-model-lost ()
+  (agentel-test-with-started session '(:model "sonnet" :effort "high")
+    (agentel-config-test-settled session)
+    (agentel-config-set session "model" "haiku")
+    (agentel-test-wait-until
+     (lambda () (equal (agentel-config-value session "model") "haiku")))
+    (let ((options (agentel-session-restart-options session)))
+      (should (equal (plist-get options :model) "haiku"))
+      (should-not (plist-get options :effort)))))
 
 (ert-deftest agentel-config-rejects-an-unknown-message ()
   (should-error (agentel-config--update '(forget) nil)

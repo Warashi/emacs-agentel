@@ -271,7 +271,9 @@
          (list (lambda (_session) '(:model "opus"))
                (lambda (_session) '(:mode "plan")))))
     (should (equal (agentel-session-restart-options
-                    (agentel-session-create :cwd "/tmp/project/" :agent 'copilot))
+                    (agentel-session-create
+                     :options '(:cwd "/tmp/project/" :agent copilot :model "haiku"
+                                     :session-id "old-1" :display nil)))
                    '(:cwd "/tmp/project/" :agent copilot :model "opus" :mode "plan")))))
 
 (provide 'agentel-test)

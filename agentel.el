@@ -133,17 +133,20 @@ arguments given to `agentel-start'.")
   "Functions returning start options that recreate a session's settings.
 Each function is called with the session and returns keyword
 arguments of `agentel-start', such as (:model \"opus\"), so a new
-session can start as the current one is now.")
+session can start as the current one is now.  They override the
+options the session started with; a nil value drops one.")
 
 (defun agentel-session-restart-options (session)
   "Return the keyword arguments of `agentel-start' that recreate SESSION.
-The new session starts empty, in the directory and with the settings
-of SESSION."
-  (apply #'append
-         (list :cwd (agentel-session-cwd session)
-               :agent (agentel-session-agent session))
-         (mapcar (lambda (function) (funcall function session))
-                 agentel-session-restart-options-functions)))
+The new session starts empty and shown, with the options SESSION
+started with and its settings now."
+  (let ((options (apply #'map-merge 'plist
+                        (agentel-session-options session)
+                        (mapcar (lambda (function) (funcall function session))
+                                agentel-session-restart-options-functions))))
+    (cl-remf options :session-id)
+    (cl-remf options :display)
+    options))
 
 (defun agentel--fail (session message)
   "End SESSION because it could not start, showing MESSAGE."
@@ -235,6 +238,7 @@ that handle them.
          (session (agentel-session-create
                    :cwd cwd
                    :agent agent
+                   :options options
                    :project (or project
                                 (when-let* ((found (project-current nil cwd)))
                                   (project-name found)))))

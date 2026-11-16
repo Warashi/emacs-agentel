@@ -38,6 +38,7 @@
   connection parent cwd buffer
   (project nil :documentation "Name of the project the session works in.")
   (agent nil :documentation "Name of the agent in `agentel-agents' that runs it.")
+  (options nil :documentation "Keyword arguments `agentel-start' started it with.")
   (store (agentel-store-create)
          :documentation "Store of the models of what changes over its life.")
   (alist nil :documentation "Per-feature values, see `agentel-session-data'."))
@@ -121,17 +122,19 @@ Each function is called with the session.  When one returns non-nil,
 the session runs.  Whoever works calls `agentel-session-changed' when
 that changes.")
 
-(cl-defun agentel-session-create (&key connection parent cwd project agent)
+(cl-defun agentel-session-create (&key connection parent cwd project agent options)
   "Create a session on CONNECTION and add it to the registry.
 PARENT is the session that spawned this one as a subagent.  CWD is
 the working directory, PROJECT the name of its project and AGENT the
-name of the agent that runs it.  The session has no id until
+name of the agent that runs it.  OPTIONS are the keyword arguments
+`agentel-start' started it with.  The session has no id until
 `agentel-session-register' gives it one."
   (let ((session (agentel-session--make :connection connection
                                         :parent parent
                                         :cwd cwd
                                         :project project
-                                        :agent agent)))
+                                        :agent agent
+                                        :options options)))
     (setq agentel-session--registry
           (append agentel-session--registry (list session)))
     (agentel-store-subscribe (agentel-session-store session)

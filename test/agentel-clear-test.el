@@ -63,6 +63,17 @@
             (should (eq (agentel-session-agent cleared) 'other))
           (kill-buffer (agentel-session-buffer cleared)))))))
 
+(ert-deftest agentel-clear-keeps-the-start-options ()
+  (let* ((given nil)
+         (agentel-command-prefix (lambda (options) (push options given) nil)))
+    (agentel-test-with-started session '(:project "fix (handoff)" :wrapper "fix")
+      (let ((cleared (agentel-clear session "")))
+        (unwind-protect
+            (progn
+              (should (equal (agentel-session-project cleared) "fix (handoff)"))
+              (should (equal (plist-get (car given) :wrapper) "fix")))
+          (kill-buffer (agentel-session-buffer cleared)))))))
+
 (ert-deftest agentel-clear-stops-a-running-turn ()
   (agentel-test-with-started session nil
     (agentel-test-send "slow")

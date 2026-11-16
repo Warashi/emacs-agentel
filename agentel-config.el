@@ -209,11 +209,10 @@ category of the option it sets."
 
 (defun agentel-config--restart-options (session)
   "Return the start options that give a new session the settings of SESSION.
-Options the current model lacks are left out, so the new session does
-not report them as unavailable."
+Options the current model lacks are nil, so the new session does not
+report them as unavailable."
   (mapcan (lambda (entry)
-            (when-let* ((value (agentel-config-value session (cdr entry))))
-              (list (car entry) value)))
+            (list (car entry) (agentel-config-value session (cdr entry))))
           agentel-config--start-options))
 
 (defun agentel-config--on-update (session update)

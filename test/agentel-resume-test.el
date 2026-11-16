@@ -61,5 +61,22 @@
                            "haiku")))
         (kill-buffer (agentel-session-buffer resumed))))))
 
+(ert-deftest agentel-resume-keeps-the-start-options ()
+  (agentel-test-with-started session '(:project "fix (handoff)")
+    (let (resumed)
+      (cl-letf (((symbol-function 'completing-read)
+                 (lambda (_prompt collection &rest _)
+                   (seq-find (lambda (c) (string-match-p "Write the parser" c))
+                             (all-completions "" collection)))))
+        (agentel-commands--run session "/resume")
+        (setq resumed (agentel-test-wait-until
+                       (lambda () (agentel-session-get "old-1")))))
+      (unwind-protect
+          (let ((options (agentel-session-restart-options resumed)))
+            (should (equal (agentel-session-project resumed) "fix (handoff)"))
+            (should-not (plist-member options :session-id))
+            (should-not (plist-member options :display)))
+        (kill-buffer (agentel-session-buffer resumed))))))
+
 (provide 'agentel-resume-test)
 ;;; agentel-resume-test.el ends here
