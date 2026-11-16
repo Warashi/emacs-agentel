@@ -175,12 +175,12 @@ Permission requests show the tool's display content, including the
 plan to approve, above the choices.  It stays in the transcript after
 the request is answered or withdrawn.
 
+=/clear= starts a new conversation in the same window, buffer name,
+options, model, effort and mode, and stops the old agent, even in the
+middle of a turn; =/resume= still finds the old conversation.
 =/resume= lists the earlier sessions of the directory and opens the
-chosen one with its history, with the options of =agentel-start= and
-the model, effort and mode of the session it was run in.  =/clear=
-starts a new conversation in the same window, buffer name, options,
-model, effort and mode, and stops the old agent, even in the middle of
-a turn; =/resume= still finds the old conversation.
+chosen one with its history in place of the session it was run in, as
+=/clear= does.
 
 Running subagents and background tasks of the agent, such as a shell
 command left running, are pinned between the transcript and

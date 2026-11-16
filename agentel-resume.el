@@ -6,11 +6,11 @@
 ;;; Commentary:
 
 ;; The /resume command lists the earlier sessions of the working
-;; directory with `session/list' and opens the chosen one in a new
-;; buffer, replaying its history with `session/load', or with
-;; `session/resume' in ACP version 2.  The resumed
-;; session takes over the settings of the session /resume was run in,
-;; as /clear does.  The agent does not offer /resume itself because
+;; directory with `session/list' and opens the chosen one in place of
+;; the session /resume was run in, replaying its history with
+;; `session/load', or with `session/resume' in ACP version 2.  As
+;; /clear does, it closes the old buffer and its agent and takes over
+;; their settings, buffer name and windows.  The agent does not offer /resume itself because
 ;; its own picker is terminal only.
 
 ;;; Code:
@@ -21,8 +21,7 @@
 (require 'agentel-connection)
 (require 'agentel-commands)
 
-(declare-function agentel-start "agentel")
-(declare-function agentel-session-restart-options "agentel")
+(declare-function agentel-replace "agentel")
 
 (defun agentel-resume--describe (session)
   "Return the completion candidate of the listed SESSION."
@@ -43,11 +42,10 @@
                                    (mapcar #'car candidates))
                                   nil t))
          (session (cdr (assoc choice candidates))))
-    (let ((resumed (apply #'agentel-start
+    (let ((resumed (apply #'agentel-replace current
                           :session-id (alist-get 'sessionId session)
-                          (append (when-let* ((cwd (alist-get 'cwd session)))
-                                    (list :cwd cwd))
-                                  (agentel-session-restart-options current)))))
+                          (when-let* ((cwd (alist-get 'cwd session)))
+                            (list :cwd cwd)))))
       (agentel-session-send resumed `(retitle ,(alist-get 'title session)))
       resumed)))
 

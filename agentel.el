@@ -148,6 +148,23 @@ started with and its settings now."
     (cl-remf options :display)
     options))
 
+(defun agentel-replace (session &rest options)
+  "Close SESSION and start a new session in its place.  Return the new one.
+The new session starts as SESSION is now, with OPTIONS given first,
+and its buffer takes over the name and windows of SESSION's buffer."
+  (let* ((old-buffer (agentel-session-buffer session))
+         (name (buffer-name old-buffer))
+         (windows (get-buffer-window-list old-buffer nil t))
+         (new (apply #'agentel-start :display nil
+                     (append options (agentel-session-restart-options session))))
+         (new-buffer (agentel-session-buffer new)))
+    (dolist (window windows)
+      (set-window-buffer window new-buffer))
+    (kill-buffer old-buffer)
+    (with-current-buffer new-buffer
+      (rename-buffer name t))
+    new))
+
 (defun agentel--fail (session message)
   "End SESSION because it could not start, showing MESSAGE."
   (agentel-conversation-note session message 'error)

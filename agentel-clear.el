@@ -15,22 +15,11 @@
 (require 'agentel-session)
 (require 'agentel-commands)
 
-(declare-function agentel-start "agentel")
-(declare-function agentel-session-restart-options "agentel")
+(declare-function agentel-replace "agentel")
 
 (defun agentel-clear (session _args)
   "Replace SESSION with a new session started as SESSION is now."
-  (let* ((old-buffer (agentel-session-buffer session))
-         (name (buffer-name old-buffer))
-         (cleared (apply #'agentel-start :display nil
-                         (agentel-session-restart-options session)))
-         (new-buffer (agentel-session-buffer cleared)))
-    (dolist (window (get-buffer-window-list old-buffer nil t))
-      (set-window-buffer window new-buffer))
-    (kill-buffer old-buffer)
-    (with-current-buffer new-buffer
-      (rename-buffer name t))
-    cleared))
+  (agentel-replace session))
 
 (agentel-commands-define "clear" "Start a new conversation with the same settings"
                          #'agentel-clear)

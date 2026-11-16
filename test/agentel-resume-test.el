@@ -38,6 +38,31 @@
                 (agentel-test-wait-for-text "The plan was to write tests first.")))
           (kill-buffer (agentel-session-buffer resumed)))))))
 
+(ert-deftest agentel-resume-replaces-the-session ()
+  (agentel-test-with-started session nil
+    (rename-buffer "*agentel: renamed*")
+    (let ((old-buffer (current-buffer))
+          (process (agentel-connection-process (agentel-session-connection session)))
+          resumed)
+      (save-window-excursion
+        (switch-to-buffer old-buffer)
+        (cl-letf (((symbol-function 'completing-read)
+                   (lambda (_prompt collection &rest _)
+                     (seq-find (lambda (c) (string-match-p "Write the parser" c))
+                               (all-completions "" collection)))))
+          (agentel-commands--run session "/resume")
+          (setq resumed (agentel-test-wait-until
+                         (lambda () (agentel-session-get "old-1")))))
+        (unwind-protect
+            (progn
+              (should-not (buffer-live-p old-buffer))
+              (agentel-test-wait-until (lambda () (not (process-live-p process))))
+              (should-not (memq session (agentel-session-list)))
+              (should (eq (window-buffer) (agentel-session-buffer resumed)))
+              (should (equal (buffer-name (agentel-session-buffer resumed))
+                             "*agentel: renamed*")))
+          (kill-buffer (agentel-session-buffer resumed)))))))
+
 (ert-deftest agentel-resume-keeps-the-settings ()
   (agentel-test-with-started session '(:model "haiku" :mode "plan")
     (agentel-test-wait-until
