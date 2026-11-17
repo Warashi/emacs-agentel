@@ -7,6 +7,7 @@
 
 (require 'ert)
 (require 'agentel-commands)
+(require 'agentel-test-helper)
 
 (defmacro agentel-commands-test-with-session (&rest body)
   "Run BODY in the chat buffer of a session bound to `session'."
@@ -83,6 +84,29 @@
 (ert-deftest agentel-commands-leaves-agent-commands-to-the-agent ()
   (agentel-commands-test-with-session
     (should-not (agentel-commands--run session "/compact now"))))
+
+(defun agentel-commands-test-candidates-before-a-prompt ()
+  "Wait until \"/\" in the started session completes \"compact\".
+The agent may tell its commands after the session is idle."
+  (goto-char (point-max))
+  (insert "/")
+  (agentel-test-wait-until
+   (lambda () (member "compact" (agentel-commands-test-candidates)))
+   2))
+
+(ert-deftest agentel-commands-completes-agent-commands-before-a-prompt ()
+  (agentel-test-with-started session nil
+    (should (agentel-commands-test-candidates-before-a-prompt))))
+
+(ert-deftest agentel-commands-v2-completes-agent-commands-before-a-prompt ()
+  (let ((agentel-test-acp-version 2))
+    (agentel-test-with-started session nil
+      (should (agentel-commands-test-candidates-before-a-prompt)))))
+
+(ert-deftest agentel-commands-v2-completes-agent-commands-of-a-resumed-session ()
+  (let ((agentel-test-acp-version 2))
+    (agentel-test-with-started session '(:session-id "old-1")
+      (should (agentel-commands-test-candidates-before-a-prompt)))))
 
 (ert-deftest agentel-commands-reject-an-unknown-message ()
   (should-error (agentel-commands--update '(forget) '((commands)))

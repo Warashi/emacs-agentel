@@ -206,20 +206,43 @@ Version 2 names the id of an option `configId'."
            agentel-mock--sessions)
   id)
 
+(defun agentel-mock--commands ()
+  "Return the available commands of a session.
+Version 2 tags each command and its input with a type."
+  (if (= agentel-mock--version 2)
+      [((type . "command") (name . "compact")
+        (description . "Clear history but keep a summary")
+        (input . ((type . "text") (hint . "<optional instructions>"))))
+       ((type . "command") (name . "context")
+        (description . "Show current context usage"))
+       ((type . "command") (name . "review")
+        (description . "Review a pull request"))]
+    [((name . "compact")
+      (description . "Clear history but keep a summary")
+      (input . ((hint . "<optional instructions>"))))
+     ((name . "context")
+      (description . "Show current context usage")
+      (input . nil))
+     ((name . "review")
+      (description . "Review a pull request")
+      (input . nil))]))
+
+(defun agentel-mock--setup-result (session-id &rest fields)
+  "Return the result of a request setting up SESSION-ID, with FIELDS.
+Version 2 gives the commands in the result instead of an update."
+  `(,@fields
+    (configOptions . ,(agentel-mock--config-options
+                       (gethash session-id agentel-mock--sessions)))
+    ,@(when (= agentel-mock--version 2)
+        `((availableCommands . ,(agentel-mock--commands))))))
+
 (defun agentel-mock--announce-commands (session-id)
-  "Send the available commands of SESSION-ID."
-  (agentel-mock--update
-   session-id
-   '((sessionUpdate . "available_commands_update")
-     (availableCommands . [((name . "compact")
-                            (description . "Clear history but keep a summary")
-                            (input . ((hint . "<optional instructions>"))))
-                           ((name . "context")
-                            (description . "Show current context usage")
-                            (input . nil))
-                           ((name . "review")
-                            (description . "Review a pull request")
-                            (input . nil))]))))
+  "Send the available commands of SESSION-ID after version 1 set it up."
+  (when (= agentel-mock--version 1)
+    (agentel-mock--update
+     session-id
+     `((sessionUpdate . "available_commands_update")
+       (availableCommands . ,(agentel-mock--commands))))))
 
 (defun agentel-mock--usage (session-id)
   "Report grown usage for SESSION-ID."
@@ -700,9 +723,7 @@ unknown values are rejected."
     (agentel-mock--say session-id "What was the plan?" "user_message_chunk")
     (agentel-mock--say session-id "The plan was to write tests first.")
     (agentel-mock--replay-subagent session-id)
-    (agentel-mock--respond
-     id `((configOptions . ,(agentel-mock--config-options
-                             (gethash session-id agentel-mock--sessions)))))
+    (agentel-mock--respond id (agentel-mock--setup-result session-id))
     (agentel-mock--announce-commands session-id)))
 
 (defun agentel-mock--resume (id params)
@@ -719,10 +740,7 @@ each message led by an empty one, and a state ends it."
       (agentel-mock--say session-id "The plan was to write tests first.")
       (agentel-mock--replay-subagent session-id))
     (agentel-mock--state session-id "idle")
-    (agentel-mock--respond
-     id `((configOptions . ,(agentel-mock--config-options
-                             (gethash session-id agentel-mock--sessions)))))
-    (agentel-mock--announce-commands session-id)))
+    (agentel-mock--respond id (agentel-mock--setup-result session-id))))
 
 (defun agentel-mock--handle-request (id method params)
   "Handle the client request ID calling METHOD with PARAMS."
@@ -757,9 +775,7 @@ each message led by an empty one, and a state ends it."
                         (format "mock-%d-%d" (emacs-pid)
                                 (cl-incf agentel-mock--counter)))))
        (agentel-mock--respond
-        id `((sessionId . ,session-id)
-             (configOptions . ,(agentel-mock--config-options
-                                (gethash session-id agentel-mock--sessions)))))
+        id (agentel-mock--setup-result session-id `(sessionId . ,session-id)))
        (agentel-mock--announce-commands session-id)))
     ((and "session/load" (guard (= agentel-mock--version 1))) (agentel-mock--load id params))
     ((and "session/resume" (guard (= agentel-mock--version 2)))

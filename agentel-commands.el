@@ -7,7 +7,8 @@
 
 ;; Completes slash commands at the start of the input.  The candidates
 ;; are the commands the agent announced with `available_commands_update'
-;; and the commands agentel runs itself, which features add with
+;; or, with ACP version 2, in the result of setting up the session, and
+;; the commands agentel runs itself, which features add with
 ;; `agentel-commands-define'.  Agent commands are sent as a prompt like
 ;; any other text; agentel's own commands run in Emacs instead.
 
@@ -17,6 +18,8 @@
 (require 'subr-x)
 (require 'agentel-session)
 (require 'agentel-chat)
+
+(defvar agentel-session-started-functions)
 
 (defvar agentel-commands-client-commands nil
   "Commands run by agentel, as (NAME DESCRIPTION FUNCTION).
@@ -44,17 +47,27 @@ COMMANDS), which replaces the commands."
   (when-let* ((model (agentel-store-find (agentel-session-store session) 'commands)))
     (agentel-store-get model 'commands)))
 
+(defun agentel-commands--announce (session commands)
+  "Announce to SESSION the agent COMMANDS, as `availableCommands' gives them."
+  (agentel-store-dispatch
+   (agentel-session-store session) 'commands 'agentel-commands
+   `(announce
+     ,(mapcar (lambda (command)
+                (let-alist command
+                  `((name . ,.name) (description . ,.description)
+                    ,@(and .input.hint `((hint . ,.input.hint))))))
+              commands))))
+
 (defun agentel-commands--on-update (session update)
   "Announce to SESSION the commands the agent tells in UPDATE."
   (when (equal (alist-get 'sessionUpdate update) "available_commands_update")
-    (agentel-store-dispatch
-     (agentel-session-store session) 'commands 'agentel-commands
-     `(announce
-       ,(mapcar (lambda (command)
-                  (let-alist command
-                    `((name . ,.name) (description . ,.description)
-                      ,@(and .input.hint `((hint . ,.input.hint))))))
-                (alist-get 'availableCommands update))))))
+    (agentel-commands--announce session (alist-get 'availableCommands update))))
+
+(defun agentel-commands--on-started (session result _options)
+  "Announce to SESSION the commands in RESULT of setting it up.
+ACP version 2 gives them there, and in an update only when they change."
+  (when-let* ((commands (alist-get 'availableCommands result)))
+    (agentel-commands--announce session commands)))
 
 (defun agentel-commands--annotation (session name)
   "Return the annotation of the command NAME in SESSION."
@@ -101,6 +114,7 @@ Return non-nil when it did."
             #'agentel-commands-completion-at-point nil t))
 
 (add-hook 'agentel-session-update-functions #'agentel-commands--on-update)
+(add-hook 'agentel-session-started-functions #'agentel-commands--on-started)
 (add-hook 'agentel-chat-send-functions #'agentel-commands--run)
 (add-hook 'agentel-chat-mode-hook #'agentel-commands--setup)
 
